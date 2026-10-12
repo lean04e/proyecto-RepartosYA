@@ -1,0 +1,56 @@
+/*Sistema de diseño - RepartosYA */
+
+:root {
+    /* PALETA DE COLORES */
+    --color-primary-dark: #0f1c2e; /* Azul oscuro, barra superior de la página */
+    --color-primary-navy: #182739; /* Azul marino secundario */
+    --color-accent-teal: #00ffd1; /* Verde teal brillante para botones */
+    --color-accent-teal-hover: #00e0b8; /* Estado Hover del boton real */
+    --color-accent-blue: #1d72f3; /* Azul de la tilde de RepartosYA */
+
+    /* COLORES NEUTROS Y FONDOS */
+    --color-bg-main: #f8f9ff; /* Blanco Azulado claro de fondo general */
+    --color-bg-card: #ffffff; /* Blanco para tarjetas y formularios */
+    --color-bg-input: #f8fafc; /* Fondo claro para inputs */
+
+    /* COLORES DE TEXTO */
+    --color-text-primary: #070c18; /* Texto principal, casi negro */
+    --color-text-secondary: #64748b; /* Texto secundario, gris */
+    --color-text-muted: #94a3b8; /* Texto suave (para placeholders) */
+    --color-text-light: #ffffff; /* Texto blanco sobre fondo oscuro */
+
+    /* BORDES Y SOMBRAS */
+    --color-border: #e2e8f0; /* Gris claro para bordes */
+    --color-border-focus: #00ffd1; /* Borde verde teal al enfocar inputs */
+    --shadow-card: 0 10px 25px -5px rgba(15, 28, 46, 0.08), 0 8px 10px -6px rgba(15, 28, 46, 0.04);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+    /* TIPOGRAFÍA */
+    --font-size-xs: 0.75rem; /* 12px - Labels pequeños, texto al pie */
+    --font-size-sm: 0.875rem; /* 14px - Texto secundario, inputs */
+    --font-size-base: 1rem; /* 16px - Texto principal */
+    --font-size-lg: 1.125rem; /* 18px - Subtitulos pequeños */
+    --font-size-xl: 1.25rem; /* 20px - Titulos de tarjetas */
+    --font-size-2xl: 1.5rem; /* 24px - Titulos de sección */
+    --font-size-3xl: 2.25rem; /* 36px - Titulos Grandes */
+    --font-family-base: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+    /* FONT WEIGHT */
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-size-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* BORDES REDONDEADOS */
+    --radius-sm: 6px; /* Inputs, botones pequeños */
+    --radius-md: 10px; /* Tarjetas normales */
+    --radius-lg: 16px; /* Tarjetas grandes, modales */
+    --radius-full: 9999px; /* Botones Totalmente circulares */
+
+    /* ESPACIOS */
+    --spacing-xs: 0.25rem; /* 4px */
+    --spacing-sm: 0.5rem; /* 8px */
+    --spacing-md: 1rem; /* 16px */
+    --spacing-lg: 1.5rem; /* 24px */
+    --spacing-xl: 2rem; /* 32px */
+}
