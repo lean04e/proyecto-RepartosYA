@@ -107,7 +107,6 @@ function App() {
           type="button"
           onClick={toggleTheme}
           aria-label={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
-          title={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
         >
           {theme === 'light' ? <MoonIcon /> : <SunIcon />}
         </button>
