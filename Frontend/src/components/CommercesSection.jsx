@@ -170,7 +170,6 @@ function CommercesSection({ commerces }) {
     </button>
   </div>
 </td>
-                  </td>
                 </tr>
               ))}
               {canShowMore && (
