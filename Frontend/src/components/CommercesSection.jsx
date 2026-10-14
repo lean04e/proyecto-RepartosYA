@@ -149,24 +149,27 @@ function CommercesSection({ commerces }) {
                   </td>
                   <td data-label="Teléfono">{commerce.phone}</td>
                   <td data-label="Dirección">{commerce.address}</td>
-                  <td className="row-actions" data-label="Acciones">
-                    <button
-                      className="action-button"
-                      type="button"
-                      onClick={() => handleOpenEdit(commerce)}
-                      aria-label={`Editar ${commerce.name}`}
-                      title={`Editar ${commerce.name}`}
-                    >
-                      <EditIcon />
-                    </button>
-                    <button
-                      className="action-button action-button-danger"
-                      type="button"
-                      aria-label={`Borrar ${commerce.name}`}
-                      title={`Borrar ${commerce.name}`}
-                    >
-                      <TrashIcon />
-                    </button>
+<td className="actions-cell" data-label="Acciones">
+  <div className="row-actions">
+    <button
+      className="action-button"
+      type="button"
+      onClick={() => handleOpenEdit(commerce)}
+      aria-label={`Editar ${commerce.name}`}
+      title={`Editar ${commerce.name}`}
+    >
+      <EditIcon />
+    </button>
+    <button
+      className="action-button action-button-danger"
+      type="button"
+      aria-label={`Borrar ${commerce.name}`}
+      title={`Borrar ${commerce.name}`}
+    >
+      <TrashIcon />
+    </button>
+  </div>
+</td>
                   </td>
                 </tr>
               ))}
