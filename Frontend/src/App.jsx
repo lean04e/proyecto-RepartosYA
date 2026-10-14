@@ -110,7 +110,6 @@ function App() {
           title={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
         >
           {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-          <span>{theme === 'light' ? 'Modo oscuro' : 'Modo claro'}</span>
         </button>
       </header>
       <main>

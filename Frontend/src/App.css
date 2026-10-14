@@ -30,24 +30,26 @@
 }
 
 .theme-toggle {
-  min-height: 40px;
-  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 9px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 50%;
   color: var(--text-strong);
-  background: var(--surface);
+  background: transparent;
   font: 600 13px/1 var(--body);
   cursor: pointer;
-  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+  transition: color 180ms ease, background 180ms ease, transform 180ms ease;
 }
 
 .theme-toggle:hover {
-  border-color: var(--primary);
-  background: var(--surface-raised);
-  transform: translateY(-1px);
+  color: var(--primary);
+  background: transparent;
+  transform: none;
 }
 
 .theme-toggle .icon {
