@@ -200,8 +200,13 @@
   width: 108px;
 }
 
+.actions-cell {
+  vertical-align: middle;
+}
+
 .row-actions {
   display: flex;
+  align-items: center;
   gap: 4px;
 }
 
