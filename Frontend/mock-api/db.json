@@ -1,0 +1,21 @@
+{
+  "users": [
+    {
+      "id": "admin-martin",
+      "username": "AdminMartin",
+      "password": "SoyElAdmin",
+      "name": "Martin",
+      "role": "admin"
+    },
+    {
+      "id": "courier-0001",
+      "username": "0001",
+      "password": "RepartidorNro1",
+      "name": "Agente Nro0001",
+      "role": "courier"
+    }
+  ],
+  "pedidos": [],
+  "comercios": [],
+  "repartidores": []
+}

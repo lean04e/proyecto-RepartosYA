@@ -1,54 +1,53 @@
 import { useState } from 'react';
+import { login } from '../services/api';
 
-function LoginForm() {
+function LoginForm({ onLoginSuccess }) {
     const [usuario, setUsuario] = useState('');
     const [contraseña, setContraseña] = useState('');
 
     // Estados para controlar el modal y su mensaje
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
+    const [pendingSession, setPendingSession] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Validar campos vacíos
-        if(!usuario.trim() || !contraseña.trim()) {
-            setModalMessage('Error: Se ingreso un usuario/contraseña incorrecto.');
+        if (!usuario.trim() || !contraseña.trim()) {
+            setModalMessage('Completa el usuario y la contraseña.');
             setModalOpen(true);
-            setContraseña(''); // Solo borramos la contraseña por seguridad
             return;
         }
 
-        // Validar longitud mínima de la contraseña (mínimo 4 caracteres)
-        if (contraseña.length < 4) {
-            setModalMessage('Error: Se ingreso un usuario/contraseña incorrecto.');
+        setIsSubmitting(true);
+        try {
+            const session = await login(usuario.trim(), contraseña);
+            setPendingSession(session);
+            setModalMessage(
+                session.user.role === 'admin'
+                    ? `Bienvenido ${session.user.name}, a la Plataforma de RepartosYA`
+                    : `Bienvenido ${session.user.name} a la Aplicación Móvil de RepartosYA`,
+            );
             setModalOpen(true);
-            setContraseña(''); // Solo borramos la contraseña
-            return;
+            setUsuario('');
+            setContraseña('');
+        } catch (error) {
+            setPendingSession(null);
+            setModalMessage(error.message);
+            setModalOpen(true);
+            setContraseña('');
+        } finally {
+            setIsSubmitting(false);
         }
+    };
 
-        // Validación de Admin
-        if (usuario === 'AdminMartin' && contraseña === 'SoyElAdmin'){
-            setModalMessage('Bienvenido Martin, a la Plataforma de RepartosYA');
-            setModalOpen(true);
-            // Si es correcto, limpiamos ambos campos
-            setUsuario('');
-            setContraseña('');
-        } 
-        // Validación de Repartidor de Prueba
-        else if (usuario === '0001' && contraseña === 'RepartidorNro1') {
-            setModalMessage('Bienvenido Agente Nro0001 a la Aplicación Móvil de RepartosYA');
-            setModalOpen(true);
-            // Si es correcto, limpiamos ambos campos
-            setUsuario('');
-            setContraseña('');
-        } 
-        else {
-            // Si puso datos incorrectos o el usuario no existe
-            setModalMessage('Error: Se ingreso un usuario/contraseña incorrecto.');
-            setModalOpen(true);
-            setContraseña(''); // Mantiene el usuario, borra solo la contraseña
+    const handleModalAceptar = () => {
+        setModalOpen(false);
+        if (pendingSession?.user.role === 'admin' && onLoginSuccess) {
+            onLoginSuccess(pendingSession);
         }
+        setPendingSession(null);
     };
 
     return(
@@ -122,7 +121,6 @@ function LoginForm() {
                             color: '#070c18' 
                         }}
                      />
-                    {/* Mensaje dinámico en rojo debajo del input si no cumple el mínimo */}
                     {contraseña.length > 0 && contraseña.length < 4 && (
                         <span style={{ 
                             display: 'block', 
@@ -136,17 +134,17 @@ function LoginForm() {
                     )}
                 </div>
 
-                <button type="submit" style={{ 
+                <button type="submit" disabled={isSubmitting} style={{
                     width: '100%', 
                     padding: '14px', 
-                    backgroundColor: 'var(--color-accent-teal)',
+                    backgroundColor: isSubmitting ? '#a7f3e5' : 'var(--color-accent-teal)',
                     color: '#042921', 
                     border: 'none', 
                     borderRadius: 'var(--radius-sm)', 
-                    cursor: 'pointer', 
+                    cursor: isSubmitting ? 'wait' : 'pointer',
                     fontWeight: '700',
                     fontSize: '16px' }}>
-                    Iniciar Sesión
+                    {isSubmitting ? 'Validando...' : 'Iniciar Sesión'}
                 </button>
             </form>
 
@@ -184,7 +182,7 @@ function LoginForm() {
                             {modalMessage}
                         </p>
                         <button
-                            onClick={() => setModalOpen(false)}
+                            onClick={handleModalAceptar}
                             style={{
                                 backgroundColor: 'var(--color-primary-dark)',
                                 color: '#ffffff',

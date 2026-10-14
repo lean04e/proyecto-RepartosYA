@@ -22,7 +22,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 50px;
-    background-color: var(--color-primary-dark, #0f1c2e);
+    background-color: var(--color-primary-blue, #0f1c2e);
     color: #ffffff;
     border-bottom-left-radius: 100% 60px;
     border-bottom-right-radius: 100% 60px;

@@ -1,4 +1,3 @@
-import React from 'react';
 import sintaxLogo from '../assets/sintax-logo.png';
 
 function Header() {

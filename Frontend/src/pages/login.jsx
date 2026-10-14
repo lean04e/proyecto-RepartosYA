@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Header from '../components/header';
 import LoginForm from '../components/loginForm';
 import repartosYaLogo from '../assets/repartosYA-logo.png'; 
 import '../styles/login.css';
 
-function Login() {
+// 1. Añadimos { onLoginSuccess } como parámetro aquí
+function Login({ onLoginSuccess }) {
     // Estado para controlar qué modal del footer se muestra
     const [footerModalType, setFooterModalType] = useState(null); // 'terms', 'privacy', 'support' o null
 
@@ -41,7 +42,8 @@ function Login() {
                     
                     {/* Columna Izquierda: Formulario de Acceso */}
                     <div className="login-left-col">
-                        <LoginForm />
+                        {/* 2. Le pasamos la función al LoginForm */}
+                        <LoginForm onLoginSuccess={onLoginSuccess} />
                     </div>
 
                     {/* Columna Derecha: Branding e Isotipo */}
