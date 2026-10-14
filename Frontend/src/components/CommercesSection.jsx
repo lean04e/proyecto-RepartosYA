@@ -6,8 +6,22 @@ const INITIAL_VISIBLE_COUNT = 6
 function CommercesSection({ commerces }) {
   const [sort, setSort] = useState({ key: 'orders', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [minimumOrders, setMinimumOrders] = useState('')
 
-  const sortedCommerces = [...commerces].sort((firstCommerce, secondCommerce) => {
+  const normalizedSearchTerm = searchTerm.trim().toLocaleLowerCase('es')
+  const filteredCommerces = commerces.filter((commerce) => {
+    const matchesSearch =
+      !normalizedSearchTerm ||
+      commerce.name.toLocaleLowerCase('es').includes(normalizedSearchTerm) ||
+      commerce.address.toLocaleLowerCase('es').includes(normalizedSearchTerm)
+    const matchesMinimumOrders =
+      minimumOrders === '' || commerce.orders >= Number(minimumOrders)
+
+    return matchesSearch && matchesMinimumOrders
+  })
+
+  const sortedCommerces = [...filteredCommerces].sort((firstCommerce, secondCommerce) => {
     const firstValue = firstCommerce[sort.key]
     const secondValue = secondCommerce[sort.key]
     const comparison =
@@ -29,6 +43,16 @@ function CommercesSection({ commerces }) {
     }))
   }
 
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value)
+    setVisibleCount(INITIAL_VISIBLE_COUNT)
+  }
+
+  const handleMinimumOrdersChange = (event) => {
+    setMinimumOrders(event.target.value)
+    setVisibleCount(INITIAL_VISIBLE_COUNT)
+  }
+
   return (
     <section className="commerces-section" aria-labelledby="commerces-title">
       <div className="section-heading">
@@ -36,10 +60,38 @@ function CommercesSection({ commerces }) {
           <p className="eyebrow">Gestion de operaciones</p>
           <h1 id="commerces-title">Comercios</h1>
         </div>
-        <div className="section-summary" aria-label="Resumen de comercios">
-          <strong>{commerces.length}</strong>
-          <span>comercios registrados</span>
-        </div>
+        <button className="add-commerce-button" type="button">
+          <PlusIcon />
+          <span>Agregar comercio</span>
+        </button>
+      </div>
+
+      <div className="commerce-filters" aria-label="Filtros de comercios">
+        <label className="search-filter" htmlFor="commerce-search">
+          <span className="sr-only">Buscar comercio por nombre o dirección</span>
+          <div className="filter-input-wrapper">
+            <SearchIcon />
+            <input
+              id="commerce-search"
+              type="search"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Buscar por nombre o dirección"
+            />
+          </div>
+        </label>
+        <label className="minimum-orders-filter" htmlFor="minimum-orders">
+          <span className="sr-only">Min. Pedidos</span>
+          <input
+            id="minimum-orders"
+            type="number"
+            min="0"
+            value={minimumOrders}
+            onChange={handleMinimumOrdersChange}
+            placeholder="Min. Pedidos"
+            aria-label="Min. Pedidos"
+          />
+        </label>
       </div>
 
       <div className="table-frame">
@@ -107,6 +159,11 @@ function CommercesSection({ commerces }) {
                   </td>
                 </tr>
               ))}
+              {visibleCommerces.length === 0 && (
+                <tr className="empty-results-row">
+                  <td colSpan="5">No se encontraron comercios con esos filtros.</td>
+                </tr>
+              )}
               {canShowMore && (
                 <tr className="show-more-row">
                   <td colSpan="5">
@@ -189,6 +246,23 @@ function ChevronUpIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="m6 15 6-6 6 6" />
+    </svg>
+  )
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="10.8" cy="10.8" r="6.3" />
+      <path d="m16 16 4.3 4.3" />
+    </svg>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
     </svg>
   )
 }
