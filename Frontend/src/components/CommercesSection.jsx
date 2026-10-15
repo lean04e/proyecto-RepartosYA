@@ -11,6 +11,7 @@ function CommercesSection({ commerces }) {
   const [formData, setFormData] = useState(null)
   const [formErrors, setFormErrors] = useState({})
   const [confirmationOpen, setConfirmationOpen] = useState(false)
+  const [deletingCommerce, setDeletingCommerce] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [minimumOrders, setMinimumOrders] = useState('')
 
@@ -105,6 +106,21 @@ function CommercesSection({ commerces }) {
       ),
     )
     handleCloseEdit()
+  }
+
+  const handleOpenDelete = (commerce) => {
+    setDeletingCommerce(commerce)
+  }
+
+  const handleCloseDelete = () => {
+    setDeletingCommerce(null)
+  }
+
+  const handleConfirmDelete = () => {
+    setCommerceList((currentCommerces) =>
+      currentCommerces.filter((commerce) => commerce.id !== deletingCommerce.id),
+    )
+    handleCloseDelete()
   }
 
   const handleSearchChange = (event) => {
@@ -215,6 +231,7 @@ function CommercesSection({ commerces }) {
     <button
       className="action-button action-button-danger"
       type="button"
+                        onClick={() => handleOpenDelete(commerce)}
       aria-label={`Borrar ${commerce.name}`}
       title={`Borrar ${commerce.name}`}
     >
@@ -263,6 +280,13 @@ function CommercesSection({ commerces }) {
             onSubmit={handleApplyEdit}
           />
         ))}
+      {deletingCommerce && (
+        <DeleteCommerceModal
+          commerceName={deletingCommerce.name}
+          onCancel={handleCloseDelete}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </section>
   )
 }
@@ -358,6 +382,32 @@ function ConfirmEditModal({ commerceName, onCancel, onConfirm }) {
           </button>
           <button className="modal-apply" type="button" onClick={onConfirm}>
             Confirmar cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeleteCommerceModal({ commerceName, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div
+        className="confirmation-modal delete-confirmation-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-commerce-title"
+      >
+        <h2 id="delete-commerce-title">¿Confirmas borrar el comercio?</h2>
+        <p className="confirmation-copy">
+          Se eliminará <strong>{commerceName}</strong> de la lista de comercios.
+        </p>
+        <div className="confirmation-actions">
+          <button className="modal-cancel" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="modal-delete" type="button" onClick={onConfirm}>
+            Borrar comercio
           </button>
         </div>
       </div>

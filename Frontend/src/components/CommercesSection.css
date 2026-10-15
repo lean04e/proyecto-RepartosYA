@@ -559,7 +559,8 @@
 }
 
 .modal-cancel,
-.modal-apply {
+.modal-apply,
+.modal-delete {
   min-height: 40px;
   padding: 9px 18px;
   border-radius: 6px;
@@ -585,5 +586,15 @@
 }
 
 .modal-apply:hover {
+  filter: brightness(1.08);
+}
+
+.modal-delete {
+  border: 1px solid var(--danger);
+  color: var(--background);
+  background: var(--danger);
+}
+
+.modal-delete:hover {
   filter: brightness(1.08);
 }
