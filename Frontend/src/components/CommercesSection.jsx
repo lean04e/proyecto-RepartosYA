@@ -15,9 +15,14 @@ function CommercesSection({ commerces }) {
   const [addingCommerce, setAddingCommerce] = useState(false)
   const [newCommerceData, setNewCommerceData] = useState(null)
   const [newCommerceErrors, setNewCommerceErrors] = useState({})
-  const [successToastVisible, setSuccessToastVisible] = useState(false)
+  const [successToastMessage, setSuccessToastMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [minimumOrders, setMinimumOrders] = useState('')
+
+  const showSuccessToast = (message) => {
+    setSuccessToastMessage(message)
+    setTimeout(() => setSuccessToastMessage(''), 3500)
+  }
 
   const normalizedSearchTerm = searchTerm.trim().toLocaleLowerCase('es')
   const filteredCommerces = commerceList.filter((commerce) => {
@@ -125,6 +130,7 @@ function CommercesSection({ commerces }) {
       currentCommerces.filter((commerce) => commerce.id !== deletingCommerce.id),
     )
     handleCloseDelete()
+    showSuccessToast('El comercio ha sido borrado exitosamente')
   }
 
   const handleOpenAdd = () => {
@@ -166,8 +172,7 @@ function CommercesSection({ commerces }) {
 
     setCommerceList((currentCommerces) => [...currentCommerces, commerceToAdd])
     handleCloseAdd()
-    setSuccessToastVisible(true)
-    setTimeout(() => setSuccessToastVisible(false), 3500)
+    showSuccessToast('El comercio ha sido añadido exitosamente')
   }
 
   const handleSearchChange = (event) => {
@@ -343,9 +348,9 @@ function CommercesSection({ commerces }) {
           onSubmit={handleAddCommerce}
         />
       )}
-      {successToastVisible && (
+      {successToastMessage && (
         <div className="success-toast" role="status">
-          El comercio ha sido añadido exitosamente
+          {successToastMessage}
         </div>
       )}
     </section>
