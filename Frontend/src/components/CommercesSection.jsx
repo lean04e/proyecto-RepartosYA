@@ -12,6 +12,10 @@ function CommercesSection({ commerces }) {
   const [formErrors, setFormErrors] = useState({})
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [deletingCommerce, setDeletingCommerce] = useState(null)
+  const [addingCommerce, setAddingCommerce] = useState(false)
+  const [newCommerceData, setNewCommerceData] = useState(null)
+  const [newCommerceErrors, setNewCommerceErrors] = useState({})
+  const [successToastVisible, setSuccessToastVisible] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [minimumOrders, setMinimumOrders] = useState('')
 
@@ -123,6 +127,49 @@ function CommercesSection({ commerces }) {
     handleCloseDelete()
   }
 
+  const handleOpenAdd = () => {
+    setNewCommerceData({ name: '', orders: '', phone: '', address: '' })
+    setNewCommerceErrors({})
+    setAddingCommerce(true)
+  }
+
+  const handleCloseAdd = () => {
+    setAddingCommerce(false)
+    setNewCommerceData(null)
+    setNewCommerceErrors({})
+  }
+
+  const handleNewCommerceFieldChange = (event) => {
+    const { name, value } = event.target
+    setNewCommerceData((currentData) => ({ ...currentData, [name]: value }))
+    setNewCommerceErrors((currentErrors) => ({ ...currentErrors, [name]: false }))
+  }
+
+  const handleAddCommerce = (event) => {
+    event.preventDefault()
+
+    const nextErrors = Object.fromEntries(
+      Object.entries(newCommerceData).map(([field, value]) => [field, !value.trim()]),
+    )
+
+    if (Object.values(nextErrors).some(Boolean)) {
+      setNewCommerceErrors(nextErrors)
+      return
+    }
+
+    const nextId = Math.max(0, ...commerceList.map((commerce) => commerce.id)) + 1
+    const commerceToAdd = {
+      id: nextId,
+      ...newCommerceData,
+      orders: Number(newCommerceData.orders),
+    }
+
+    setCommerceList((currentCommerces) => [...currentCommerces, commerceToAdd])
+    handleCloseAdd()
+    setSuccessToastVisible(true)
+    setTimeout(() => setSuccessToastVisible(false), 3500)
+  }
+
   const handleSearchChange = (event) => {
     setSearchTerm(event.target.value)
     setVisibleCount(INITIAL_VISIBLE_COUNT)
@@ -140,9 +187,9 @@ function CommercesSection({ commerces }) {
           <p className="eyebrow">Gestion de operaciones</p>
           <h1 id="commerces-title">Comercios</h1>
         </div>
-        <button className="add-commerce-button" type="button">
-          <PlusIcon />
-          <span>Agregar comercio</span>
+        <button className="add-commerce-button" type="button" onClick={handleOpenAdd}>
+          <StoreIcon />
+          <span>Cargar comercio</span>
         </button>
       </div>
 
@@ -287,6 +334,20 @@ function CommercesSection({ commerces }) {
           onConfirm={handleConfirmDelete}
         />
       )}
+      {addingCommerce && (
+        <AddCommerceModal
+          formData={newCommerceData}
+          formErrors={newCommerceErrors}
+          onChange={handleNewCommerceFieldChange}
+          onClose={handleCloseAdd}
+          onSubmit={handleAddCommerce}
+        />
+      )}
+      {successToastVisible && (
+        <div className="success-toast" role="status">
+          El comercio ha sido añadido exitosamente
+        </div>
+      )}
     </section>
   )
 }
@@ -355,6 +416,78 @@ function EditCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }
             </button>
             <button className="modal-apply" type="submit">
               Aplicar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }) {
+  const fields = [
+    { name: 'name', label: 'Nombre del comercio', type: 'text' },
+    {
+      name: 'orders',
+      label: 'Número de pedidos en el último mes',
+      type: 'number',
+    },
+    { name: 'phone', label: 'Teléfono', type: 'tel' },
+    { name: 'address', label: 'Dirección', type: 'text' },
+  ]
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div
+        className="edit-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-commerce-title"
+      >
+        <div className="modal-heading">
+          <div>
+            <p className="eyebrow">Nuevo registro</p>
+            <h2 id="add-commerce-title">Cargar comercio</h2>
+          </div>
+          <button
+            className="modal-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar carga de comercio"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <form className="edit-form" onSubmit={onSubmit} noValidate>
+          <div className="form-fields">
+            {fields.map((field) => (
+              <label className="form-field" htmlFor={`new-commerce-${field.name}`} key={field.name}>
+                <span>{field.label}</span>
+                <input
+                  id={`new-commerce-${field.name}`}
+                  name={field.name}
+                  type={field.type}
+                  value={formData[field.name]}
+                  onChange={onChange}
+                  className={formErrors[field.name] ? 'has-error' : ''}
+                  aria-invalid={formErrors[field.name] || undefined}
+                  aria-describedby={formErrors[field.name] ? `new-${field.name}-error` : undefined}
+                />
+                {formErrors[field.name] && (
+                  <small id={`new-${field.name}-error`} className="field-error" role="alert">
+                    Completa este campo.
+                  </small>
+                )}
+              </label>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button className="modal-cancel" type="button" onClick={onClose}>
+              Cancelar
+            </button>
+            <button className="modal-apply" type="submit">
+              Cargar comercio
             </button>
           </div>
         </form>
@@ -496,10 +629,10 @@ function SearchIcon() {
   )
 }
 
-function PlusIcon() {
+function StoreIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
+      <path d="M4 10h16v10H4zM3 10l2-5h14l2 5M8 20v-5h4v5M16 14h1" />
     </svg>
   )
 }

@@ -50,7 +50,7 @@
 }
 
 .add-commerce-button:hover {
-  background: var(--secondary);
+  background: var(--accent);
   box-shadow: 0 12px 28px var(--primary-shadow);
   transform: translateY(-1px);
 }
@@ -597,4 +597,40 @@
 
 .modal-delete:hover {
   filter: brightness(1.08);
+}
+
+.success-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  min-width: 270px;
+  padding: 15px 18px;
+  border: 1px solid var(--primary);
+  border-left: 4px solid var(--primary);
+  border-radius: 6px;
+  color: var(--text-strong);
+  background: var(--surface);
+  box-shadow: 0 14px 34px rgba(3, 9, 22, 0.2);
+  font-size: 13px;
+  font-weight: 800;
+  animation: toast-fade 3.5s ease forwards;
+}
+
+@keyframes toast-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  12%,
+  78% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
