@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Login from './pages/login';
 import AdminDashboard from './pages/adminDashboard';
 
@@ -19,9 +19,15 @@ function getStoredAdminSession() {
 
 function App() {
     const [session, setSession] = useState(getStoredAdminSession);
-    const [isDarkMode, setIsDarkMode] = useState(
-        () => localStorage.getItem('repartosya_theme') === 'dark',
-    );
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem('repartosya_theme') === 'dark';
+    });
+
+    useEffect(() => {
+        document.documentElement.dataset.theme = isDarkMode ? 'dark' : 'light';
+        localStorage.setItem('repartosya_theme', isDarkMode ? 'dark' : 'light');
+    }, [isDarkMode]);
 
     const handleLoginSuccess = (newSession) => {
         sessionStorage.setItem('repartosya_session', JSON.stringify(newSession));
@@ -34,9 +40,7 @@ function App() {
     };
 
     const handleToggleTheme = () => {
-        const nextIsDarkMode = !isDarkMode;
-        localStorage.setItem('repartosya_theme', nextIsDarkMode ? 'dark' : 'light');
-        setIsDarkMode(nextIsDarkMode);
+        setIsDarkMode((prevMode) => !prevMode);
     };
 
     return (
