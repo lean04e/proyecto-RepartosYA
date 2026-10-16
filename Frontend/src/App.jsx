@@ -19,6 +19,9 @@ function getStoredAdminSession() {
 
 function App() {
     const [session, setSession] = useState(getStoredAdminSession);
+    const [isDarkMode, setIsDarkMode] = useState(
+        () => localStorage.getItem('repartosya_theme') === 'dark',
+    );
 
     const handleLoginSuccess = (newSession) => {
         sessionStorage.setItem('repartosya_session', JSON.stringify(newSession));
@@ -30,12 +33,22 @@ function App() {
         setSession(null);
     };
 
+    const handleToggleTheme = () => {
+        const nextIsDarkMode = !isDarkMode;
+        localStorage.setItem('repartosya_theme', nextIsDarkMode ? 'dark' : 'light');
+        setIsDarkMode(nextIsDarkMode);
+    };
+
     return (
         <div style={{ width: '100%', minHeight: '100vh', margin: 0, padding: 0 }}>
             {!session ? (
                 <Login onLoginSuccess={handleLoginSuccess} />
             ) : (
-                <AdminDashboard onLogout={handleLogout} />
+                <AdminDashboard
+                    onLogout={handleLogout}
+                    isDarkMode={isDarkMode}
+                    onToggleTheme={handleToggleTheme}
+                />
             )}
         </div>
     );

@@ -1,11 +1,14 @@
 import repartosYaLogo from '../../assets/repartosYA-logo.png';
+import repartosYALogoOsc from '../../assets/repartosYA-version-Osc.png';
 
-function TopNavbar({ onToggleSidebar, onLogout }) {
+function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme }) {
     return (
         <header className="admin-top-navbar">
             <div className="top-navbar-left">
                 <div className="brand-logo-container">
-                    <img src={repartosYaLogo} alt="RepartosYA" className="navbar-company-logo" />
+                    <img src={isDarkMode ? repartosYALogoOsc : repartosYaLogo} 
+                    alt="RepartosYA" 
+                    className="navbar-company-logo" />
                 </div>
                 <button
                     type="button"
@@ -16,6 +19,12 @@ function TopNavbar({ onToggleSidebar, onLogout }) {
                 >
                     ☰
                 </button>
+                <button
+                    type="button"
+                    className="top-icon-btn-png menu-toggle-btn"
+                >
+                    📄 PNG
+                </button>
             </div>
 
             <div className="top-search-box">
@@ -25,21 +34,19 @@ function TopNavbar({ onToggleSidebar, onLogout }) {
             </div>
 
             <div className="top-nav-right">
-                <div className="ops-status-pill">
-                    <span className="green-dot" />
-                    <span>Operación Normal - 98.4% puntualidad</span>
-                </div>
-                <div className="fleet-turn-pill">
-                    <span className="clock-icon" aria-hidden="true">◷</span>
-                    <div className="fleet-text">
-                        <span className="fleet-title">TURNO DE EMPLEADOS</span>
-                        <span className="fleet-desc">Turno --:</span>
-                    </div>
-                    <button type="button" className="btn-modify-turn">Modificar / Crear</button>
-                </div>
                 <button type="button" className="top-icon-btn notification-btn" aria-label="Notificaciones">
                     🔔
                     <span className="notification-badge" />
+                </button>
+                <button
+                    type="button"
+                    onClick={onToggleTheme}
+                    className="top-icon-btn theme-toggle-btn"
+                    aria-label={isDarkMode ? 'Activar modo claro' : 'Activar modo oscuro'}
+                    aria-pressed={isDarkMode}
+                    title={isDarkMode ? 'Activar modo claro' : 'Activar modo oscuro'}
+                >
+                    {isDarkMode ? '☀' : '☾'}
                 </button>
                 <button
                     type="button"
