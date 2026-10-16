@@ -115,6 +115,7 @@ function CommercesSection({ commerces }) {
       ),
     )
     handleCloseEdit()
+    showSuccessToast('El comercio ha sido modificado exitosamente')
   }
 
   const handleOpenDelete = (commerce) => {
