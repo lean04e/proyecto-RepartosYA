@@ -16,6 +16,12 @@
   --focus-ring: rgba(42, 99, 223, 0.38);
   --danger: #b42318;
   --danger-soft: #fff1f0;
+  --status-success-bg: #ecfdf3;
+  --status-success-text: #027a48;
+  --status-success-border: #abefc6;
+  --status-warning-bg: #fffaeb;
+  --status-warning-text: #b54708;
+  --status-warning-border: #fedf89;
   --body: 'Trebuchet MS', 'Segoe UI', sans-serif;
   --heading: Georgia, 'Times New Roman', serif;
   font: 16px/1.5 var(--body);
@@ -44,6 +50,12 @@
   --focus-ring: rgba(119, 147, 248, 0.58);
   --danger: #ff8a83;
   --danger-soft: rgba(180, 35, 24, 0.2);
+  --status-success-bg: rgba(16, 185, 129, 0.15);
+  --status-success-text: #6ee7b7;
+  --status-success-border: rgba(110, 231, 183, 0.3);
+  --status-warning-bg: rgba(245, 158, 11, 0.15);
+  --status-warning-text: #fcd34d;
+  --status-warning-border: rgba(252, 211, 77, 0.3);
 }
 
 * {

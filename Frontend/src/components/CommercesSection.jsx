@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { generateDefaultOrders } from '../data/mockCommerces'
 import './CommercesSection.css'
 
 const INITIAL_VISIBLE_COUNT = 6
@@ -7,6 +8,7 @@ function CommercesSection({ commerces }) {
   const [commerceList, setCommerceList] = useState(commerces)
   const [sort, setSort] = useState({ key: 'orders', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
+  const [detailCommerce, setDetailCommerce] = useState(null)
   const [editingCommerce, setEditingCommerce] = useState(null)
   const [formData, setFormData] = useState(null)
   const [formErrors, setFormErrors] = useState({})
@@ -58,6 +60,14 @@ function CommercesSection({ commerces }) {
     }))
   }
 
+  const handleOpenDetail = (commerce) => {
+    setDetailCommerce(commerce)
+  }
+
+  const handleCloseDetail = () => {
+    setDetailCommerce(null)
+  }
+
   const handleOpenEdit = (commerce) => {
     setEditingCommerce(commerce)
     setFormData({
@@ -107,13 +117,21 @@ function CommercesSection({ commerces }) {
   }
 
   const handleConfirmEdit = () => {
+    const updatedOrders = Number(formData.orders)
     setCommerceList((currentCommerces) =>
       currentCommerces.map((commerce) =>
         commerce.id === editingCommerce.id
-          ? { ...commerce, ...formData, orders: Number(formData.orders) }
+          ? { ...commerce, ...formData, orders: updatedOrders }
           : commerce,
       ),
     )
+    if (detailCommerce && detailCommerce.id === editingCommerce.id) {
+      setDetailCommerce((prev) => ({
+        ...prev,
+        ...formData,
+        orders: updatedOrders,
+      }))
+    }
     handleCloseEdit()
     showSuccessToast('El comercio ha sido modificado exitosamente')
   }
@@ -130,6 +148,9 @@ function CommercesSection({ commerces }) {
     setCommerceList((currentCommerces) =>
       currentCommerces.filter((commerce) => commerce.id !== deletingCommerce.id),
     )
+    if (detailCommerce && detailCommerce.id === deletingCommerce.id) {
+      setDetailCommerce(null)
+    }
     handleCloseDelete()
     showSuccessToast('El comercio ha sido borrado exitosamente')
   }
@@ -165,10 +186,13 @@ function CommercesSection({ commerces }) {
     }
 
     const nextId = Math.max(0, ...commerceList.map((commerce) => commerce.id)) + 1
+    const initialOrders = Number(newCommerceData.orders)
     const commerceToAdd = {
       id: nextId,
       ...newCommerceData,
-      orders: Number(newCommerceData.orders),
+      orders: initialOrders,
+      historicalOrders: initialOrders,
+      recentOrders: generateDefaultOrders(nextId),
     }
 
     setCommerceList((currentCommerces) => [...currentCommerces, commerceToAdd])
@@ -261,7 +285,20 @@ function CommercesSection({ commerces }) {
             </thead>
             <tbody>
               {visibleCommerces.map((commerce) => (
-                <tr key={commerce.id}>
+                <tr
+                  key={commerce.id}
+                  className="commerce-row"
+                  onClick={() => handleOpenDetail(commerce)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ver detalle de ${commerce.name}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleOpenDetail(commerce)
+                    }
+                  }}
+                >
                   <th scope="row" data-label="Nombre del comercio">
                     <span className="commerce-name">{commerce.name}</span>
                   </th>
@@ -270,28 +307,34 @@ function CommercesSection({ commerces }) {
                   </td>
                   <td data-label="Teléfono">{commerce.phone}</td>
                   <td data-label="Dirección">{commerce.address}</td>
-<td className="actions-cell" data-label="Acciones">
-  <div className="row-actions">
-    <button
-      className="action-button"
-      type="button"
-      onClick={() => handleOpenEdit(commerce)}
-      aria-label={`Editar ${commerce.name}`}
-      title={`Editar ${commerce.name}`}
-    >
-      <EditIcon />
-    </button>
-    <button
-      className="action-button action-button-danger"
-      type="button"
-                        onClick={() => handleOpenDelete(commerce)}
-      aria-label={`Borrar ${commerce.name}`}
-      title={`Borrar ${commerce.name}`}
-    >
-      <TrashIcon />
-    </button>
-  </div>
-</td>
+                   <td className="actions-cell" data-label="Acciones">
+                    <div className="row-actions">
+                      <button
+                        className="action-button"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenEdit(commerce)
+                        }}
+                        aria-label={`Editar ${commerce.name}`}
+                        title={`Editar ${commerce.name}`}
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        className="action-button action-button-danger"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenDelete(commerce)
+                        }}
+                        aria-label={`Borrar ${commerce.name}`}
+                        title={`Borrar ${commerce.name}`}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {visibleCommerces.length === 0 && (
@@ -317,6 +360,13 @@ function CommercesSection({ commerces }) {
           </table>
         </div>
       </div>
+      {detailCommerce && (
+        <CommerceDetailModal
+          commerce={detailCommerce}
+          onClose={handleCloseDetail}
+          onEdit={handleOpenEdit}
+        />
+      )}
       {editingCommerce &&
         (confirmationOpen ? (
           <ConfirmEditModal
@@ -639,6 +689,206 @@ function StoreIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4 10h16v10H4zM3 10l2-5h14l2 5M8 20v-5h4v5M16 14h1" />
+    </svg>
+  )
+}
+
+function CommerceDetailModal({ commerce, onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  // Compatibilidad con Backend / Base de Datos:
+  // Se leen pedidos históricos y pedidos recientes con fallback seguro
+  const historicalOrders =
+    commerce.historicalOrders !== undefined
+      ? commerce.historicalOrders
+      : Math.round(Number(commerce.orders || 0) * 3)
+
+  const recentOrders =
+    Array.isArray(commerce.recentOrders) && commerce.recentOrders.length > 0
+      ? commerce.recentOrders.slice(0, 10)
+      : []
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="commerce-detail-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-heading">
+          <div>
+            <h2 id="commerce-detail-title">{commerce.name}</h2>
+          </div>
+          <button
+            className="modal-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar detalle de comercio"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div className="detail-modal-body">
+          {/* Bloque con los datos del comercio */}
+          <div className="detail-summary-grid">
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <PhoneIcon />
+                <span>Teléfono</span>
+              </span>
+              <span className="detail-card-value">{commerce.phone || 'No especificado'}</span>
+            </div>
+
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <LocationIcon />
+                <span>Dirección</span>
+              </span>
+              <span className="detail-card-value">{commerce.address || 'No especificada'}</span>
+            </div>
+
+            <div className="detail-card detail-card-highlight">
+              <span className="detail-card-label">
+                <CalendarMonthIcon />
+                <span>Pedidos en el último mes</span>
+              </span>
+              <span className="detail-card-value detail-metric-number">
+                {Number(commerce.orders || 0).toLocaleString('es-AR')}
+              </span>
+            </div>
+
+            <div className="detail-card detail-card-highlight">
+              <span className="detail-card-label">
+                <HistoryIcon />
+                <span>Número de pedidos histórica</span>
+              </span>
+              <span className="detail-card-value detail-metric-number">
+                {historicalOrders.toLocaleString('es-AR')}
+              </span>
+            </div>
+          </div>
+
+          {/* Historial de pedidos */}
+          <div className="detail-orders-section">
+            <h3 className="detail-orders-title">Historial de pedidos</h3>
+
+            <div className="detail-orders-frame">
+              <table className="detail-orders-table">
+                <caption className="sr-only">Últimos pedidos del comercio</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Fecha</th>
+                    <th scope="col">ID del pedido</th>
+                    <th scope="col">Estado del pedido</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.length > 0 ? (
+                    recentOrders.map((order) => (
+                      <tr key={order.id}>
+                        <td className="order-date-cell">{order.date}</td>
+                        <td className="order-id-cell">
+                          <code>{order.id}</code>
+                        </td>
+                        <td className="order-status-cell">
+                          <OrderStatusBadge status={order.status} />
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="3" className="detail-orders-empty">
+                        No hay pedidos recientes registrados para este comercio.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="detail-modal-footer">
+          <button className="modal-apply" type="button" onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrderStatusBadge({ status }) {
+  const normalized = (status || '').toLowerCase()
+
+  let label = 'Desconocido'
+  let badgeClass = 'status-default'
+
+  if (normalized === 'entregado') {
+    label = 'Entregado'
+    badgeClass = 'status-entregado'
+  } else if (normalized === 'pendiente') {
+    label = 'Pendiente'
+    badgeClass = 'status-pendiente'
+  } else if (normalized === 'cancelado') {
+    label = 'Cancelado'
+    badgeClass = 'status-cancelado'
+  }
+
+  return (
+    <span className={`status-badge ${badgeClass}`}>
+      <span className="status-dot" aria-hidden="true" />
+      <span>{label}</span>
+    </span>
+  )
+}
+
+
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92Z" />
+    </svg>
+  )
+}
+
+function LocationIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  )
+}
+
+function CalendarMonthIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  )
+}
+
+function HistoryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l3 3" />
     </svg>
   )
 }
