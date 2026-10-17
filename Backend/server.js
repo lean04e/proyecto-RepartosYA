@@ -10,9 +10,8 @@ app.use(cors());
 
 const authRoutes = require('./Authentication_And_Access/routes/authRoutes');
 app.use('/auth', authRoutes);
-
 // Conexión a MongoDB Atlas (Asegurate de poner tus datos reales acá también)
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.xqvkqv6.mongodb.net/repartosya?retryWrites=true&w=majority';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log('📦 Conectado exitosamente a MongoDB Atlas en la nube ☁️'))

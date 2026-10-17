@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const pedidoSchema = new mongoose.Schema({
     codigo: {
-        type: Integer,
+        type: Number,
         requiered: true
     },
     origen: {

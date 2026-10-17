@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Conectando a MongoDB Atlas con tus datos reales y la base 'repartosya'
-    await mongoose.connect('mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.xqvkqv6.mongodb.net/repartosya?retryWrites=true&w=majority');
+    // Conectando a MongoDB Atlas con tus datos nuevos y reales
+    await mongoose.connect('mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority');
     console.log('📦 Conectado a MongoDB Atlas con éxito en la nube ☁️');
   } catch (error) {
     console.error(`Error al conectar a MongoDB: ${error.message}`);
@@ -11,4 +11,4 @@ const connectDB = async () => {
   }
 };
 
-connectDB(); // Fíjate también que acá llamabas a 'conectarDB' pero la función se llamaba 'connectDB', lo unificamos.
+connectDB();

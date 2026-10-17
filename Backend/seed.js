@@ -3,8 +3,7 @@ const Admin = require('./Models/Admin');
 const Repartidor = require('./Models/Repartidor');
 
 // Conexión directa a MongoDB Atlas
-const MONGO_URI = 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.xqvkqv6.mongodb.net/repartosya?retryWrites=true&w=majority';
-
+const MONGO_URI = 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
 async function cargarDatosBase() {
   try {
     await mongoose.connect(MONGO_URI);
