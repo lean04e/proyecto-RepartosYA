@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import TopNavbar from '../components/admin/TopNavBar';
+import CommercesSection from '../components/CommercesSection';
+import { initialCommerceData } from '../data/mockCommerces';
 import avatar from '../assets/jefeP.jpeg';
 import { getAll } from '../services/api';
 import '../styles/admin.css';
@@ -82,11 +84,11 @@ function getOrderLabel(order, index) {
 }
 
 const sections = [
-    { icon: '▣', label: 'Gestión de Pedidos', href: '#pedidos', active: true, badge: '0' },
-    { icon: '▥', label: 'Reportes', href: '#dashboard',  badge: '0'},
-    { icon: '▤', label: 'Comercios', href: '#comercios' },
+    { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos', badge: '0' },
+    { icon: '📊', label: 'Reportes', href: '#dashboard',  badge: '0'},
+    { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
     { icon: '🚚', label: 'Repartidores', href: '#repartidores', status: 'Activos' },
-    { icon: '⚙', label: 'Configuración', href: '#configuracion' },
+    { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
 ];
 
 const metricTitles = [
@@ -97,13 +99,14 @@ const metricTitles = [
 ];
 
 const orderSections = [
-    { id: 'pending', title: 'Pendiente', note: 'Por despachar', color: 'pending' },
-    { id: 'in-progress', title: 'En Curso', note: 'Monitoreo GPS', color: 'in-progress' },
-    { id: 'delivered', title: 'Entregado', note: 'Comprobante OK', color: 'delivered' },
+    { id: 'pending', title: 'Pendiente', color: 'pending' },
+    { id: 'in-progress', title: 'En Curso', color: 'in-progress' },
+    { id: 'delivered', title: 'Entregado', color: 'delivered' },
 ];
 
-function AdminDashboard({ onLogout }) {
+function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [activeSection, setActiveSection] = useState('orders');
     const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
     const [today, setToday] = useState(formatToday);
     const [orders, setOrders] = useState(null);
@@ -195,10 +198,12 @@ function AdminDashboard({ onLogout }) {
     ]));
 
     return (
-        <div className="admin-layout-container">
+        <div className="admin-layout-container" data-theme={isDarkMode ? 'dark' : 'light'}>
             <TopNavbar
                 onToggleSidebar={() => setIsSidebarOpen((isOpen) => !isOpen)}
                 onLogout={() => setIsLogoutDialogOpen(true)}
+                isDarkMode={isDarkMode}
+                onToggleTheme={onToggleTheme}
             />
 
             {isSidebarOpen && (
@@ -210,8 +215,13 @@ function AdminDashboard({ onLogout }) {
                                 <a
                                     key={section.label}
                                     href={section.href}
-                                    className={`sidebar-menu-item${section.active ? ' active' : ''}`}
-                                    aria-current={section.active ? 'page' : undefined}
+                                    className={`sidebar-menu-item${section.id === activeSection ? ' active' : ''}`}
+                                    aria-current={section.id === activeSection ? 'page' : undefined}
+                                    onClick={section.id ? (event) => {
+                                        event.preventDefault();
+                                        setActiveSection(section.id);
+                                        setActiveOrderView(null);
+                                    } : undefined}
                                 >
                                     <span className="sidebar-item-icon" aria-hidden="true">{section.icon}</span>
                                     <span className="sidebar-item-label">{section.label}</span>
@@ -239,13 +249,41 @@ function AdminDashboard({ onLogout }) {
             )}
 
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
+                {activeSection === 'commerces' ? (
+                    <CommercesSection commerces={initialCommerceData} />
+                ) : (
+                    <>
                 <div className="admin-header-title-row">
                     <div>
                         <p className="eyebrow"><span className="green-dot" /> DESPACHO CENTRAL · TIEMPO REAL</p>
                         <h1 className="main-title">Gestión de Pedidos en Vivo</h1>
                         <p className="subtitle-date">Hoy, {today} <span>•</span> {pedidos.length} {pedidos.length === 1 ? 'registro de pedido' : 'registros de pedidos'} en el turno</p>
                     </div>
-                    <button type="button" className="new-order-button">＋ Nuevo Pedido</button>
+
+                    {/* Este bloque pertenece a un estilo que profundizaremos en el sprint 2 */}
+
+                    {/* 
+
+                    <div className="search-box-inline">
+                        <span className="search-icon">🌐</span>
+                        <input type="text" placeholder="Código #RY o cliente..." />
+                    </div>
+                    <div className="view-switcher">
+                        <button className="view-btn active">
+                            <span className="icon">🗄️</span> Tablero
+                        </button>
+                        <button className="view-btn">
+                            <span className="icon">📜</span> Lista
+                        </button>
+                    </div>
+
+                     */}
+
+                    <button type="button" className="new-order-button">
+                        <span className= "btn-icon">➕</span>
+                        <span className= "btn-text">Nuevo Pedido</span>
+                        <span className= "btn-badge">Despacho</span>
+                    </button>
                 </div>
 
                 <section className="metrics-grid" aria-label="Indicadores">
@@ -310,6 +348,8 @@ function AdminDashboard({ onLogout }) {
                         </article>
                     ))}
                 </section>
+                    </>
+                )}
             </main>
             {activeOrderView && (
                 <div
