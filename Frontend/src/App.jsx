@@ -1,66 +1,61 @@
-import { useEffect, useState } from 'react'
-import CommercesSection from './components/CommercesSection'
-import { initialCommerceData } from './data/mockCommerces'
-import './App.css'
+import { useState, useEffect } from 'react';
+import Login from './pages/login';
+import AdminDashboard from './pages/adminDashboard';
 
-const THEME_STORAGE_KEY = 'repartosya-theme'
+function getStoredAdminSession() {
+    const storedSession = sessionStorage.getItem('repartosya_session');
+    if (!storedSession) {
+        return null;
+    }
+
+    try {
+        const session = JSON.parse(storedSession);
+        return session.user?.role === 'admin' ? session : null;
+    } catch {
+        sessionStorage.removeItem('repartosya_session');
+        return null;
+    }
+}
 
 function App() {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'light'
+    const [session, setSession] = useState(getStoredAdminSession);
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem('repartosya_theme') === 'dark';
+    });
 
-    return window.localStorage.getItem(THEME_STORAGE_KEY) || 'light'
-  })
+    useEffect(() => {
+        document.documentElement.dataset.theme = isDarkMode ? 'dark' : 'light';
+        localStorage.setItem('repartosya_theme', isDarkMode ? 'dark' : 'light');
+    }, [isDarkMode]);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
-  }, [theme])
+    const handleLoginSuccess = (newSession) => {
+        sessionStorage.setItem('repartosya_session', JSON.stringify(newSession));
+        setSession(newSession);
+    };
 
-  const toggleTheme = () => {
-    setTheme((currentTheme) => (currentTheme === 'light' ? 'dark' : 'light'))
-  }
+    const handleLogout = () => {
+        sessionStorage.removeItem('repartosya_session');
+        setSession(null);
+    };
 
-  return (
-    <div className="app-shell">
-      <header className="app-header">
-        <a className="brand" href="/" aria-label="RepartosYA inicio">
-          <img
-            src={theme === 'dark' ? '/repartosya-logo-dark.svg' : '/repartosya-logo.svg'}
-            alt="RepartosYA"
-          />
-        </a>
-        <button
-          className="theme-toggle"
-          type="button"
-          onClick={toggleTheme}
-          aria-label={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
-        >
-          {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-        </button>
-      </header>
-      <main>
-        <CommercesSection commerces={initialCommerceData} />
-      </main>
-    </div>
-  )
+    const handleToggleTheme = () => {
+        setIsDarkMode((prevMode) => !prevMode);
+    };
+
+    return (
+        <div style={{ width: '100%', minHeight: '100vh', margin: 0, padding: 0 }}>
+            {!session ? (
+                <Login onLoginSuccess={handleLoginSuccess} />
+            ) : (
+                <AdminDashboard
+                    onLogout={handleLogout}
+                    isDarkMode={isDarkMode}
+                    onToggleTheme={handleToggleTheme}
+                />
+            )}
+        </div>
+    );
 }
 
-function MoonIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-      <path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5a8.5 8.5 0 1 0 11.7 11.7Z" />
-    </svg>
-  )
-}
-
-function SunIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-      <circle cx="12" cy="12" r="3.5" />
-      <path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" />
-    </svg>
-  )
-}
-
-export default App
+export default App;

@@ -58,7 +58,19 @@
   --status-warning-border: rgba(252, 211, 77, 0.3);
 }
 
-* {
+body {
+  margin: 0;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
 }
 
