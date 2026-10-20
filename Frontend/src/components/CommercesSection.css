@@ -659,10 +659,15 @@
    Modal: Ver Detalle del Comercio (feature/VerDetalleComercio)
    ========================================================================== */
 
+/* Deja libre el alto del encabezado fijo de la página (70px) para que no tape el modal */
+.detail-backdrop {
+  padding-top: 94px;
+}
+
 .detail-modal {
   width: 760px;
   max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - 118px);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-strong);
@@ -685,6 +690,15 @@
     opacity: 1;
     transform: scale(1) translateY(0);
   }
+}
+
+.detail-modal .modal-heading {
+  align-items: center;
+  padding: 14px 20px 14px 32px;
+}
+
+.detail-modal .modal-close {
+  margin: 0;
 }
 
 .detail-modal-body {

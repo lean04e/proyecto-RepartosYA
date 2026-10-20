@@ -717,7 +717,7 @@ function CommerceDetailModal({ commerce, onClose }) {
       : []
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop detail-backdrop" role="presentation" onClick={onClose}>
       <div
         className="detail-modal"
         role="dialog"
