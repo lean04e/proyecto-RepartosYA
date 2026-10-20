@@ -490,6 +490,7 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  margin: -14px -18px 0 0;
   padding: 7px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -526,8 +527,8 @@
 
 .form-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 22px 28px;
 }
 
 .form-field {
@@ -541,6 +542,7 @@
 
 .form-field input {
   width: 100%;
+  box-sizing: border-box;
   height: 44px;
   padding: 0 12px;
   border: 1px solid var(--border-strong);
