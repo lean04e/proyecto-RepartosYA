@@ -43,8 +43,8 @@ function compareOrders(firstOrder, secondOrder, key) {
       return firstOrder.id.localeCompare(secondOrder.id, 'es', { numeric: true })
     case 'driver':
       return firstOrder.driver.localeCompare(secondOrder.driver, 'es')
-    case 'commerce':
-      return firstOrder.commerce.localeCompare(secondOrder.commerce, 'es')
+    case 'destination':
+      return firstOrder.destination.localeCompare(secondOrder.destination, 'es')
     case 'status':
       return STATUS_CONFIG[firstOrder.status].order - STATUS_CONFIG[secondOrder.status].order
     default:
@@ -66,7 +66,7 @@ function OrdersSection({ orders }) {
   const filteredOrders = orderList.filter((order) => {
     const matchesSearch =
       !normalizedSearchTerm ||
-      [order.id, order.driver ?? '', order.commerce].some((value) =>
+      [order.id, order.driver ?? '', order.destination].some((value) =>
         normalizeText(value).includes(normalizedSearchTerm),
       )
     const matchesStatus =
@@ -133,7 +133,7 @@ function OrdersSection({ orders }) {
 
       <div className="commerce-filters" aria-label="Filtros de pedidos">
         <label className="search-filter" htmlFor="order-search">
-          <span className="sr-only">Buscar pedido por ID, repartidor o comercio</span>
+          <span className="sr-only">Buscar pedido por ID, repartidor o destino</span>
           <div className="filter-input-wrapper">
             <SearchIcon />
             <input
@@ -141,7 +141,7 @@ function OrdersSection({ orders }) {
               type="search"
               value={searchTerm}
               onChange={handleSearchChange}
-              placeholder="Buscar por ID, repartidor o comercio"
+              placeholder="Buscar por ID, repartidor o destino"
             />
           </div>
         </label>
@@ -175,7 +175,7 @@ function OrdersSection({ orders }) {
                 <SortableHeader column="date" label="Fecha y hora" sort={sort} onSort={handleSort} />
                 <SortableHeader column="id" label="ID" sort={sort} onSort={handleSort} />
                 <SortableHeader column="driver" label="Repartidor" sort={sort} onSort={handleSort} />
-                <SortableHeader column="commerce" label="Comercio" sort={sort} onSort={handleSort} />
+                <SortableHeader column="destination" label="Destino" sort={sort} onSort={handleSort} />
                 <SortableHeader column="status" label="Estado" sort={sort} onSort={handleSort} />
                 <th scope="col" className="actions-column">
                   <span className="sr-only">Acciones</span>
@@ -194,7 +194,7 @@ function OrdersSection({ orders }) {
                   <td data-label="Repartidor">
                     {order.driver ?? <span className="unassigned-driver">Sin asignar</span>}
                   </td>
-                  <td data-label="Comercio">{order.commerce}</td>
+                  <td data-label="Destino">{order.destination}</td>
                   <td data-label="Estado">
                     <OrderStatusBadge status={order.status} />
                   </td>
