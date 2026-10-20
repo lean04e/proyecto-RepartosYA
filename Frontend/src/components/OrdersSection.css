@@ -1,0 +1,90 @@
+.orders-section {
+  width: 100%;
+  margin-top: 36px;
+}
+
+.orders-list-title {
+  margin: 0 0 16px;
+  color: var(--text-strong);
+  font-family: var(--heading);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.order-date-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.unassigned-driver {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.status-en-curso {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.status-en-curso .status-dot {
+  background: var(--primary);
+}
+
+[data-theme='dark'] .status-en-curso {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+[data-theme='dark'] .status-en-curso .status-dot {
+  background: var(--accent);
+}
+
+.orders-table .sort-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.order-status-filter {
+  color: var(--text-strong);
+  font-weight: 800;
+  width: 190px;
+  min-width: 0;
+  flex: 0 0 190px;
+  margin-left: auto;
+}
+
+.order-status-filter select {
+  width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-strong);
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: inherit;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.order-status-filter select.is-placeholder {
+  color: var(--text-muted);
+}
+
+.order-status-filter select option {
+  color: var(--text-strong);
+  background: var(--surface);
+}
+
+.order-status-filter select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}

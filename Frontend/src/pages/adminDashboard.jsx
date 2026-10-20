@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
+import OrdersSection from '../components/OrdersSection';
 import { initialCommerceData } from '../data/mockCommerces';
+import { initialOrdersData } from '../data/mockOrders';
 import avatar from '../assets/jefeP.jpeg';
 import { getAll } from '../services/api';
 import '../styles/admin.css';
@@ -348,6 +350,8 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         </article>
                     ))}
                 </section>
+
+                <OrdersSection orders={initialOrdersData} />
                     </>
                 )}
             </main>
