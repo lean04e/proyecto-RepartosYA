@@ -115,6 +115,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [ordersError, setOrdersError] = useState('');
     const [activeOrderView, setActiveOrderView] = useState(null);
     const [pedidos, setPedidos] = useState([]);
+    const [openAddCommerce, setOpenAddCommerce] = useState(false);
 
     useEffect(() => {
         fetch('http:localhost:3001/pedidos')
@@ -222,6 +223,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                                     onClick={section.id ? (event) => {
                                         event.preventDefault();
                                         setActiveSection(section.id);
+                                        setOpenAddCommerce(false);
                                         setActiveOrderView(null);
                                     } : undefined}
                                 >
@@ -252,7 +254,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
-                    <CommercesSection commerces={initialCommerceData} />
+                    <CommercesSection commerces={initialCommerceData} openAddOnMount={openAddCommerce} />
                 ) : (
                     <>
                 <div className="admin-header-title-row">
@@ -351,7 +353,15 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                     ))}
                 </section>
 
-                <OrdersSection orders={initialOrdersData} />
+                <OrdersSection
+                    orders={initialOrdersData}
+                    commerces={initialCommerceData}
+                    onGoToCommerces={() => {
+                        setOpenAddCommerce(true);
+                        setActiveSection('commerces');
+                        setActiveOrderView(null);
+                    }}
+                />
                     </>
                 )}
             </main>

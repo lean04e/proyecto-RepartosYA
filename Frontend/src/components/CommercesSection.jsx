@@ -4,7 +4,7 @@ import './CommercesSection.css'
 
 const INITIAL_VISIBLE_COUNT = 6
 
-function CommercesSection({ commerces }) {
+function CommercesSection({ commerces, openAddOnMount = false }) {
   const [commerceList, setCommerceList] = useState(commerces)
   const [sort, setSort] = useState({ key: 'orders', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
@@ -14,8 +14,10 @@ function CommercesSection({ commerces }) {
   const [formErrors, setFormErrors] = useState({})
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [deletingCommerce, setDeletingCommerce] = useState(null)
-  const [addingCommerce, setAddingCommerce] = useState(false)
-  const [newCommerceData, setNewCommerceData] = useState(null)
+  const [addingCommerce, setAddingCommerce] = useState(openAddOnMount)
+  const [newCommerceData, setNewCommerceData] = useState(
+    openAddOnMount ? { name: '', orders: '', phone: '', address: '' } : null,
+  )
   const [newCommerceErrors, setNewCommerceErrors] = useState({})
   const [successToastMessage, setSuccessToastMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')

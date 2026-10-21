@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './CommercesSection.css'
 import './OrdersSection.css'
 
@@ -52,9 +52,12 @@ function compareOrders(firstOrder, secondOrder, key) {
   }
 }
 
-function OrdersSection({ orders }) {
+function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const [orderList, setOrderList] = useState(orders)
   const [cancelingOrder, setCancelingOrder] = useState(null)
+  const [editingOrder, setEditingOrder] = useState(null)
+  const [formData, setFormData] = useState(null)
+  const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [successToastMessage, setSuccessToastMessage] = useState('')
   const [sort, setSort] = useState({ key: 'date', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
@@ -103,6 +106,64 @@ function OrdersSection({ orders }) {
     )
     setCancelingOrder(null)
     showSuccessToast('El pedido ha sido cancelado exitosamente')
+  }
+
+  // Repartidores disponibles: hasta que exista la sección de repartidores, se toman de los pedidos.
+  const driverOptions = useMemo(
+    () =>
+      [...new Set(orders.map((order) => order.driver).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, 'es'),
+      ),
+    [orders],
+  )
+  const commerceOptions = commerces.map((commerce) => commerce.name)
+
+  const handleOpenEdit = (order) => {
+    setEditingOrder(order)
+    setFormData({
+      driver: order.driver ?? '',
+      destination: order.destination,
+      status: order.status,
+    })
+  }
+
+  const handleCloseEdit = () => {
+    setEditingOrder(null)
+    setFormData(null)
+    setConfirmationOpen(false)
+  }
+
+  const handleFieldChange = (event) => {
+    const { name, value } = event.target
+    setFormData((currentData) => ({ ...currentData, [name]: value }))
+  }
+
+  const handleApplyEdit = (event) => {
+    event.preventDefault()
+
+    const hasChanges =
+      formData.driver !== (editingOrder.driver ?? '') ||
+      formData.destination !== editingOrder.destination ||
+      formData.status !== editingOrder.status
+
+    if (!hasChanges) {
+      handleCloseEdit()
+      return
+    }
+
+    setConfirmationOpen(true)
+  }
+
+  const handleConfirmEdit = () => {
+    setOrderList((currentOrders) =>
+      currentOrders.map((order) =>
+        order.id === editingOrder.id
+          ? { ...order, ...formData, driver: formData.driver || null }
+          : order,
+      ),
+    )
+    handleCloseEdit()
+    showSuccessToast('El pedido ha sido modificado exitosamente')
   }
 
   const handleRemoveOrder = (orderId) => {
@@ -203,6 +264,7 @@ function OrdersSection({ orders }) {
                       <button
                         className="action-button"
                         type="button"
+                        onClick={() => handleOpenEdit(order)}
                         aria-label={`Modificar pedido ${order.id}`}
                         title={`Modificar pedido ${order.id}`}
                       >
@@ -256,6 +318,25 @@ function OrdersSection({ orders }) {
           </table>
         </div>
       </div>
+      {editingOrder &&
+        (confirmationOpen ? (
+          <ConfirmEditOrderModal
+            orderId={editingOrder.id}
+            onCancel={handleCloseEdit}
+            onConfirm={handleConfirmEdit}
+          />
+        ) : (
+          <EditOrderModal
+            orderId={editingOrder.id}
+            formData={formData}
+            driverOptions={driverOptions}
+            commerceOptions={commerceOptions}
+            onChange={handleFieldChange}
+            onClose={handleCloseEdit}
+            onSubmit={handleApplyEdit}
+            onGoToCommerces={onGoToCommerces}
+          />
+        ))}
       {cancelingOrder && (
         <CancelOrderModal
           orderId={cancelingOrder.id}
@@ -269,6 +350,158 @@ function OrdersSection({ orders }) {
         </div>
       )}
     </section>
+  )
+}
+
+function EditOrderModal({
+  orderId,
+  formData,
+  driverOptions,
+  commerceOptions,
+  onChange,
+  onClose,
+  onSubmit,
+  onGoToCommerces,
+}) {
+  // Si el valor actual ya no figura en la lista, se conserva como opción para no perderlo.
+  const withCurrent = (options, current) =>
+    current && !options.includes(current) ? [current, ...options] : options
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div
+        className="edit-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-order-title"
+      >
+        <div className="modal-heading">
+          <div>
+            <p className="eyebrow">Editar registro</p>
+            <h2 id="edit-order-title">Modificar pedido {orderId}</h2>
+          </div>
+          <button
+            className="modal-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar modificacion de pedido"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <form className="edit-form" onSubmit={onSubmit} noValidate>
+          <div className="form-fields">
+            <div className="form-field">
+              <label htmlFor="order-driver">Repartidor</label>
+              <div className="select-with-action">
+                <select
+                  id="order-driver"
+                  name="driver"
+                  value={formData.driver}
+                  onChange={onChange}
+                >
+                  <option value="">Sin asignar</option>
+                  {withCurrent(driverOptions, formData.driver).map((driver) => (
+                    <option key={driver} value={driver}>
+                      {driver}
+                    </option>
+                  ))}
+                </select>
+                {/* Sin funcionalidad hasta que se implemente la sección de repartidores. */}
+                <button
+                  className="field-link-button"
+                  type="button"
+                  aria-label="Ir a repartidores"
+                  title="Ir a repartidores"
+                >
+                  <ExternalLinkIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="order-destination">Destino</label>
+              <div className="select-with-action">
+                <select
+                  id="order-destination"
+                  name="destination"
+                  value={formData.destination}
+                  onChange={onChange}
+                >
+                  {withCurrent(commerceOptions, formData.destination).map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="field-link-button"
+                  type="button"
+                  onClick={onGoToCommerces}
+                  aria-label="Ir a comercios y cargar un comercio"
+                  title="Ir a comercios y cargar un comercio"
+                >
+                  <ExternalLinkIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="order-status">Estado</label>
+              <div className="select-with-action">
+                <select
+                  id="order-status"
+                  name="status"
+                  value={formData.status}
+                  onChange={onChange}
+                >
+                  {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button className="modal-cancel" type="button" onClick={onClose}>
+              Cancelar
+            </button>
+            <button className="modal-apply" type="submit">
+              Aceptar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmEditOrderModal({ orderId, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div
+        className="confirmation-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-edit-order-title"
+      >
+        <h2 id="confirm-edit-order-title">¿Aplicar cambios?</h2>
+        <p className="confirmation-copy">
+          Se actualizarán los datos del pedido <strong>{orderId}</strong> en la lista de pedidos.
+        </p>
+        <div className="confirmation-actions">
+          <button className="modal-cancel" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="modal-apply" type="button" onClick={onConfirm}>
+            Confirmar cambios
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -369,6 +602,22 @@ function CancelIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8.5" />
       <path d="m9 9 6 6M15 9l-6 6" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m6 6 12 12M18 6 6 18" />
+    </svg>
+  )
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
     </svg>
   )
 }
