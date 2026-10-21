@@ -283,11 +283,6 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
                      */}
 
-                    <button type="button" className="new-order-button">
-                        <span className= "btn-icon">➕</span>
-                        <span className= "btn-text">Nuevo Pedido</span>
-                        <span className= "btn-badge">Despacho</span>
-                    </button>
                 </div>
 
                 <section className="metrics-grid" aria-label="Indicadores">

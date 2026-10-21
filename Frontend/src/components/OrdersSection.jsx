@@ -58,6 +58,9 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const [editingOrder, setEditingOrder] = useState(null)
   const [formData, setFormData] = useState(null)
   const [confirmationOpen, setConfirmationOpen] = useState(false)
+  const [addingOrder, setAddingOrder] = useState(false)
+  const [newOrderData, setNewOrderData] = useState(null)
+  const [newOrderErrors, setNewOrderErrors] = useState({})
   const [successToastMessage, setSuccessToastMessage] = useState('')
   const [sort, setSort] = useState({ key: 'date', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
@@ -166,6 +169,54 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     showSuccessToast('El pedido ha sido modificado exitosamente')
   }
 
+  // TEMPORAL: el ID lo asignará la base de datos; borrar esto y el campo id de handleOpenAdd.
+  const nextOrderId = `PED-${
+    Math.max(0, ...orderList.map((order) => Number(order.id.replace(/\D/g, '')))) + 1
+  }`
+
+  const handleOpenAdd = () => {
+    setNewOrderData({ id: nextOrderId, driver: '', destination: '' })
+    setNewOrderErrors({})
+    setAddingOrder(true)
+  }
+
+  const handleCloseAdd = () => {
+    setAddingOrder(false)
+    setNewOrderData(null)
+    setNewOrderErrors({})
+  }
+
+  const handleNewOrderFieldChange = (event) => {
+    const { name, value } = event.target
+    setNewOrderData((currentData) => ({ ...currentData, [name]: value }))
+    setNewOrderErrors((currentErrors) => ({ ...currentErrors, [name]: false }))
+  }
+
+  const handleAddOrder = (event) => {
+    event.preventDefault()
+
+    const nextErrors = {
+      driver: !newOrderData.driver,
+      destination: !newOrderData.destination,
+    }
+
+    if (Object.values(nextErrors).some(Boolean)) {
+      setNewOrderErrors(nextErrors)
+      return
+    }
+
+    setOrderList((currentOrders) => [
+      ...currentOrders,
+      {
+        ...newOrderData,
+        createdAt: new Date().toISOString(),
+        status: 'pendiente',
+      },
+    ])
+    handleCloseAdd()
+    showSuccessToast('El pedido ha sido añadido exitosamente')
+  }
+
   const handleRemoveOrder = (orderId) => {
     setOrderList((currentOrders) => currentOrders.filter((order) => order.id !== orderId))
   }
@@ -190,7 +241,13 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
 
   return (
     <section className="orders-section" aria-labelledby="orders-list-title">
-      <h2 id="orders-list-title" className="orders-list-title">Listado de pedidos</h2>
+      <div className="orders-list-heading">
+        <h2 id="orders-list-title" className="orders-list-title">Listado de pedidos</h2>
+        <button type="button" className="new-order-button" onClick={handleOpenAdd}>
+          <PackageIcon />
+          <span className="btn-text">Nuevo Pedido</span>
+        </button>
+      </div>
 
       <div className="commerce-filters" aria-label="Filtros de pedidos">
         <label className="search-filter" htmlFor="order-search">
@@ -337,6 +394,18 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
             onGoToCommerces={onGoToCommerces}
           />
         ))}
+      {addingOrder && (
+        <AddOrderModal
+          formData={newOrderData}
+          formErrors={newOrderErrors}
+          driverOptions={driverOptions}
+          commerceOptions={commerceOptions}
+          onChange={handleNewOrderFieldChange}
+          onClose={handleCloseAdd}
+          onSubmit={handleAddOrder}
+          onGoToCommerces={onGoToCommerces}
+        />
+      )}
       {cancelingOrder && (
         <CancelOrderModal
           orderId={cancelingOrder.id}
@@ -479,6 +548,130 @@ function EditOrderModal({
   )
 }
 
+function AddOrderModal({
+  formData,
+  formErrors,
+  driverOptions,
+  commerceOptions,
+  onChange,
+  onClose,
+  onSubmit,
+  onGoToCommerces,
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div
+        className="edit-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-order-title"
+      >
+        <div className="modal-heading">
+          <div>
+            <p className="eyebrow">Nuevo registro</p>
+            <h2 id="add-order-title">Cargar pedido</h2>
+          </div>
+          <button
+            className="modal-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar carga de pedido"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <form className="edit-form" onSubmit={onSubmit} noValidate>
+          <div className="form-fields">
+            <div className="form-field">
+              <label htmlFor="new-order-id">ID</label>
+              <input id="new-order-id" name="id" type="text" value={formData.id} readOnly />
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="new-order-driver">Repartidor</label>
+              <div className="select-with-action">
+                <select
+                  id="new-order-driver"
+                  name="driver"
+                  value={formData.driver}
+                  onChange={onChange}
+                  className={formErrors.driver ? 'has-error' : ''}
+                  aria-invalid={formErrors.driver || undefined}
+                >
+                  <option value="" disabled hidden />
+                  {driverOptions.map((driver) => (
+                    <option key={driver} value={driver}>
+                      {driver}
+                    </option>
+                  ))}
+                </select>
+                {/* Sin funcionalidad hasta que se implemente la sección de repartidores. */}
+                <button
+                  className="field-link-button"
+                  type="button"
+                  aria-label="Ir a repartidores"
+                  title="Ir a repartidores"
+                >
+                  <ExternalLinkIcon />
+                </button>
+              </div>
+              {formErrors.driver && (
+                <small className="field-error" role="alert">
+                  Completa este campo.
+                </small>
+              )}
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="new-order-destination">Destino</label>
+              <div className="select-with-action">
+                <select
+                  id="new-order-destination"
+                  name="destination"
+                  value={formData.destination}
+                  onChange={onChange}
+                  className={formErrors.destination ? 'has-error' : ''}
+                  aria-invalid={formErrors.destination || undefined}
+                >
+                  <option value="" disabled hidden />
+                  {commerceOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="field-link-button"
+                  type="button"
+                  onClick={onGoToCommerces}
+                  aria-label="Ir a comercios y cargar un comercio"
+                  title="Ir a comercios y cargar un comercio"
+                >
+                  <ExternalLinkIcon />
+                </button>
+              </div>
+              {formErrors.destination && (
+                <small className="field-error" role="alert">
+                  Completa este campo.
+                </small>
+              )}
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button className="modal-cancel" type="button" onClick={onClose}>
+              Cancelar
+            </button>
+            <button className="modal-apply" type="submit">
+              Aceptar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function ConfirmEditOrderModal({ orderId, onCancel, onConfirm }) {
   return (
     <div className="modal-backdrop" role="presentation">
@@ -602,6 +795,14 @@ function CancelIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8.5" />
       <path d="m9 9 6 6M15 9l-6 6" />
+    </svg>
+  )
+}
+
+function PackageIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9M8 5.3l8 4.5" />
     </svg>
   )
 }
