@@ -7,12 +7,13 @@
  *   driver: Nombre del repartidor asignado o null si todavía no tiene
  *   origin: Nombre del comercio de origen del pedido
  *   destination: Nombre del comercio que realizó el pedido
+ *   statusHistory: Cambios de estado { at (ISO 8601), from (null al crearse), to }, del más antiguo al más reciente
  *   status: 'registrado' | 'en-curso' | 'entregado' | 'cancelado'
  *
  * Los datos están desordenados a propósito para poder probar el ordenamiento.
  */
 
-export const initialOrdersData = [
+const rawOrders = [
   { id: 'PED-4281', createdAt: '2026-10-20T09:15:00', driver: 'Lucas Fernández', origin: 'Bodega del Sur', destination: 'Mercado Central', status: 'en-camino' },
   { id: 'PED-4290', createdAt: '2026-10-20T11:42:00', driver: null, origin: 'Mercado Central', destination: 'Punto Fresco', status: 'registrado' },
   { id: 'PED-4275', createdAt: '2026-10-19T18:05:00', driver: 'Martina Gómez', origin: 'Verde Natural', destination: 'Almacen La Esquina', status: 'entregado' },
@@ -30,3 +31,30 @@ export const initialOrdersData = [
   { id: 'PED-4270', createdAt: '2026-10-18T16:40:00', driver: 'Bruno Sosa', origin: 'Casa del Sabor', destination: 'Verde Natural', status: 'entregado' },
   { id: 'PED-4294', createdAt: '2026-10-20T12:40:00', driver: 'Martina Gómez', origin: 'Panaderia Norte', destination: 'Bodega del Sur', status: 'asignado' },
 ]
+
+// Recorrido de estados que tuvo cada pedido hasta llegar a su estado actual.
+const STATUS_PATHS = {
+  registrado: ['registrado'],
+  asignado: ['registrado', 'asignado'],
+  'en-camino': ['registrado', 'asignado', 'en-camino'],
+  entregado: ['registrado', 'asignado', 'en-camino', 'entregado'],
+  cancelado: ['registrado', 'cancelado'],
+}
+
+const HISTORY_STEP_MS = 12 * 60 * 1000
+
+// TEMPORAL: el historial lo aportará la base de datos; aquí se genera a partir del estado actual.
+export const initialOrdersData = rawOrders.map((order) => {
+  const path = STATUS_PATHS[order.status]
+  const createdAt = new Date(order.createdAt).getTime()
+
+  return {
+    ...order,
+    // El primer registro es la creación del pedido, sin estado anterior (from: null).
+    statusHistory: path.map((to, index) => ({
+      at: new Date(createdAt + index * HISTORY_STEP_MS).toISOString(),
+      from: index === 0 ? null : path[index - 1],
+      to,
+    })),
+  }
+})

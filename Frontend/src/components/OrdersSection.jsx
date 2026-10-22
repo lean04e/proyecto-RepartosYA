@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './CommercesSection.css'
 import './OrdersSection.css'
 
@@ -55,9 +55,22 @@ function compareOrders(firstOrder, secondOrder, key) {
   }
 }
 
+// Devuelve el pedido con el nuevo estado y el cambio agregado a su historial.
+function withStatusChange(order, nextStatus) {
+  return {
+    ...order,
+    status: nextStatus,
+    statusHistory: [
+      ...order.statusHistory,
+      { at: new Date().toISOString(), from: order.status, to: nextStatus },
+    ],
+  }
+}
+
 function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const [orderList, setOrderList] = useState(orders)
   const [cancelingOrder, setCancelingOrder] = useState(null)
+  const [detailOrderId, setDetailOrderId] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
   const [formData, setFormData] = useState(null)
   const [confirmationOpen, setConfirmationOpen] = useState(false)
@@ -107,7 +120,9 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const handleAdvanceStatus = (order, nextStatus, message) => {
     setOrderList((currentOrders) =>
       currentOrders.map((currentOrder) =>
-        currentOrder.id === order.id ? { ...currentOrder, status: nextStatus } : currentOrder,
+        currentOrder.id === order.id
+          ? withStatusChange(currentOrder, nextStatus)
+          : currentOrder,
       ),
     )
     showSuccessToast(message)
@@ -116,7 +131,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const handleConfirmCancel = () => {
     setOrderList((currentOrders) =>
       currentOrders.map((order) =>
-        order.id === cancelingOrder.id ? { ...order, status: 'cancelado' } : order,
+        order.id === cancelingOrder.id ? withStatusChange(order, 'cancelado') : order,
       ),
     )
     setCancelingOrder(null)
@@ -132,6 +147,8 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     [orders],
   )
   const commerceOptions = commerces.map((commerce) => commerce.name)
+  const detailOrder = orderList.find((order) => order.id === detailOrderId)
+  const findCommerce = (name) => commerces.find((commerce) => commerce.name === name)
 
   const handleOpenEdit = (order) => {
     setEditingOrder(order)
@@ -217,13 +234,18 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
       return
     }
 
+    // Al crearse, el pedido queda Asignado si ya tiene repartidor y Registrado si no.
+    const createdAt = new Date().toISOString()
+    const initialStatus = newOrderData.driver ? 'asignado' : 'registrado'
+
     setOrderList((currentOrders) => [
       ...currentOrders,
       {
         ...newOrderData,
         driver: newOrderData.driver || null,
-        createdAt: new Date().toISOString(),
-        status: 'registrado',
+        createdAt,
+        status: initialStatus,
+        statusHistory: [{ at: createdAt, from: null, to: initialStatus }],
       },
     ])
     handleCloseAdd()
@@ -231,6 +253,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   }
 
   const handleRemoveOrder = (orderId) => {
+    if (detailOrderId === orderId) setDetailOrderId(null)
     setOrderList((currentOrders) => currentOrders.filter((order) => order.id !== orderId))
   }
 
@@ -316,7 +339,20 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
             </thead>
             <tbody>
               {visibleOrders.map((order) => (
-                <tr key={order.id}>
+                <tr
+                  key={order.id}
+                  className="commerce-row"
+                  onClick={() => setDetailOrderId(order.id)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ver detalle del pedido ${order.id}`}
+                  onKeyDown={(event) => {
+                    if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault()
+                      setDetailOrderId(order.id)
+                    }
+                  }}
+                >
                   <td data-label="Fecha y hora" className="order-date-cell">
                     {formatDateTime(order.createdAt)}
                   </td>
@@ -331,7 +367,11 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
                   <td data-label="Estado">
                     <OrderStatusBadge status={order.status} />
                   </td>
-                  <td className="actions-cell" data-label="Acciones">
+                  <td
+                    className="actions-cell"
+                    data-label="Acciones"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <div className="row-actions">
                       <button
                         className="action-button"
@@ -424,6 +464,14 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
           </table>
         </div>
       </div>
+      {detailOrder && (
+        <OrderDetailModal
+          order={detailOrder}
+          origin={findCommerce(detailOrder.origin)}
+          destination={findCommerce(detailOrder.destination)}
+          onClose={() => setDetailOrderId(null)}
+        />
+      )}
       {editingOrder &&
         (confirmationOpen ? (
           <ConfirmEditOrderModal
@@ -468,6 +516,133 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
         </div>
       )}
     </section>
+  )
+}
+
+function OrderDetailModal({ order, origin, destination, onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  const history = [...order.statusHistory].reverse()
+
+  return (
+    <div className="modal-backdrop detail-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="order-detail-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-heading">
+          <div>
+            <h2 id="order-detail-title">Pedido {order.id}</h2>
+          </div>
+          <button
+            className="modal-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar detalle de pedido"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div className="detail-modal-body">
+          <div className="detail-summary-grid">
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <PackageIcon />
+                <span>ID</span>
+              </span>
+              <span className="detail-card-value">{order.id}</span>
+            </div>
+
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <DriverIcon />
+                <span>Repartidor</span>
+              </span>
+              <span className="detail-card-value">
+                {order.driver ?? <span className="unassigned-driver">Sin asignar</span>}
+              </span>
+            </div>
+
+            <OrderPartyCard title="Origen" name={order.origin} commerce={origin} />
+            <OrderPartyCard title="Destino" name={order.destination} commerce={destination} />
+          </div>
+
+          <div className="detail-orders-section">
+            <h3 className="detail-orders-title">Historial de estados</h3>
+
+            <div className="detail-orders-frame">
+              <table className="detail-orders-table">
+                <caption className="sr-only">Cambios de estado del pedido</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Fecha y hora</th>
+                    <th scope="col">Estado anterior</th>
+                    <th scope="col">Estado nuevo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.length > 0 ? (
+                    history.map((change) => (
+                      <tr key={change.at + change.to}>
+                        <td className="order-date-cell">{formatDateTime(change.at)}</td>
+                        <td className="order-status-cell">
+                          {change.from && <OrderStatusBadge status={change.from} />}
+                        </td>
+                        <td className="order-status-cell">
+                          <OrderStatusBadge status={change.to} />
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="3" className="detail-orders-empty">
+                        Este pedido no tiene movimientos registrados.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="detail-modal-footer">
+          <button className="modal-apply" type="button" onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrderPartyCard({ title, name, commerce }) {
+  return (
+    <div className="detail-card detail-card-highlight">
+      <span className="detail-card-label">
+        <LocationIcon />
+        <span>{title}</span>
+      </span>
+      <span className="detail-card-value">{name}</span>
+      <span className="detail-party-line">
+        <span className="detail-party-label">Dirección</span>
+        {commerce?.address || 'No especificada'}
+      </span>
+      <span className="detail-party-line">
+        <span className="detail-party-label">Teléfono</span>
+        {commerce?.phone || 'No especificado'}
+      </span>
+    </div>
   )
 }
 
@@ -872,6 +1047,24 @@ function TrashIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4 7h16M10 11v5M14 11v5M6.5 7l.7 13h9.6l.7-13M9 7V4h6v3" />
+    </svg>
+  )
+}
+
+function LocationIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  )
+}
+
+function DriverIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
     </svg>
   )
 }
