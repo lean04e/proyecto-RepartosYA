@@ -7,10 +7,11 @@ const VISIBLE_COUNT_STEP = 4
 const ALL_STATUSES = 'todos'
 
 const STATUS_CONFIG = {
-  pendiente: { label: 'Pendiente', order: 0 },
-  'en-curso': { label: 'En curso', order: 1 },
-  entregado: { label: 'Entregado', order: 2 },
-  cancelado: { label: 'Cancelado', order: 3 },
+  registrado: { label: 'Registrado', order: 0 },
+  asignado: { label: 'Asignado', order: 1 },
+  'en-camino': { label: 'En Camino', order: 2 },
+  entregado: { label: 'Entregado', order: 3 },
+  cancelado: { label: 'Cancelado', order: 4 },
 }
 
 const dateTimeFormatter = new Intl.DateTimeFormat('es-AR', {
@@ -43,6 +44,8 @@ function compareOrders(firstOrder, secondOrder, key) {
       return firstOrder.id.localeCompare(secondOrder.id, 'es', { numeric: true })
     case 'driver':
       return firstOrder.driver.localeCompare(secondOrder.driver, 'es')
+    case 'origin':
+      return firstOrder.origin.localeCompare(secondOrder.origin, 'es')
     case 'destination':
       return firstOrder.destination.localeCompare(secondOrder.destination, 'es')
     case 'status':
@@ -72,7 +75,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const filteredOrders = orderList.filter((order) => {
     const matchesSearch =
       !normalizedSearchTerm ||
-      [order.id, order.driver ?? '', order.destination].some((value) =>
+      [order.id, order.driver ?? '', order.origin, order.destination].some((value) =>
         normalizeText(value).includes(normalizedSearchTerm),
       )
     const matchesStatus =
@@ -101,6 +104,15 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setTimeout(() => setSuccessToastMessage(''), 3500)
   }
 
+  const handleAdvanceStatus = (order, nextStatus, message) => {
+    setOrderList((currentOrders) =>
+      currentOrders.map((currentOrder) =>
+        currentOrder.id === order.id ? { ...currentOrder, status: nextStatus } : currentOrder,
+      ),
+    )
+    showSuccessToast(message)
+  }
+
   const handleConfirmCancel = () => {
     setOrderList((currentOrders) =>
       currentOrders.map((order) =>
@@ -125,8 +137,8 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setEditingOrder(order)
     setFormData({
       driver: order.driver ?? '',
+      origin: order.origin,
       destination: order.destination,
-      status: order.status,
     })
   }
 
@@ -146,8 +158,8 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
 
     const hasChanges =
       formData.driver !== (editingOrder.driver ?? '') ||
-      formData.destination !== editingOrder.destination ||
-      formData.status !== editingOrder.status
+      formData.origin !== editingOrder.origin ||
+      formData.destination !== editingOrder.destination
 
     if (!hasChanges) {
       handleCloseEdit()
@@ -175,7 +187,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   }`
 
   const handleOpenAdd = () => {
-    setNewOrderData({ id: nextOrderId, driver: '', destination: '' })
+    setNewOrderData({ id: nextOrderId, driver: '', origin: '', destination: '' })
     setNewOrderErrors({})
     setAddingOrder(true)
   }
@@ -196,7 +208,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     event.preventDefault()
 
     const nextErrors = {
-      driver: !newOrderData.driver,
+      origin: !newOrderData.origin,
       destination: !newOrderData.destination,
     }
 
@@ -209,8 +221,9 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
       ...currentOrders,
       {
         ...newOrderData,
+        driver: newOrderData.driver || null,
         createdAt: new Date().toISOString(),
-        status: 'pendiente',
+        status: 'registrado',
       },
     ])
     handleCloseAdd()
@@ -251,7 +264,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
 
       <div className="commerce-filters" aria-label="Filtros de pedidos">
         <label className="search-filter" htmlFor="order-search">
-          <span className="sr-only">Buscar pedido por ID, repartidor o destino</span>
+          <span className="sr-only">Buscar pedido por ID, repartidor, origen o destino</span>
           <div className="filter-input-wrapper">
             <SearchIcon />
             <input
@@ -259,7 +272,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
               type="search"
               value={searchTerm}
               onChange={handleSearchChange}
-              placeholder="Buscar por ID, repartidor o destino"
+              placeholder="Buscar por ID, repartidor, origen o destino"
             />
           </div>
         </label>
@@ -293,6 +306,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
                 <SortableHeader column="date" label="Fecha y hora" sort={sort} onSort={handleSort} />
                 <SortableHeader column="id" label="ID" sort={sort} onSort={handleSort} />
                 <SortableHeader column="driver" label="Repartidor" sort={sort} onSort={handleSort} />
+                <SortableHeader column="origin" label="Origen" sort={sort} onSort={handleSort} />
                 <SortableHeader column="destination" label="Destino" sort={sort} onSort={handleSort} />
                 <SortableHeader column="status" label="Estado" sort={sort} onSort={handleSort} />
                 <th scope="col" className="actions-column">
@@ -312,6 +326,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
                   <td data-label="Repartidor">
                     {order.driver ?? <span className="unassigned-driver">Sin asignar</span>}
                   </td>
+                  <td data-label="Origen">{order.origin}</td>
                   <td data-label="Destino">{order.destination}</td>
                   <td data-label="Estado">
                     <OrderStatusBadge status={order.status} />
@@ -327,6 +342,40 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
                       >
                         <EditIcon />
                       </button>
+                      {order.status === 'asignado' && (
+                        <button
+                          className="action-button"
+                          type="button"
+                          onClick={() =>
+                            handleAdvanceStatus(
+                              order,
+                              'en-camino',
+                              'El pedido ha pasado a estado En Camino',
+                            )
+                          }
+                          aria-label={`Marcar pedido ${order.id} como En Camino`}
+                          title="Marcar como En Camino"
+                        >
+                          <TruckIcon />
+                        </button>
+                      )}
+                      {order.status === 'en-camino' && (
+                        <button
+                          className="action-button"
+                          type="button"
+                          onClick={() =>
+                            handleAdvanceStatus(
+                              order,
+                              'entregado',
+                              'El pedido ha pasado a estado Entregado',
+                            )
+                          }
+                          aria-label={`Marcar pedido ${order.id} como Entregado`}
+                          title="Marcar como Entregado"
+                        >
+                          <CheckIcon />
+                        </button>
+                      )}
                       {order.status === 'cancelado' || order.status === 'entregado' ? (
                         <button
                           className="action-button action-button-danger"
@@ -354,12 +403,12 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
               ))}
               {visibleOrders.length === 0 && (
                 <tr className="empty-results-row">
-                  <td colSpan="6">No se encontraron pedidos con esos filtros.</td>
+                  <td colSpan="7">No se encontraron pedidos con esos filtros.</td>
                 </tr>
               )}
               {canShowMore && (
                 <tr className="show-more-row">
-                  <td colSpan="6">
+                  <td colSpan="7">
                     <button
                       className="show-more-button"
                       type="button"
@@ -490,6 +539,33 @@ function EditOrderModal({
             </div>
 
             <div className="form-field">
+              <label htmlFor="order-origin">Origen</label>
+              <div className="select-with-action">
+                <select
+                  id="order-origin"
+                  name="origin"
+                  value={formData.origin}
+                  onChange={onChange}
+                >
+                  {withCurrent(commerceOptions, formData.origin).map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="field-link-button"
+                  type="button"
+                  onClick={onGoToCommerces}
+                  aria-label="Ir a comercios y cargar un comercio"
+                  title="Ir a comercios y cargar un comercio"
+                >
+                  <ExternalLinkIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="form-field">
               <label htmlFor="order-destination">Destino</label>
               <div className="select-with-action">
                 <select
@@ -513,24 +589,6 @@ function EditOrderModal({
                 >
                   <ExternalLinkIcon />
                 </button>
-              </div>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="order-status">Estado</label>
-              <div className="select-with-action">
-                <select
-                  id="order-status"
-                  name="status"
-                  value={formData.status}
-                  onChange={onChange}
-                >
-                  {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
           </div>
@@ -596,10 +654,8 @@ function AddOrderModal({
                   name="driver"
                   value={formData.driver}
                   onChange={onChange}
-                  className={formErrors.driver ? 'has-error' : ''}
-                  aria-invalid={formErrors.driver || undefined}
                 >
-                  <option value="" disabled hidden />
+                  <option value="">Sin asignar</option>
                   {driverOptions.map((driver) => (
                     <option key={driver} value={driver}>
                       {driver}
@@ -616,7 +672,37 @@ function AddOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
-              {formErrors.driver && (
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="new-order-origin">Origen</label>
+              <div className="select-with-action">
+                <select
+                  id="new-order-origin"
+                  name="origin"
+                  value={formData.origin}
+                  onChange={onChange}
+                  className={formErrors.origin ? 'has-error' : ''}
+                  aria-invalid={formErrors.origin || undefined}
+                >
+                  <option value="" disabled hidden />
+                  {commerceOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="field-link-button"
+                  type="button"
+                  onClick={onGoToCommerces}
+                  aria-label="Ir a comercios y cargar un comercio"
+                  title="Ir a comercios y cargar un comercio"
+                >
+                  <ExternalLinkIcon />
+                </button>
+              </div>
+              {formErrors.origin && (
                 <small className="field-error" role="alert">
                   Completa este campo.
                 </small>
@@ -786,6 +872,23 @@ function TrashIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4 7h16M10 11v5M14 11v5M6.5 7l.7 13h9.6l.7-13M9 7V4h6v3" />
+    </svg>
+  )
+}
+
+function TruckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7M7 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.5 12.3 2.4 2.4 4.6-4.9" />
     </svg>
   )
 }
