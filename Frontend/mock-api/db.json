@@ -3,6 +3,7 @@
     {
       "id": "admin-martin",
       "username": "AdminMartin",
+      "email": "admin@repartosya.com",
       "password": "SoyElAdmin",
       "name": "Martin",
       "role": "admin"
@@ -10,6 +11,7 @@
     {
       "id": "courier-0001",
       "username": "0001",
+      "email": "0001@repartosya.com",
       "password": "RepartidorNro1",
       "name": "Agente Nro0001",
       "role": "courier"

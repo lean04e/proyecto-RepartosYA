@@ -30,6 +30,63 @@ server.post('/auth/login', (request, response) => {
     });
 });
 
+server.post('/auth/forgot-password', (request, response) => {
+    const { identifier } = request.body || {};
+    if (!identifier || !identifier.trim()) {
+        response.status(400).json({ message: 'Debes ingresar tu usuario o correo electrónico.' });
+        return;
+    }
+
+    const clean = identifier.trim().toLowerCase();
+    const user = router.db.get('users').value().find(u => 
+        (u.username && u.username.toLowerCase() === clean) ||
+        (u.email && u.email.toLowerCase() === clean)
+    );
+
+    if (!user) {
+        response.status(404).json({ message: 'El usuario o correo electrónico ingresado no se encuentra registrado.' });
+        return;
+    }
+
+    const resetToken = `reset-${randomUUID()}`;
+    response.json({
+        message: 'Enlace de recuperación generado con éxito.',
+        token: resetToken,
+        user: {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            email: user.email || `${user.username.toLowerCase()}@repartosya.com`,
+        },
+    });
+});
+
+server.post('/auth/reset-password', (request, response) => {
+    const { username, newPassword } = request.body || {};
+    if (!username || !newPassword) {
+        response.status(400).json({ message: 'Datos incompletos para restablecer la contraseña.' });
+        return;
+    }
+
+    if (newPassword.length < 4 || newPassword.length > 20) {
+        response.status(400).json({ message: 'La contraseña debe tener entre 4 y 20 caracteres.' });
+        return;
+    }
+
+    const user = router.db.get('users').find({ username }).value();
+    if (!user) {
+        response.status(404).json({ message: 'Usuario no encontrado.' });
+        return;
+    }
+
+    router.db.get('users').find({ username }).assign({ password: newPassword }).write();
+
+    response.json({
+        message: 'Contraseña actualizada correctamente.',
+        username,
+    });
+});
+
 server.use((request, response, next) => {
     if (/^\/users(?:\/|$)/.test(request.path)) {
         response.status(404).json({ message: 'Recurso no encontrado.' });
