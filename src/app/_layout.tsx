@@ -1,27 +1,28 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
 import { AppThemeProvider, useAppTheme } from '@/hooks/app-theme';
 
-// Evita que la pantalla de carga se oculte automáticamente antes de tiempo
-// SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
+export default function RootLayout() {
   return (
     <AppThemeProvider>
-      <ThemedTabLayout />
+      <ThemedRootLayout />
     </AppThemeProvider>
   );
 }
 
-function ThemedTabLayout() {
+function ThemedRootLayout() {
   const { isDarkMode } = useAppTheme();
   return (
     <ThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+        }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="repartidorDashboard" />
+        <Stack.Screen name="options" />
+      </Stack>
     </ThemeProvider>
   );
 }

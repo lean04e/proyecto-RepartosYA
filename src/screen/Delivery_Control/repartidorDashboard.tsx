@@ -17,7 +17,6 @@ export default function RepartidorDashboard() {
     apellido?: string;
   }>();
   const { isDarkMode, toggleTheme } = useAppTheme();
-  const [showOptions, setShowOptions] = useState(false);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -146,16 +145,6 @@ export default function RepartidorDashboard() {
           {ordersError && <Text style={styles.orderError} accessibilityRole="alert">{ordersError}</Text>}
         </View>
 
-        {showOptions && (
-          <View style={[styles.optionsPopover, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.optionsTitle, { color: palette.text }]}>Opciones</Text>
-            <Text style={[styles.optionLabel, { color: palette.secondary }]}>REPARTIDOR</Text>
-            <Text style={[styles.optionValue, { color: palette.text }]}>{fullName}</Text>
-            <Text style={[styles.optionLabel, { color: palette.secondary }]}>NÚMERO</Text>
-            <Text style={[styles.optionValue, { color: palette.text }]}>{id || '—'}</Text>
-          </View>
-        )}
-
         <View style={[styles.bottomMenu, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <Pressable
             style={({ pressed }) => [styles.menuButton, pressed && styles.buttonPressed]}
@@ -170,21 +159,18 @@ export default function RepartidorDashboard() {
           </Pressable>
           <Pressable
             style={({ pressed }) => [styles.menuButton, pressed && styles.buttonPressed]}
-            onPress={() => setShowOptions((visible) => !visible)}
+            onPress={() => router.push({
+              pathname: '/options',
+              params: {
+                id: id ?? '',
+                nombre: nombre ?? '',
+                apellido: apellido ?? '',
+              },
+            })}
             accessibilityRole="button"
-            accessibilityState={{ expanded: showOptions }}
             accessibilityLabel="Opciones">
             <Text style={[styles.menuIcon, { color: palette.text }]}>☰</Text>
             <Text style={[styles.menuLabel, { color: palette.secondary }]}>Opciones</Text>
-          </Pressable>
-          
-          <Pressable
-            style={({ pressed }) => [styles.menuButton, styles.logoutButtonHighlight, pressed && styles.buttonPressed]}
-            onPress={() => router.replace('/')}
-            accessibilityRole="button"
-            accessibilityLabel="Cerrar sesión">
-            <Text style={[styles.menuIcon, { color: palette.text }]}>↪</Text>
-            <Text style={[styles.menuLabel, { color: palette.secondary }]}>Cerrar sesión</Text>
           </Pressable>
         </View>
 

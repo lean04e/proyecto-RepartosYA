@@ -24,21 +24,44 @@ export default function Login() {
 
     if (!normalizedUsername || !normalizedPassword) {
       setLoginMessage('No se ingreso nro de repartidor o contraseña');
+      setNroRepartidor('');
+      setContraseña('');
       return;
     }
 
     const repartidorEncontrado = database.repartidores.find((rep) => rep.id === normalizedUsername);
 
     if (!repartidorEncontrado) {
-      setLoginMessage(`El usuario ${normalizedUsername} no corresponde con ninguno en la base de datos`);
+      setLoginMessage(`El Número de Repartidor " ${normalizedUsername} " no corresponde con los empleados registrados en el sistema.`);
       return;
     }
 
     if (normalizedPassword !== repartidorEncontrado.contra) {
-      setLoginMessage('El Nro de Repartidor o la contraseña es incorrecto');
+      setLoginMessage('Credenciales invalidas. Por favor verifique sus datos.');
+      setNroRepartidor('');
       setContraseña('');
       return;
     }
+
+    {/* try {
+      const userData = {
+        id: repartidorEncontrado.id,
+        nombre: repartidorEncontrado.nombre,
+        apellido: repartidorEncontrado.apellido,
+        isLoggedIn: false,
+      }
+
+      //Se evalua con un if el estado del usuario
+      if(userData.isLoggedIn) {
+        setErrorMessage('El usuario ya se encuentra con una sesiónactiva en otro dispositivo.');
+        return;
+      }
+
+      console.log('Login Exitoso. Redirigiendo...');
+      router.replace('/repartidorDashboard');
+    } catch(error) {
+      setErrorMessage('Ocurrió un error al intentar conectar con el servidor.');
+    } */}
 
     router.replace({
       pathname: '/repartidorDashboard',
@@ -93,7 +116,7 @@ export default function Login() {
                 style={styles.input}
                 value={nroRepartidor}
                 onChangeText={setNroRepartidor}
-                placeholder="0001"
+                placeholder="Por ej. 0001"
                 placeholderTextColor={COLORS.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -123,12 +146,12 @@ export default function Login() {
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
-                <Text style={styles.passwordToggle}>{showPassword ? '◉' : '◎'}</Text>
+                <Text style={styles.passwordToggle}>{showPassword ? '🕳️' : '👁️'}</Text>
               </Pressable>
             </View>
 
             <View style={styles.optionsRow}>
-              <Pressable
+              {/*<Pressable
                 style={styles.rememberButton}
                 onPress={() => setRememberMe((remembered) => !remembered)}
                 accessibilityRole="checkbox"
@@ -137,7 +160,7 @@ export default function Login() {
                   {rememberMe && <Text style={styles.checkboxCheck}>✓</Text>}
                 </View>
                 <Text style={styles.rememberText}>Recordar</Text>
-              </Pressable>
+              </Pressable> */}
               <Pressable accessibilityRole="button">
                 <Text style={styles.forgotPassword}>¿Olvidó su contraseña?</Text>
               </Pressable>
