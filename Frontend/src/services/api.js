@@ -39,6 +39,20 @@ export function login(username, password) {
     });
 }
 
+export function requestPasswordReset(identifier) {
+    return request('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ identifier }),
+    });
+}
+
+export function resetPassword(username, newPassword) {
+    return request('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ username, newPassword }),
+    });
+}
+
 export function getAll(resource) {
     return request(getResourcePath(resource));
 }
