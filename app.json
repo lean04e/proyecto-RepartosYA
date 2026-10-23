@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Grupo-05",
+    "slug": "Sintax",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/sintax-logo.png",
+    "backgroundColor": "#FFFFFF",
+    "scheme": "frontendmobile",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "icon": "./assets/images/sintax-logo.png"
+    },
+    "android": {
+      "package": "com.grupo05.repartosya",
+      "adaptiveIcon": {
+        "backgroundColor": "#2563eb",
+        "foregroundImage": "./assets/images/sintax-logo.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "server",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#2563eb",
+          "image": "./assets/images/repartosYA-version-Osc.png",
+          "imageWidth": 220
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
