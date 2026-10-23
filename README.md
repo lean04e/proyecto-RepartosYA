@@ -12,8 +12,8 @@ Plataforma Web + Aplicación Móvil  para la gestión integral de pedidos, traza
 - **Repositorio:** Github.
 
 ## Equipo de Desarrollo
-- **Frontend:** Leandro Mora, Ñero 1, Ñero 2.
-- **Backend:**
+- **Frontend:** Martin Andres Burgueño, Leandro Mora, Joaquin Martinez.
+- **Backend:** Nicolás Barragán, Mateo Ariel Di Bastiano, Agustin Shimizu.
 
 ## Cliente
 - Martin
