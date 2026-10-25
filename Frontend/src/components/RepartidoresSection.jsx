@@ -17,18 +17,16 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [deletingDriver, setDeletingDriver] = useState(null);
   const [addingDriver, setAddingDriver] = useState(openAddOnMount);
+
+  // Los campos de alta son estrictamente: nombre, apellido, email, password, telefono
   const [newDriverData, setNewDriverData] = useState(
     openAddOnMount
       ? {
-          firstName: '',
-          lastName: '',
-          phone: '',
+          nombre: '',
+          apellido: '',
           email: '',
-          vehicle: 'Moto',
-          status: 'Disponible',
-          destination: 'En base / Central',
-          pendingOrders: '0',
-          orders: '0',
+          password: '',
+          telefono: '',
         }
       : null
   );
@@ -54,7 +52,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
   // Filtrado
   const normalizedSearchTerm = searchTerm.trim().toLocaleLowerCase('es');
   const filteredDrivers = driverList.filter((driver) => {
-    const fullName = driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim();
+    const fullName = driver.name || `${driver.nombre || driver.firstName || ''} ${driver.apellido || driver.lastName || ''}`.trim();
     const matchesSearch =
       !normalizedSearchTerm || fullName.toLocaleLowerCase('es').includes(normalizedSearchTerm);
 
@@ -109,18 +107,14 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
     setDetailDriver(null);
   };
 
-  // HU #5: Cargar Repartidor
+  // HU #5: Cargar Repartidor (Campos del backend: nombre, apellido, email, password, telefono)
   const handleOpenAdd = () => {
     setNewDriverData({
-      firstName: '',
-      lastName: '',
-      phone: '',
+      nombre: '',
+      apellido: '',
       email: '',
-      vehicle: 'Moto',
-      status: 'Disponible',
-      destination: 'En base / Central',
-      pendingOrders: '0',
-      orders: '0',
+      password: '',
+      telefono: '',
     });
     setNewDriverErrors({});
     setAddingDriver(true);
@@ -141,21 +135,11 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
   const handleAddDriver = (event) => {
     event.preventDefault();
 
-    // Regla HU #5: Todos los campos de datos deben ser completados
-    const requiredFields = [
-      'firstName',
-      'lastName',
-      'phone',
-      'email',
-      'vehicle',
-      'status',
-      'destination',
-      'pendingOrders',
-      'orders',
-    ];
+    // Regla HU #5: Todos los campos de datos deben ser completados (nombre, apellido, email, password, telefono)
+    const requiredFields = ['nombre', 'apellido', 'email', 'password', 'telefono'];
     const errors = {};
     for (const field of requiredFields) {
-      if (newDriverData[field] === undefined || String(newDriverData[field]).trim() === '') {
+      if (!newDriverData[field] || String(newDriverData[field]).trim() === '') {
         errors[field] = true;
       }
     }
@@ -168,21 +152,23 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
 
     // Escenario 2: El repartidor pasa a estar disponible en el sistema inmediatamente después de la carga
     const newId = Date.now();
-    const fullName = `${newDriverData.firstName.trim()} ${newDriverData.lastName.trim()}`;
+    const fullName = `${newDriverData.nombre.trim()} ${newDriverData.apellido.trim()}`;
     const nuevoRepartidor = {
       id: newId,
       name: fullName,
-      firstName: newDriverData.firstName.trim(),
-      lastName: newDriverData.lastName.trim(),
-      phone: newDriverData.phone.trim(),
+      nombre: newDriverData.nombre.trim(),
+      apellido: newDriverData.apellido.trim(),
       email: newDriverData.email.trim(),
-      vehicle: newDriverData.vehicle,
-      status: newDriverData.status || 'Disponible',
-      destination: newDriverData.destination.trim() || 'En base / Central',
-      pendingOrders: Number(newDriverData.pendingOrders) || 0,
-      deliveredOrders: Number(newDriverData.orders) || 0,
-      orders: Number(newDriverData.orders) || 0,
-      historicalOrders: (Number(newDriverData.orders) || 0) * 4,
+      password: newDriverData.password,
+      telefono: newDriverData.telefono.trim(),
+      phone: newDriverData.telefono.trim(),
+      // Valores operativos de sistema automáticos (no añadidos por el admin)
+      status: 'Disponible',
+      destination: 'En base',
+      pendingOrders: 0,
+      deliveredOrders: 0,
+      orders: 0,
+      historicalOrders: 0,
       recentOrders: [],
     };
 
@@ -195,15 +181,11 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
   const handleOpenEdit = (driver) => {
     setEditingDriver(driver);
     setFormData({
-      firstName: driver.firstName || driver.name?.split(' ')[0] || '',
-      lastName: driver.lastName || driver.name?.split(' ').slice(1).join(' ') || '',
-      phone: driver.phone || '',
+      nombre: driver.nombre || driver.firstName || driver.name?.split(' ')[0] || '',
+      apellido: driver.apellido || driver.lastName || driver.name?.split(' ').slice(1).join(' ') || '',
       email: driver.email || '',
-      vehicle: driver.vehicle || 'Moto',
-      status: driver.status || 'Disponible',
-      destination: driver.destination || 'En base / Central',
-      pendingOrders: String(driver.pendingOrders ?? 0),
-      orders: String(driver.deliveredOrders ?? driver.orders ?? 0),
+      password: driver.password || '',
+      telefono: driver.telefono || driver.phone || '',
     });
     setFormErrors({});
   };
@@ -224,18 +206,8 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
   const handleApplyEdit = (event) => {
     event.preventDefault();
 
-    // Regla HU #20: Deben completarse todos los campos de datos
-    const requiredFields = [
-      'firstName',
-      'lastName',
-      'phone',
-      'email',
-      'vehicle',
-      'status',
-      'destination',
-      'pendingOrders',
-      'orders',
-    ];
+    // Regla HU #20: Deben completarse todos los campos de datos requeridos
+    const requiredFields = ['nombre', 'apellido', 'email', 'telefono'];
     const errors = {};
     for (const field of requiredFields) {
       if (!formData[field] || String(formData[field]).trim() === '') {
@@ -255,9 +227,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
 
   const handleConfirmEdit = () => {
     // Escenario 1: Se confirma explícitamente y se cambian los datos en el sistema
-    const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
-    const updatedPending = Number(formData.pendingOrders) || 0;
-    const updatedDelivered = Number(formData.orders) || 0;
+    const fullName = `${formData.nombre.trim()} ${formData.apellido.trim()}`;
 
     setDriverList((prev) =>
       prev.map((d) =>
@@ -265,16 +235,12 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
           ? {
               ...d,
               name: fullName,
-              firstName: formData.firstName.trim(),
-              lastName: formData.lastName.trim(),
-              phone: formData.phone.trim(),
+              nombre: formData.nombre.trim(),
+              apellido: formData.apellido.trim(),
               email: formData.email.trim(),
-              vehicle: formData.vehicle,
-              status: formData.status,
-              destination: formData.destination.trim(),
-              pendingOrders: updatedPending,
-              deliveredOrders: updatedDelivered,
-              orders: updatedDelivered,
+              telefono: formData.telefono.trim(),
+              phone: formData.telefono.trim(),
+              password: formData.password || d.password,
             }
           : d
       )
@@ -284,16 +250,12 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
       setDetailDriver((prev) => ({
         ...prev,
         name: fullName,
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        phone: formData.phone.trim(),
+        nombre: formData.nombre.trim(),
+        apellido: formData.apellido.trim(),
         email: formData.email.trim(),
-        vehicle: formData.vehicle,
-        status: formData.status,
-        destination: formData.destination.trim(),
-        pendingOrders: updatedPending,
-        deliveredOrders: updatedDelivered,
-        orders: updatedDelivered,
+        telefono: formData.telefono.trim(),
+        phone: formData.telefono.trim(),
+        password: formData.password || prev.password,
       }));
     }
 
@@ -455,7 +417,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
               ) : (
                 visibleDrivers.map((driver) => {
                   const displayName =
-                    driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim();
+                    driver.name || `${driver.nombre || driver.firstName || ''} ${driver.apellido || driver.lastName || ''}`.trim();
                   const initials = (displayName || 'R')
                     .split(' ')
                     .map((p) => p[0])
@@ -465,7 +427,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
 
                   const pending = Number(driver.pendingOrders ?? 0);
                   const delivered = Number(driver.deliveredOrders ?? driver.orders ?? 0);
-                  const destination = driver.destination || 'En base / Central';
+                  const destination = driver.destination || 'En base';
 
                   return (
                     <tr
@@ -584,7 +546,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
         />
       )}
 
-      {/* HU #5: Cargar Repartidor Modal */}
+      {/* HU #5: Cargar Repartidor Modal (datos: nombre, apellido, email, password, telefono) */}
       {addingDriver && (
         <AddDriverModal
           formData={newDriverData}
@@ -599,7 +561,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
       {editingDriver &&
         (confirmationOpen ? (
           <ConfirmEditModal
-            driverName={`${formData.firstName} ${formData.lastName}`.trim()}
+            driverName={`${formData.nombre} ${formData.apellido}`.trim()}
             onCancel={() => {
               // HU #20 Escenario 3: Se cancela la confirmación y se vuelve sin cambios
               handleCloseEdit();
@@ -621,7 +583,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
         <DeleteDriverModal
           driverName={
             deletingDriver.name ||
-            `${deletingDriver.firstName || ''} ${deletingDriver.lastName || ''}`.trim()
+            `${deletingDriver.nombre || deletingDriver.firstName || ''} ${deletingDriver.apellido || deletingDriver.lastName || ''}`.trim()
           }
           onCancel={handleCloseDelete}
           onConfirm={handleConfirmDelete}
@@ -675,7 +637,7 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
   }, [onClose]);
 
   const displayName =
-    driver.name || `${driver.firstName || ''} ${driver.lastName || ''}`.trim();
+    driver.name || `${driver.nombre || driver.firstName || ''} ${driver.apellido || driver.lastName || ''}`.trim();
 
   const delivered = Number(driver.deliveredOrders ?? driver.orders ?? 0);
   const pending = Number(driver.pendingOrders ?? 0);
@@ -719,7 +681,7 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
                 <PhoneIcon />
                 <span>Teléfono</span>
               </span>
-              <span className="detail-card-value">{driver.phone || 'No especificado'}</span>
+              <span className="detail-card-value">{driver.telefono || driver.phone || 'No especificado'}</span>
             </div>
 
             <div className="detail-card">
@@ -728,14 +690,6 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
                 <span>Correo electrónico</span>
               </span>
               <span className="detail-card-value">{driver.email || 'No especificado'}</span>
-            </div>
-
-            <div className="detail-card">
-              <span className="detail-card-label">
-                <DeliveryIcon />
-                <span>Vehículo</span>
-              </span>
-              <span className="detail-card-value">{driver.vehicle || 'Moto'}</span>
             </div>
 
             <div className="detail-card">
@@ -753,7 +707,7 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
                 <LocationIcon />
                 <span>Dónde se dirige</span>
               </span>
-              <span className="detail-card-value">{driver.destination || 'En base / Central'}</span>
+              <span className="detail-card-value">{driver.destination || 'En base'}</span>
             </div>
 
             <div className="detail-card">
@@ -857,7 +811,7 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
   );
 }
 
-// HU #5: Modal Cargar Repartidor
+// HU #5: Modal Cargar Repartidor (Los datos añadidos son: nombre, apellido, email, password, telefono)
 function AddDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   return (
     <div className="modal-backdrop" role="presentation">
@@ -884,51 +838,35 @@ function AddDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) {
 
         <form className="edit-form" onSubmit={onSubmit} noValidate>
           <div className="form-fields">
-            <label className="form-field" htmlFor="add-firstName">
+            <label className="form-field" htmlFor="add-nombre">
               <span>Nombre *</span>
               <input
-                id="add-firstName"
-                name="firstName"
+                id="add-nombre"
+                name="nombre"
                 type="text"
                 placeholder="Ej. Lucas"
-                value={formData?.firstName || ''}
+                value={formData?.nombre || ''}
                 onChange={onChange}
-                className={formErrors.firstName ? 'has-error' : ''}
+                className={formErrors.nombre ? 'has-error' : ''}
               />
-              {formErrors.firstName && (
+              {formErrors.nombre && (
                 <small className="field-error">Completa el nombre.</small>
               )}
             </label>
 
-            <label className="form-field" htmlFor="add-lastName">
+            <label className="form-field" htmlFor="add-apellido">
               <span>Apellido *</span>
               <input
-                id="add-lastName"
-                name="lastName"
+                id="add-apellido"
+                name="apellido"
                 type="text"
                 placeholder="Ej. Fernández"
-                value={formData?.lastName || ''}
+                value={formData?.apellido || ''}
                 onChange={onChange}
-                className={formErrors.lastName ? 'has-error' : ''}
+                className={formErrors.apellido ? 'has-error' : ''}
               />
-              {formErrors.lastName && (
+              {formErrors.apellido && (
                 <small className="field-error">Completa el apellido.</small>
-              )}
-            </label>
-
-            <label className="form-field" htmlFor="add-phone">
-              <span>Teléfono *</span>
-              <input
-                id="add-phone"
-                name="phone"
-                type="tel"
-                placeholder="Ej. +54 11 5821 4410"
-                value={formData?.phone || ''}
-                onChange={onChange}
-                className={formErrors.phone ? 'has-error' : ''}
-              />
-              {formErrors.phone && (
-                <small className="field-error">Completa el teléfono.</small>
               )}
             </label>
 
@@ -948,91 +886,35 @@ function AddDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) {
               )}
             </label>
 
-            <label className="form-field" htmlFor="add-vehicle">
-              <span>Vehículo *</span>
-              <select
-                id="add-vehicle"
-                name="vehicle"
-                value={formData?.vehicle || 'Moto'}
-                onChange={onChange}
-                className={formErrors.vehicle ? 'has-error' : ''}
-              >
-                <option value="Moto">Moto</option>
-                <option value="Bicicleta">Bicicleta</option>
-                <option value="Auto">Auto</option>
-                <option value="Camioneta">Camioneta</option>
-              </select>
-              {formErrors.vehicle && (
-                <small className="field-error">Selecciona un vehículo.</small>
-              )}
-            </label>
-
-            <label className="form-field" htmlFor="add-status">
-              <span>Estado del repartidor *</span>
-              <select
-                id="add-status"
-                name="status"
-                value={formData?.status || 'Disponible'}
-                onChange={onChange}
-                className={formErrors.status ? 'has-error' : ''}
-              >
-                <option value="Disponible">Disponible</option>
-                <option value="Buscando pedidos">Buscando pedidos</option>
-                <option value="Entregando">Entregando</option>
-                <option value="Turno finalizado">Turno finalizado</option>
-              </select>
-              {formErrors.status && (
-                <small className="field-error">Selecciona el estado.</small>
-              )}
-            </label>
-
-            <label className="form-field full-width" htmlFor="add-destination">
-              <span>Dónde se dirige *</span>
+            <label className="form-field" htmlFor="add-telefono">
+              <span>Teléfono *</span>
               <input
-                id="add-destination"
-                name="destination"
-                type="text"
-                placeholder="Ej. En base / Central o dirección"
-                value={formData?.destination || ''}
+                id="add-telefono"
+                name="telefono"
+                type="tel"
+                placeholder="Ej. +54 11 5821 4410"
+                value={formData?.telefono || ''}
                 onChange={onChange}
-                className={formErrors.destination ? 'has-error' : ''}
+                className={formErrors.telefono ? 'has-error' : ''}
               />
-              {formErrors.destination && (
-                <small className="field-error">Indica el destino actual o 'En base'.</small>
+              {formErrors.telefono && (
+                <small className="field-error">Completa el teléfono.</small>
               )}
             </label>
 
-            <label className="form-field" htmlFor="add-pendingOrders">
-              <span>Pedidos pendientes *</span>
+            <label className="form-field full-width" htmlFor="add-password">
+              <span>Contraseña *</span>
               <input
-                id="add-pendingOrders"
-                name="pendingOrders"
-                type="number"
-                min="0"
-                placeholder="0"
-                value={formData?.pendingOrders || '0'}
+                id="add-password"
+                name="password"
+                type="password"
+                placeholder="Ingresa la contraseña para el repartidor"
+                value={formData?.password || ''}
                 onChange={onChange}
-                className={formErrors.pendingOrders ? 'has-error' : ''}
+                className={formErrors.password ? 'has-error' : ''}
               />
-              {formErrors.pendingOrders && (
-                <small className="field-error">Completa este campo.</small>
-              )}
-            </label>
-
-            <label className="form-field" htmlFor="add-orders">
-              <span>Pedidos entregados (mes) *</span>
-              <input
-                id="add-orders"
-                name="orders"
-                type="number"
-                min="0"
-                placeholder="0"
-                value={formData?.orders || '0'}
-                onChange={onChange}
-                className={formErrors.orders ? 'has-error' : ''}
-              />
-              {formErrors.orders && (
-                <small className="field-error">Completa este campo.</small>
+              {formErrors.password && (
+                <small className="field-error">Completa la contraseña.</small>
               )}
             </label>
           </div>
@@ -1051,23 +933,18 @@ function AddDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   );
 }
 
-// HU #20: Modal Modificar Repartidor
+// HU #20: Modal Modificar Repartidor (Los datos modificados son: nombre, apellido, email, telefono, password)
 function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) {
-  // HU #20 Escenario 2: Se bloquea el botón aceptar si hay algún campo vacío
-  const requiredFields = [
-    'firstName',
-    'lastName',
-    'phone',
-    'email',
-    'vehicle',
-    'status',
-    'destination',
-    'pendingOrders',
-    'orders',
-  ];
-  const hasEmptyFields = requiredFields.some(
-    (field) => !formData[field] || String(formData[field]).trim() === ''
-  );
+  // HU #20 Escenario 2: Se bloquea el botón aceptar si hay algún campo requerido vacío
+  const hasEmptyFields =
+    !formData.nombre ||
+    !formData.nombre.trim() ||
+    !formData.apellido ||
+    !formData.apellido.trim() ||
+    !formData.email ||
+    !formData.email.trim() ||
+    !formData.telefono ||
+    !formData.telefono.trim();
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -1094,48 +971,33 @@ function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) 
 
         <form className="edit-form" onSubmit={onSubmit} noValidate>
           <div className="form-fields">
-            <label className="form-field" htmlFor="edit-firstName">
+            <label className="form-field" htmlFor="edit-nombre">
               <span>Nombre *</span>
               <input
-                id="edit-firstName"
-                name="firstName"
+                id="edit-nombre"
+                name="nombre"
                 type="text"
-                value={formData.firstName || ''}
+                value={formData.nombre || ''}
                 onChange={onChange}
-                className={formErrors.firstName || !formData.firstName?.trim() ? 'has-error' : ''}
+                className={formErrors.nombre || !formData.nombre?.trim() ? 'has-error' : ''}
               />
-              {(formErrors.firstName || !formData.firstName?.trim()) && (
+              {(formErrors.nombre || !formData.nombre?.trim()) && (
                 <small className="field-error">Completa el nombre.</small>
               )}
             </label>
 
-            <label className="form-field" htmlFor="edit-lastName">
+            <label className="form-field" htmlFor="edit-apellido">
               <span>Apellido *</span>
               <input
-                id="edit-lastName"
-                name="lastName"
+                id="edit-apellido"
+                name="apellido"
                 type="text"
-                value={formData.lastName || ''}
+                value={formData.apellido || ''}
                 onChange={onChange}
-                className={formErrors.lastName || !formData.lastName?.trim() ? 'has-error' : ''}
+                className={formErrors.apellido || !formData.apellido?.trim() ? 'has-error' : ''}
               />
-              {(formErrors.lastName || !formData.lastName?.trim()) && (
+              {(formErrors.apellido || !formData.apellido?.trim()) && (
                 <small className="field-error">Completa el apellido.</small>
-              )}
-            </label>
-
-            <label className="form-field" htmlFor="edit-phone">
-              <span>Teléfono *</span>
-              <input
-                id="edit-phone"
-                name="phone"
-                type="tel"
-                value={formData.phone || ''}
-                onChange={onChange}
-                className={formErrors.phone || !formData.phone?.trim() ? 'has-error' : ''}
-              />
-              {(formErrors.phone || !formData.phone?.trim()) && (
-                <small className="field-error">Completa el teléfono.</small>
               )}
             </label>
 
@@ -1154,74 +1016,30 @@ function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) 
               )}
             </label>
 
-            <label className="form-field" htmlFor="edit-vehicle">
-              <span>Vehículo *</span>
-              <select
-                id="edit-vehicle"
-                name="vehicle"
-                value={formData.vehicle || 'Moto'}
-                onChange={onChange}
-              >
-                <option value="Moto">Moto</option>
-                <option value="Bicicleta">Bicicleta</option>
-                <option value="Auto">Auto</option>
-                <option value="Camioneta">Camioneta</option>
-              </select>
-            </label>
-
-            <label className="form-field" htmlFor="edit-status">
-              <span>Estado del repartidor *</span>
-              <select
-                id="edit-status"
-                name="status"
-                value={formData.status || 'Disponible'}
-                onChange={onChange}
-              >
-                <option value="Disponible">Disponible</option>
-                <option value="Buscando pedidos">Buscando pedidos</option>
-                <option value="Entregando">Entregando</option>
-                <option value="Turno finalizado">Turno finalizado</option>
-              </select>
-            </label>
-
-            <label className="form-field full-width" htmlFor="edit-destination">
-              <span>Dónde se dirige *</span>
+            <label className="form-field" htmlFor="edit-telefono">
+              <span>Teléfono *</span>
               <input
-                id="edit-destination"
-                name="destination"
-                type="text"
-                value={formData.destination || ''}
+                id="edit-telefono"
+                name="telefono"
+                type="tel"
+                value={formData.telefono || ''}
                 onChange={onChange}
-                className={formErrors.destination || !formData.destination?.trim() ? 'has-error' : ''}
+                className={formErrors.telefono || !formData.telefono?.trim() ? 'has-error' : ''}
               />
-              {(formErrors.destination || !formData.destination?.trim()) && (
-                <small className="field-error">Indica el destino actual.</small>
+              {(formErrors.telefono || !formData.telefono?.trim()) && (
+                <small className="field-error">Completa el teléfono.</small>
               )}
             </label>
 
-            <label className="form-field" htmlFor="edit-pendingOrders">
-              <span>Pedidos pendientes *</span>
+            <label className="form-field full-width" htmlFor="edit-password">
+              <span>Contraseña (dejar en blanco para conservar actual)</span>
               <input
-                id="edit-pendingOrders"
-                name="pendingOrders"
-                type="number"
-                min="0"
-                value={formData.pendingOrders ?? '0'}
+                id="edit-password"
+                name="password"
+                type="password"
+                placeholder="Nueva contraseña opcional"
+                value={formData.password || ''}
                 onChange={onChange}
-                className={formErrors.pendingOrders || formData.pendingOrders === '' ? 'has-error' : ''}
-              />
-            </label>
-
-            <label className="form-field" htmlFor="edit-orders">
-              <span>Pedidos entregados (mes) *</span>
-              <input
-                id="edit-orders"
-                name="orders"
-                type="number"
-                min="0"
-                value={formData.orders ?? '0'}
-                onChange={onChange}
-                className={formErrors.orders || formData.orders === '' ? 'has-error' : ''}
               />
             </label>
           </div>
@@ -1234,7 +1052,11 @@ function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) 
               className="modal-apply"
               type="submit"
               disabled={hasEmptyFields}
-              title={hasEmptyFields ? 'Completa todos los campos para poder aceptar' : 'Aceptar modificaciones'}
+              title={
+                hasEmptyFields
+                  ? 'Completa todos los campos obligatorios para poder aceptar'
+                  : 'Aceptar modificaciones'
+              }
             >
               Aceptar
             </button>
@@ -1336,7 +1158,7 @@ function DeliveryIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <rect x="1" y="3" width="15" height="13" rx="1" />
-      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+      <polygon points="16 8 20 8 23 11 23 16 16 16 8" />
       <circle cx="5.5" cy="18.5" r="2.5" />
       <circle cx="18.5" cy="18.5" r="2.5" />
     </svg>
