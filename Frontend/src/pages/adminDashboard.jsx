@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
-import { initialCommerceData } from '../data/mockCommerces';
 import avatar from '../assets/jefeP.jpeg';
 import { getAll } from '../services/api';
 import '../styles/admin.css';
@@ -113,9 +112,31 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [ordersError, setOrdersError] = useState('');
     const [activeOrderView, setActiveOrderView] = useState(null);
     const [pedidos, setPedidos] = useState([]);
+    const [commerces, setCommerces] = useState([]);
 
+    // EFFECT PARA COMERCIOS (Con traducción de datos backend -> frontend)
     useEffect(() => {
-        fetch('http:localhost:3001/pedidos')
+        getAll('comercios')
+            .then((data) => {
+                if (Array.isArray(data)) {
+                    const comerciosAdaptados = data.map((comercio) => ({
+                        id: comercio._id,
+                        name: comercio.nombre,
+                        orders: comercio.cantPedidos,
+                        phone: comercio.telefono,
+                        address: comercio.direccion,
+                        historicalOrders: (comercio.cantPedidos || 0) * 5, 
+                        recentOrders: [] 
+                    }));
+                    setCommerces(comerciosAdaptados);
+                }
+            })
+            .catch((err) => console.error('Error al cargar los comercios:', err));
+    }, []);
+
+    // EFFECT PARA PEDIDOS
+    useEffect(() => {
+        fetch('http://localhost:3001/pedidos')
             .then((res) => res.json())
             .then((data) => {
                 setPedidos(data);
@@ -250,7 +271,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
-                    <CommercesSection commerces={initialCommerceData} />
+                    <CommercesSection commerces={commerces} />
                 ) : (
                     <>
                 <div className="admin-header-title-row">
@@ -259,25 +280,6 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         <h1 className="main-title">Gestión de Pedidos en Vivo</h1>
                         <p className="subtitle-date">Hoy, {today} <span>•</span> {pedidos.length} {pedidos.length === 1 ? 'registro de pedido' : 'registros de pedidos'} en el turno</p>
                     </div>
-
-                    {/* Este bloque pertenece a un estilo que profundizaremos en el sprint 2 */}
-
-                    {/* 
-
-                    <div className="search-box-inline">
-                        <span className="search-icon">🌐</span>
-                        <input type="text" placeholder="Código #RY o cliente..." />
-                    </div>
-                    <div className="view-switcher">
-                        <button className="view-btn active">
-                            <span className="icon">🗄️</span> Tablero
-                        </button>
-                        <button className="view-btn">
-                            <span className="icon">📜</span> Lista
-                        </button>
-                    </div>
-
-                     */}
 
                     <button type="button" className="new-order-button">
                         <span className= "btn-icon">➕</span>

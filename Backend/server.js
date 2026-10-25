@@ -8,11 +8,17 @@ const app = express();
 app.use(express.json()); 
 app.use(cors());        
 
+// 1. Tus rutas de autenticación existentes
 const authRoutes = require('./Authentication_And_Access/routes/authRoutes');
 app.use('/auth', authRoutes);
-// Conexión a MongoDB Atlas (Asegurate de poner tus datos reales acá también)
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
 
+// 2. NUEVO: Agregamos las rutas de comercio que acabamos de crear
+const tradeRoutes = require('./Trade_Management/tradeRoutes');
+// AHORA (alineado con el api.js del front)
+app.use('/comercios', tradeRoutes);
+
+// Conexión a MongoDB Atlas
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
 mongoose.connect(MONGO_URI)
   .then(() => console.log('📦 Conectado exitosamente a MongoDB Atlas en la nube ☁️'))
   .catch((err) => console.error('❌ Error al conectar a MongoDB:', err));
