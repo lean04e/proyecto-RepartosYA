@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { create } from '../services/api'; // <-- AGREGAR ESTA LÍNEA
-import './CommercesSection.css'
+import { useEffect, useState } from 'react';
+import { create, remove, update } from '../services/api';
+import './CommercesSection.css';
 
 const INITIAL_VISIBLE_COUNT = 6
 
@@ -74,6 +74,7 @@ function CommercesSection({ commerces, openAddOnMount = false }) {
     setEditingCommerce(commerce)
     setFormData({
       name: commerce.name,
+      rubro: commerce.rubro || '', // <-- Aseguramos cargar el rubro actual
       orders: String(commerce.orders),
       phone: commerce.phone,
       address: commerce.address,
@@ -118,24 +119,45 @@ function CommercesSection({ commerces, openAddOnMount = false }) {
     setConfirmationOpen(true)
   }
 
-  const handleConfirmEdit = () => {
-    const updatedOrders = Number(formData.orders)
-    setCommerceList((currentCommerces) =>
-      currentCommerces.map((commerce) =>
-        commerce.id === editingCommerce.id
-          ? { ...commerce, ...formData, orders: updatedOrders }
-          : commerce,
-      ),
-    )
-    if (detailCommerce && detailCommerce.id === editingCommerce.id) {
-      setDetailCommerce((prev) => ({
-        ...prev,
-        ...formData,
-        orders: updatedOrders,
-      }))
+  const handleConfirmEdit = async () => {
+    try {
+      // 1. Preparamos el objeto con la estructura que espera el backend
+      const comercioParaBackend = {
+        nombre: formData.name,
+        rubro: formData.rubro,
+        telefono: formData.phone,
+        direccion: formData.address,
+        cantPedidos: Number(formData.orders) || 0,
+      }
+
+      // 2. Actualizamos de verdad en MongoDB Atlas mediante PUT
+      await update('comercios', editingCommerce.id, comercioParaBackend)
+
+      const updatedOrders = Number(formData.orders)
+      
+      // 3. Actualizamos el estado local de React
+      setCommerceList((currentCommerces) =>
+        currentCommerces.map((commerce) =>
+          commerce.id === editingCommerce.id
+            ? { ...commerce, ...formData, orders: updatedOrders }
+            : commerce,
+        ),
+      )
+      
+      if (detailCommerce && detailCommerce.id === editingCommerce.id) {
+        setDetailCommerce((prev) => ({
+          ...prev,
+          ...formData,
+          orders: updatedOrders,
+        }))
+      }
+      
+      handleCloseEdit()
+      showSuccessToast('El comercio ha sido modificado exitosamente en la base de datos')
+    } catch (error) {
+      console.error('Error al actualizar el comercio:', error)
+      alert('Hubo un error al intentar modificar el comercio en la base de datos.')
     }
-    handleCloseEdit()
-    showSuccessToast('El comercio ha sido modificado exitosamente')
   }
 
   const handleOpenDelete = (commerce) => {
@@ -146,15 +168,26 @@ function CommercesSection({ commerces, openAddOnMount = false }) {
     setDeletingCommerce(null)
   }
 
-  const handleConfirmDelete = () => {
-    setCommerceList((currentCommerces) =>
-      currentCommerces.filter((commerce) => commerce.id !== deletingCommerce.id),
-    )
-    if (detailCommerce && detailCommerce.id === deletingCommerce.id) {
-      setDetailCommerce(null)
+const handleConfirmDelete = async () => {
+    try {
+      // 1. Borramos de verdad en MongoDB usando el _id del comercio
+      await remove('comercios', deletingCommerce.id)
+
+      // 2. Quitamos el elemento de la lista local de React
+      setCommerceList((currentCommerces) =>
+        currentCommerces.filter((commerce) => commerce.id !== deletingCommerce.id),
+      )
+
+      if (detailCommerce && detailCommerce.id === deletingCommerce.id) {
+        setDetailCommerce(null)
+      }
+
+      handleCloseDelete()
+      showSuccessToast('El comercio ha sido borrado exitosamente')
+    } catch (error) {
+      console.error('Error al borrar el comercio:', error)
+      alert('Hubo un error al intentar eliminar el comercio en la base de datos.')
     }
-    handleCloseDelete()
-    showSuccessToast('El comercio ha sido borrado exitosamente')
   }
 
   const handleOpenAdd = () => {
@@ -433,6 +466,7 @@ function CommercesSection({ commerces, openAddOnMount = false }) {
 function EditCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   const fields = [
     { name: 'name', label: 'Nombre del comercio', type: 'text' },
+    { name: 'rubro', label: 'Rubro', type: 'text' }, // <-- Agregado para cumplir con el backend
     {
       name: 'orders',
       label: 'Número de pedidos en el último mes',
