@@ -3,7 +3,7 @@ import './RepartidoresSection.css';
 
 const INITIAL_VISIBLE_COUNT = 6;
 
-function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
+function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversChange }) {
   const [driverList, setDriverList] = useState(drivers);
   // Criterio HU #16: Ordenada por estado por defecto
   const [sort, setSort] = useState({ key: 'status', direction: 'asc' });
@@ -172,7 +172,11 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
       recentOrders: [],
     };
 
-    setDriverList((prev) => [nuevoRepartidor, ...prev]);
+    const updatedList = [nuevoRepartidor, ...driverList];
+    setDriverList(updatedList);
+    if (onDriversChange) {
+      onDriversChange(updatedList);
+    }
     handleCloseAdd();
     showSuccessToast(`¡Repartidor ${fullName} cargado y disponible en el sistema!`);
   };
@@ -186,6 +190,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
       email: driver.email || '',
       password: driver.password || '',
       telefono: driver.telefono || driver.phone || '',
+      status: driver.status || 'Disponible',
     });
     setFormErrors({});
   };
@@ -207,7 +212,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
     event.preventDefault();
 
     // Regla HU #20: Deben completarse todos los campos de datos requeridos
-    const requiredFields = ['nombre', 'apellido', 'email', 'telefono'];
+    const requiredFields = ['nombre', 'apellido', 'email', 'telefono', 'status'];
     const errors = {};
     for (const field of requiredFields) {
       if (!formData[field] || String(formData[field]).trim() === '') {
@@ -228,23 +233,37 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
   const handleConfirmEdit = () => {
     // Escenario 1: Se confirma explícitamente y se cambian los datos en el sistema
     const fullName = `${formData.nombre.trim()} ${formData.apellido.trim()}`;
+    const newStatus = formData.status || editingDriver.status || 'Disponible';
 
-    setDriverList((prev) =>
-      prev.map((d) =>
-        d.id === editingDriver.id
-          ? {
-              ...d,
-              name: fullName,
-              nombre: formData.nombre.trim(),
-              apellido: formData.apellido.trim(),
-              email: formData.email.trim(),
-              telefono: formData.telefono.trim(),
-              phone: formData.telefono.trim(),
-              password: formData.password || d.password,
-            }
-          : d
-      )
-    );
+    const updatedList = driverList.map((d) => {
+      if (d.id === editingDriver.id) {
+        let destination = d.destination;
+        if (newStatus === 'Turno finalizado' && (!destination || destination === 'En base')) {
+          destination = 'Sin destino asignado';
+        } else if (newStatus === 'Disponible' && (!destination || destination === 'Sin destino asignado')) {
+          destination = 'En base';
+        }
+
+        return {
+          ...d,
+          name: fullName,
+          nombre: formData.nombre.trim(),
+          apellido: formData.apellido.trim(),
+          email: formData.email.trim(),
+          telefono: formData.telefono.trim(),
+          phone: formData.telefono.trim(),
+          password: formData.password || d.password,
+          status: newStatus,
+          destination,
+        };
+      }
+      return d;
+    });
+
+    setDriverList(updatedList);
+    if (onDriversChange) {
+      onDriversChange(updatedList);
+    }
 
     if (detailDriver && detailDriver.id === editingDriver.id) {
       setDetailDriver((prev) => ({
@@ -256,6 +275,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
         telefono: formData.telefono.trim(),
         phone: formData.telefono.trim(),
         password: formData.password || prev.password,
+        status: newStatus,
       }));
     }
 
@@ -276,7 +296,11 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false }) {
 
   const handleConfirmDelete = () => {
     // Escenario 1: Se acepta y el repartidor desaparece de las listas y menús
-    setDriverList((prev) => prev.filter((d) => d.id !== deletingDriver.id));
+    const updatedList = driverList.filter((d) => d.id !== deletingDriver.id);
+    setDriverList(updatedList);
+    if (onDriversChange) {
+      onDriversChange(updatedList);
+    }
     if (detailDriver && detailDriver.id === deletingDriver.id) {
       setDetailDriver(null);
     }
@@ -933,7 +957,7 @@ function AddDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   );
 }
 
-// HU #20: Modal Modificar Repartidor (Los datos modificados son: nombre, apellido, email, telefono, password)
+// HU #20: Modal Modificar Repartidor (Los datos modificados son: nombre, apellido, email, telefono, status, password)
 function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   // HU #20 Escenario 2: Se bloquea el botón aceptar si hay algún campo requerido vacío
   const hasEmptyFields =
@@ -944,7 +968,9 @@ function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) 
     !formData.email ||
     !formData.email.trim() ||
     !formData.telefono ||
-    !formData.telefono.trim();
+    !formData.telefono.trim() ||
+    !formData.status ||
+    !formData.status.trim();
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -1029,6 +1055,21 @@ function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) 
               {(formErrors.telefono || !formData.telefono?.trim()) && (
                 <small className="field-error">Completa el teléfono.</small>
               )}
+            </label>
+
+            <label className="form-field full-width" htmlFor="edit-status">
+              <span>Estado del repartidor *</span>
+              <select
+                id="edit-status"
+                name="status"
+                value={formData.status || 'Disponible'}
+                onChange={onChange}
+              >
+                <option value="Disponible">Disponible</option>
+                <option value="Buscando pedidos">Buscando pedidos</option>
+                <option value="Entregando">Entregando</option>
+                <option value="Turno finalizado">Turno finalizado (Inactivo)</option>
+              </select>
             </label>
 
             <label className="form-field full-width" htmlFor="edit-password">

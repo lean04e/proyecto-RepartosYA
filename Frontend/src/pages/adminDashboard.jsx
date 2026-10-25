@@ -87,13 +87,7 @@ function getOrderLabel(order, index) {
     return identifier ? `Pedido ${identifier}` : `Pedido ${index + 1}`;
 }
 
-const sections = [
-    { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos', badge: '0' },
-    { icon: '📊', label: 'Reportes', href: '#dashboard',  badge: '0'},
-    { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
-    { id: 'drivers', icon: '🚚', label: 'Repartidores', href: '#repartidores', status: 'Activos' },
-    { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
-];
+
 
 const metricTitles = [
     { id: 'pending', title: 'Total Pendientes' },
@@ -120,6 +114,26 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
     const [drivers, setDrivers] = useState(initialDriversData);
+
+    const hasActiveDrivers = Array.isArray(drivers) && drivers.length > 0 && drivers.some((driver) => {
+        const status = String(driver.status || '').trim().toLowerCase();
+        return !status.includes('finalizado') && !status.includes('inactiv');
+    });
+
+    const sections = [
+        { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos', badge: '0' },
+        { icon: '📊', label: 'Reportes', href: '#dashboard', badge: '0' },
+        { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
+        {
+            id: 'drivers',
+            icon: '🚚',
+            label: 'Repartidores',
+            href: '#repartidores',
+            status: hasActiveDrivers ? 'Activos' : 'Inactivos',
+            statusClass: hasActiveDrivers ? 'badge-status-active' : 'badge-status-inactive',
+        },
+        { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
+    ];
 
     // EFFECT PARA REPARTIDORES
     useEffect(() => {
@@ -283,7 +297,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                                     <span className="sidebar-item-icon" aria-hidden="true">{section.icon}</span>
                                     <span className="sidebar-item-label">{section.label}</span>
                                     {section.badge && <span className="badge-counter">{section.badge}</span>}
-                                    {section.status && <span className="badge-status-active">{section.status}</span>}
+                                    {section.status && <span className={section.statusClass || 'badge-status-active'}>{section.status}</span>}
                                 </a>
                             ))}
                         </nav>
@@ -309,7 +323,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                 {activeSection === 'commerces' ? (
                     <CommercesSection commerces={commerces} openAddOnMount={openAddCommerce} />
                 ) : activeSection === 'drivers' ? (
-                    <RepartidoresSection drivers={drivers} />
+                    <RepartidoresSection drivers={drivers} onDriversChange={setDrivers} />
                 ) : (
                     <>
                 <div className="admin-header-title-row">

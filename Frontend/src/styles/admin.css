@@ -297,18 +297,26 @@
 }
 
 .badge-counter,
-.badge-status-active {
+.badge-status-active,
+.badge-status-inactive {
     padding: 4px 8px;
     border-radius: 999px;
     background: #d91e18;
     color: #fff;
     font-size: 11px;
     line-height: 1.2;
+    font-weight: 700;
 }
 
 .badge-status-active {
     background: #d1fae5;
     color: #047857;
+}
+
+.badge-status-inactive {
+    background: #e2e8f0;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
 }
 
 .sidebar-user-card {
@@ -854,7 +862,8 @@
 }
 
 [data-theme='dark'] .ops-status-pill,
-[data-theme='dark'] .fleet-turn-pill{
+[data-theme='dark'] .fleet-turn-pill,
+[data-theme='dark'] .badge-status-inactive {
     background: #273449;
     border-color: #3b475b;
     color: #d1d5db;
