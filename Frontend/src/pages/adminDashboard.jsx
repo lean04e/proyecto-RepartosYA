@@ -7,6 +7,7 @@ import { initialCommerceData } from '../data/mockCommerces';
 import { initialOrdersData } from '../data/mockOrders';
 import { getAll } from '../services/api';
 import '../styles/admin.css';
+
 const ORDER_REFRESH_INTERVAL = 60_000;
 
 function formatToday() {
@@ -114,7 +115,6 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [ordersError, setOrdersError] = useState('');
     const [activeOrderView, setActiveOrderView] = useState(null);
     const [pedidos, setPedidos] = useState([]);
-
     const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
 
@@ -277,7 +277,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
-                    <CommercesSection commerces={commerces} />
+                    <CommercesSection commerces={commerces} openAddOnMount={openAddCommerce} />
                 ) : (
                     <>
                 <div className="admin-header-title-row">
