@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import avatar from '../assets/jefeP.jpeg';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
-import avatar from '../assets/jefeP.jpeg';
+import OrdersSection from '../components/OrdersSection';
+import { initialCommerceData } from '../data/mockCommerces';
+import { initialOrdersData } from '../data/mockOrders';
 import { getAll } from '../services/api';
 import '../styles/admin.css';
-
 const ORDER_REFRESH_INTERVAL = 60_000;
 
 function formatToday() {
@@ -112,7 +114,10 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [ordersError, setOrdersError] = useState('');
     const [activeOrderView, setActiveOrderView] = useState(null);
     const [pedidos, setPedidos] = useState([]);
+
     const [commerces, setCommerces] = useState([]);
+    const [openAddCommerce, setOpenAddCommerce] = useState(false);
+
 
     // EFFECT PARA COMERCIOS (Con traducción de datos backend -> frontend)
     useEffect(() => {
@@ -241,6 +246,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                                     onClick={section.id ? (event) => {
                                         event.preventDefault();
                                         setActiveSection(section.id);
+                                        setOpenAddCommerce(false);
                                         setActiveOrderView(null);
                                     } : undefined}
                                 >
@@ -350,6 +356,16 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         </article>
                     ))}
                 </section>
+
+                <OrdersSection
+                    orders={initialOrdersData}
+                    commerces={initialCommerceData}
+                    onGoToCommerces={() => {
+                        setOpenAddCommerce(true);
+                        setActiveSection('commerces');
+                        setActiveOrderView(null);
+                    }}
+                />
                     </>
                 )}
             </main>

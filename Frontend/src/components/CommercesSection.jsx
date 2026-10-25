@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { generateDefaultOrders } from '../data/mockCommerces'
+import { create } from '../services/api'; // <-- AGREGAR ESTA LÍNEA
 import './CommercesSection.css'
 
 const INITIAL_VISIBLE_COUNT = 6
 
-function CommercesSection({ commerces }) {
+function CommercesSection({ commerces, openAddOnMount = false }) {
   const [commerceList, setCommerceList] = useState(commerces)
   const [sort, setSort] = useState({ key: 'orders', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
@@ -14,8 +14,10 @@ function CommercesSection({ commerces }) {
   const [formErrors, setFormErrors] = useState({})
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [deletingCommerce, setDeletingCommerce] = useState(null)
-  const [addingCommerce, setAddingCommerce] = useState(false)
-  const [newCommerceData, setNewCommerceData] = useState(null)
+  const [addingCommerce, setAddingCommerce] = useState(openAddOnMount)
+  const [newCommerceData, setNewCommerceData] = useState(
+    openAddOnMount ? { name: '', orders: '', phone: '', address: '' } : null,
+  )
   const [newCommerceErrors, setNewCommerceErrors] = useState({})
   const [successToastMessage, setSuccessToastMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -156,7 +158,7 @@ function CommercesSection({ commerces }) {
   }
 
   const handleOpenAdd = () => {
-    setNewCommerceData({ name: '', orders: '', phone: '', address: '' })
+    setNewCommerceData({ name: '', rubro: '', orders: '', phone: '', address: '' })
     setNewCommerceErrors({})
     setAddingCommerce(true)
   }
@@ -173,7 +175,7 @@ function CommercesSection({ commerces }) {
     setNewCommerceErrors((currentErrors) => ({ ...currentErrors, [name]: false }))
   }
 
-  const handleAddCommerce = (event) => {
+  const handleAddCommerce = async (event) => {
     event.preventDefault()
 
     const nextErrors = Object.fromEntries(
@@ -185,19 +187,39 @@ function CommercesSection({ commerces }) {
       return
     }
 
-    const nextId = Math.max(0, ...commerceList.map((commerce) => commerce.id)) + 1
-    const initialOrders = Number(newCommerceData.orders)
-    const commerceToAdd = {
-      id: nextId,
-      ...newCommerceData,
-      orders: initialOrders,
-      historicalOrders: initialOrders,
-      recentOrders: generateDefaultOrders(nextId),
-    }
+    try {
+      // 1. Preparamos el objeto con las propiedades que espera tu backend (en español)
+      const comercioParaBackend = {
+        nombre: newCommerceData.name,
+        rubro: newCommerceData.rubro,
+        telefono: newCommerceData.phone,
+        direccion: newCommerceData.address,
+        cantPedidos: Number(newCommerceData.orders) || 0,
+      }
 
-    setCommerceList((currentCommerces) => [...currentCommerces, commerceToAdd])
-    handleCloseAdd()
-    showSuccessToast('El comercio ha sido añadido exitosamente')
+      // 2. Guardamos de verdad en MongoDB a través de la ruta POST /comercios
+      const comercioCreado = await create('comercios', comercioParaBackend)
+
+      // 3. Traducimos la respuesta del servidor al formato que usa visualmente la tabla
+      const comercioAdaptado = {
+        id: comercioCreado._id,
+        name: comercioCreado.nombre,
+        rubro: comercioCreado.rubro,
+        orders: comercioCreado.cantPedidos,
+        phone: comercioCreado.telefono,
+        address: comercioCreado.direccion,
+        historicalOrders: (comercioCreado.cantPedidos || 0) * 5,
+        recentOrders: [],
+      }
+
+      // 4. Actualizamos el estado de la lista y cerramos el modal con éxito
+      setCommerceList((currentCommerces) => [...currentCommerces, comercioAdaptado])
+      handleCloseAdd()
+      showSuccessToast('¡Comercio guardado en la base de datos exitosamente!')
+    } catch (error) {
+      console.error('Error al guardar el comercio:', error)
+      alert('Hubo un error al intentar guardar el comercio en la base de datos.')
+    }
   }
 
   const handleSearchChange = (event) => {
@@ -483,6 +505,7 @@ function EditCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }
 function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   const fields = [
     { name: 'name', label: 'Nombre del comercio', type: 'text' },
+    { name: 'rubro', label: 'Rubro', type: 'text' }, // <-- CAMPO OBLIGATORIO AGREGADO
     {
       name: 'orders',
       label: 'Número de pedidos en el último mes',
@@ -524,7 +547,7 @@ function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit })
                   id={`new-commerce-${field.name}`}
                   name={field.name}
                   type={field.type}
-                  value={formData[field.name]}
+                  value={formData[field.name] || ''}
                   onChange={onChange}
                   className={formErrors[field.name] ? 'has-error' : ''}
                   aria-invalid={formErrors[field.name] || undefined}
@@ -717,7 +740,7 @@ function CommerceDetailModal({ commerce, onClose }) {
       : []
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop detail-backdrop" role="presentation" onClick={onClose}>
       <div
         className="detail-modal"
         role="dialog"

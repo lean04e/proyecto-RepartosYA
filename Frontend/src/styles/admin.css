@@ -400,6 +400,10 @@
     margin-left: 260px;
 }
 
+.admin-content-area:not(.sidebar-is-open) > .commerces-section {
+    margin-inline: auto;
+}
+
 .admin-header-title-row {
     display: flex;
     align-items: flex-end;

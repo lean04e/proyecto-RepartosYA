@@ -71,6 +71,7 @@
 }
 
 .commerce-filters {
+  width: 100%;
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -94,6 +95,9 @@
 
 .minimum-orders-filter {
   width: 150px;
+  min-width: 0;
+  flex: 0 0 150px;
+  margin-left: auto;
 }
 
 .filter-input-wrapper {
@@ -119,6 +123,7 @@
 .filter-input-wrapper input,
 .minimum-orders-filter input {
   width: 100%;
+  box-sizing: border-box;
   height: 44px;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -485,6 +490,7 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  margin: -14px -18px 0 0;
   padding: 7px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -521,8 +527,8 @@
 
 .form-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 22px 28px;
 }
 
 .form-field {
@@ -536,6 +542,7 @@
 
 .form-field input {
   width: 100%;
+  box-sizing: border-box;
   height: 44px;
   padding: 0 12px;
   border: 1px solid var(--border-strong);
@@ -652,10 +659,15 @@
    Modal: Ver Detalle del Comercio (feature/VerDetalleComercio)
    ========================================================================== */
 
+/* Deja libre el alto del encabezado fijo de la página (70px) para que no tape el modal */
+.detail-backdrop {
+  padding-top: 94px;
+}
+
 .detail-modal {
   width: 760px;
   max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - 118px);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-strong);
@@ -678,6 +690,15 @@
     opacity: 1;
     transform: scale(1) translateY(0);
   }
+}
+
+.detail-modal .modal-heading {
+  align-items: center;
+  padding: 14px 20px 14px 32px;
+}
+
+.detail-modal .modal-close {
+  margin: 0;
 }
 
 .detail-modal-body {
@@ -920,9 +941,14 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  padding: 18px 32px;
+  padding: 8px 32px;
   border-top: 1px solid var(--border);
   background: var(--surface);
+}
+
+.detail-modal-footer .modal-apply {
+  min-height: 34px;
+  padding: 6px 16px;
 }
 
 .detail-edit-btn {

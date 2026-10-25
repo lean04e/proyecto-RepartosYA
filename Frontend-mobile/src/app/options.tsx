@@ -1,0 +1,1 @@
+export { default } from '../screen/System_Configuration_And_Customization/options';

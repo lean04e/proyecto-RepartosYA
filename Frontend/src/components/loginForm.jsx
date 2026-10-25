@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { login } from '../services/api';
+import PasswordRecoveryModal from './PasswordRecoveryModal';
+import '../styles/passwordRecovery.css';
 
 function LoginForm({ onLoginSuccess }) {
     const [usuario, setUsuario] = useState('');
@@ -10,6 +12,7 @@ function LoginForm({ onLoginSuccess }) {
     const [modalMessage, setModalMessage] = useState('');
     const [pendingSession, setPendingSession] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -134,6 +137,27 @@ function LoginForm({ onLoginSuccess }) {
                     )}
                 </div>
 
+                {/* Botón para recuperar contraseña */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px', marginBottom: '22px' }}>
+                    <button
+                        type="button"
+                        onClick={() => setIsRecoveryOpen(true)}
+                        className="login-forgot-password-btn"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#070c18',
+                            textDecoration: 'none',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            padding: 0
+                        }}
+                    >
+                        ¿Olvidaste tu contraseña? Recuperar contraseña
+                    </button>
+                </div>
+
                 <button type="submit" disabled={isSubmitting} style={{
                     width: '100%', 
                     padding: '14px', 
@@ -199,6 +223,12 @@ function LoginForm({ onLoginSuccess }) {
                     </div>
                 </div>
             )}
+
+            {/* Modal de recuperación de contraseña */}
+            <PasswordRecoveryModal
+                isOpen={isRecoveryOpen}
+                onClose={() => setIsRecoveryOpen(false)}
+            />
         </div>
     );
 }
