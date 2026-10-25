@@ -39,7 +39,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
   const [minimumOrders, setMinimumOrders] = useState('');
 
   useEffect(() => {
-    if (Array.isArray(drivers) && drivers.length > 0) {
+    if (Array.isArray(drivers)) {
       setDriverList(drivers);
     }
   }, [drivers]);
@@ -163,7 +163,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
       telefono: newDriverData.telefono.trim(),
       phone: newDriverData.telefono.trim(),
       // Valores operativos de sistema automáticos (no añadidos por el admin)
-      status: 'Disponible',
+      status: 'Activo',
       destination: 'En base',
       pendingOrders: 0,
       deliveredOrders: 0,
@@ -190,7 +190,7 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
       email: driver.email || '',
       password: driver.password || '',
       telefono: driver.telefono || driver.phone || '',
-      status: driver.status || 'Disponible',
+      status: driver.status || 'Activo',
     });
     setFormErrors({});
   };
@@ -233,14 +233,14 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
   const handleConfirmEdit = () => {
     // Escenario 1: Se confirma explícitamente y se cambian los datos en el sistema
     const fullName = `${formData.nombre.trim()} ${formData.apellido.trim()}`;
-    const newStatus = formData.status || editingDriver.status || 'Disponible';
+    const newStatus = formData.status || editingDriver.status || 'Activo';
 
     const updatedList = driverList.map((d) => {
       if (d.id === editingDriver.id) {
         let destination = d.destination;
-        if (newStatus === 'Turno finalizado' && (!destination || destination === 'En base')) {
+        if (newStatus === 'Inactivo' && (!destination || destination === 'En base')) {
           destination = 'Sin destino asignado';
-        } else if (newStatus === 'Disponible' && (!destination || destination === 'Sin destino asignado')) {
+        } else if (newStatus === 'Activo' && (!destination || destination === 'Sin destino asignado')) {
           destination = 'En base';
         }
 
@@ -356,10 +356,12 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
             }}
           >
             <option value="">Todos los estados</option>
-            <option value="Buscando pedidos">Buscando pedidos</option>
-            <option value="Entregando">Entregando</option>
-            <option value="Disponible">Disponible</option>
-            <option value="Turno finalizado">Turno finalizado</option>
+            <option value="Activo">Activo</option>
+            <option value="Asignado">Asignado</option>
+            <option value="Retirando pedido">Retirando pedido</option>
+            <option value="En viaje">En viaje</option>
+            <option value="Entregado">Entregado</option>
+            <option value="Inactivo">Inactivo</option>
           </select>
         </label>
 
@@ -625,19 +627,28 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
 }
 
 function DriverStatusBadge({ status }) {
-  const norm = (status || 'Disponible').trim().toLowerCase();
-  let label = 'Disponible';
-  let badgeClass = 'driver-status-disponible';
+  const norm = (status || 'Activo').trim().toLowerCase();
+  let label = 'Activo';
+  let badgeClass = 'driver-status-activo';
 
-  if (norm.includes('buscando')) {
-    label = 'Buscando pedidos';
-    badgeClass = 'driver-status-buscando';
-  } else if (norm.includes('entregando') || norm.includes('camino') || norm.includes('curso')) {
-    label = 'Entregando';
-    badgeClass = 'driver-status-entregando';
-  } else if (norm.includes('finalizado') || norm.includes('inactivo')) {
-    label = 'Turno finalizado';
+  if (norm.includes('inactiv') || norm.includes('finalizado')) {
+    label = 'Inactivo';
     badgeClass = 'driver-status-inactivo';
+  } else if (norm.includes('retirando')) {
+    label = 'Retirando pedido';
+    badgeClass = 'driver-status-amarillo';
+  } else if (norm.includes('viaje') || norm.includes('camino')) {
+    label = 'En viaje';
+    badgeClass = 'driver-status-amarillo';
+  } else if (norm.includes('entregado')) {
+    label = 'Entregado';
+    badgeClass = 'driver-status-azul';
+  } else if (norm.includes('asignado')) {
+    label = 'Asignado';
+    badgeClass = 'driver-status-asignado';
+  } else {
+    label = 'Activo';
+    badgeClass = 'driver-status-activo';
   }
 
   return (
@@ -1062,13 +1073,15 @@ function EditDriverModal({ formData, formErrors, onChange, onClose, onSubmit }) 
               <select
                 id="edit-status"
                 name="status"
-                value={formData.status || 'Disponible'}
+                value={formData.status || 'Activo'}
                 onChange={onChange}
               >
-                <option value="Disponible">Disponible</option>
-                <option value="Buscando pedidos">Buscando pedidos</option>
-                <option value="Entregando">Entregando</option>
-                <option value="Turno finalizado">Turno finalizado (Inactivo)</option>
+                <option value="Activo">Activo</option>
+                <option value="Asignado">Asignado</option>
+                <option value="Retirando pedido">Retirando pedido</option>
+                <option value="En viaje">En viaje</option>
+                <option value="Entregado">Entregado</option>
+                <option value="Inactivo">Inactivo</option>
               </select>
             </label>
 

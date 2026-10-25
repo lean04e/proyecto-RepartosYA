@@ -117,7 +117,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
     const hasActiveDrivers = Array.isArray(drivers) && drivers.length > 0 && drivers.some((driver) => {
         const status = String(driver.status || '').trim().toLowerCase();
-        return !status.includes('finalizado') && !status.includes('inactiv');
+        return !status.includes('inactiv') && !status.includes('finalizado');
     });
 
     const sections = [
@@ -148,7 +148,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         email: repartidor.email || '',
                         phone: repartidor.telefono || repartidor.phone || '',
                         vehicle: repartidor.vehiculo || repartidor.vehicle || 'Moto',
-                        status: repartidor.estado || repartidor.status || 'Disponible',
+                        status: repartidor.estado || repartidor.status || 'Activo',
                         destination: repartidor.dondeSeDirige || repartidor.destination || 'En base / Central',
                         pendingOrders: Number(repartidor.pedidosPendientes ?? repartidor.pendingOrders ?? 0),
                         deliveredOrders: Number(repartidor.cantPedidos ?? repartidor.orders ?? 0),

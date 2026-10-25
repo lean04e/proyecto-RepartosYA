@@ -5,8 +5,11 @@
  * Y las propiedades operativas gestionadas por el sistema:
  *   status, destination, pendingOrders, orders (deliveredOrders), historicalOrders, recentOrders
  */
+// Lista vacía inicial solicitada por el usuario
+export const initialDriversData = [];
 
-export const initialDriversData = [
+// Lista de ejemplo de respaldo (para pruebas o restauración)
+export const sampleDriversData = [
   {
     id: 1,
     name: 'Lucas Fernández',
@@ -16,7 +19,7 @@ export const initialDriversData = [
     password: 'RepartidorNro1',
     telefono: '+54 11 5821 4410',
     phone: '+54 11 5821 4410',
-    status: 'Entregando',
+    status: 'En viaje',
     destination: 'Av. Corrientes 1842, CABA',
     pendingOrders: 2,
     orders: 342,
@@ -44,7 +47,7 @@ export const initialDriversData = [
     password: 'RepartidorNro2',
     telefono: '+54 11 4982 3319',
     phone: '+54 11 4982 3319',
-    status: 'Buscando pedidos',
+    status: 'Retirando pedido',
     destination: 'Calle Honduras 5210, CABA',
     pendingOrders: 1,
     orders: 289,
@@ -72,7 +75,7 @@ export const initialDriversData = [
     password: 'RepartidorNro3',
     telefono: '+54 11 6301 8842',
     phone: '+54 11 6301 8842',
-    status: 'Disponible',
+    status: 'Activo',
     destination: 'En base',
     pendingOrders: 0,
     orders: 254,
@@ -100,7 +103,7 @@ export const initialDriversData = [
     password: 'RepartidorNro4',
     telefono: '+54 11 5110 7723',
     phone: '+54 11 5110 7723',
-    status: 'Entregando',
+    status: 'Asignado',
     destination: 'Av. Santa Fe 3268, CABA',
     pendingOrders: 1,
     orders: 210,
@@ -128,7 +131,7 @@ export const initialDriversData = [
     password: 'RepartidorNro5',
     telefono: '+54 11 4429 6610',
     phone: '+54 11 4429 6610',
-    status: 'Disponible',
+    status: 'Entregado',
     destination: 'En base',
     pendingOrders: 0,
     orders: 178,
@@ -156,7 +159,7 @@ export const initialDriversData = [
     password: 'RepartidorNro6',
     telefono: '+54 11 4721 9901',
     phone: '+54 11 4721 9901',
-    status: 'Buscando pedidos',
+    status: 'Activo',
     destination: 'Gorriti 4932, CABA',
     pendingOrders: 1,
     orders: 145,
@@ -184,7 +187,7 @@ export const initialDriversData = [
     password: 'RepartidorNro7',
     telefono: '+54 11 5566 2211',
     phone: '+54 11 5566 2211',
-    status: 'Turno finalizado',
+    status: 'Inactivo',
     destination: 'Sin destino asignado',
     pendingOrders: 0,
     orders: 112,

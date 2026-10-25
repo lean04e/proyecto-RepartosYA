@@ -302,44 +302,87 @@
   line-height: 1.2;
 }
 
+/* Verde: Activo y Asignado */
+.driver-status-activo,
+.driver-status-asignado,
 .driver-status-disponible {
-  color: var(--status-success-text);
-  background: var(--status-success-bg);
-  border: 1px solid var(--status-success-border);
+  color: #047857;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
 }
 
+.driver-status-activo .status-dot,
+.driver-status-asignado .status-dot,
 .driver-status-disponible .status-dot {
-  background: var(--status-success-text);
+  background: #10b981;
 }
 
-.driver-status-buscando {
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
-  border: 1px solid rgba(37, 99, 235, 0.25);
+/* Amarillo: Retirando pedido y En viaje */
+.driver-status-amarillo,
+.driver-status-retirando,
+.driver-status-en-viaje {
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
 }
 
-.driver-status-buscando .status-dot {
-  background: #2563eb;
+.driver-status-amarillo .status-dot,
+.driver-status-retirando .status-dot,
+.driver-status-en-viaje .status-dot {
+  background: #f59e0b;
 }
 
-.driver-status-entregando {
-  color: var(--status-warning-text);
-  background: var(--status-warning-bg);
-  border: 1px solid var(--status-warning-border);
+/* Azul: Entregado */
+.driver-status-azul,
+.driver-status-entregado {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
 }
 
-.driver-status-entregando .status-dot {
-  background: var(--status-warning-text);
+.driver-status-azul .status-dot,
+.driver-status-entregado .status-dot {
+  background: #3b82f6;
 }
 
+/* Gris: Inactivo */
 .driver-status-inactivo {
-  color: var(--text-muted);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
 }
 
 .driver-status-inactivo .status-dot {
-  background: var(--text-muted);
+  background: #94a3b8;
+}
+
+:root[data-theme='dark'] .driver-status-activo,
+:root[data-theme='dark'] .driver-status-asignado,
+:root[data-theme='dark'] .driver-status-disponible {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+:root[data-theme='dark'] .driver-status-amarillo,
+:root[data-theme='dark'] .driver-status-retirando,
+:root[data-theme='dark'] .driver-status-en-viaje {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+:root[data-theme='dark'] .driver-status-azul,
+:root[data-theme='dark'] .driver-status-entregado {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+:root[data-theme='dark'] .driver-status-inactivo {
+  color: #94a3b8;
+  background: #1e293b;
+  border-color: #334155;
 }
 
 .empty-results-row td {
