@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import avatar from '../assets/jefeP.jpeg';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
+import RepartidoresSection from '../components/RepartidoresSection';
 import OrdersSection from '../components/OrdersSection';
 import { initialCommerceData } from '../data/mockCommerces';
+import { initialDriversData } from '../data/mockDrivers';
 import { initialOrdersData } from '../data/mockOrders';
 import { getAll } from '../services/api';
 import '../styles/admin.css';
@@ -89,7 +91,7 @@ const sections = [
     { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos', badge: '0' },
     { icon: '📊', label: 'Reportes', href: '#dashboard',  badge: '0'},
     { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
-    { icon: '🚚', label: 'Repartidores', href: '#repartidores', status: 'Activos' },
+    { id: 'drivers', icon: '🚚', label: 'Repartidores', href: '#repartidores', status: 'Activos' },
     { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
 ];
 
@@ -117,6 +119,34 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [pedidos, setPedidos] = useState([]);
     const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
+    const [drivers, setDrivers] = useState(initialDriversData);
+
+    // EFFECT PARA REPARTIDORES
+    useEffect(() => {
+        getAll('repartidores')
+            .then((data) => {
+                if (Array.isArray(data) && data.length > 0) {
+                    const repartidoresAdaptados = data.map((repartidor) => ({
+                        id: repartidor._id || repartidor.id,
+                        name: `${repartidor.nombre || ''} ${repartidor.apellido || ''}`.trim() || repartidor.name,
+                        firstName: repartidor.nombre || repartidor.firstName || '',
+                        lastName: repartidor.apellido || repartidor.lastName || '',
+                        email: repartidor.email || '',
+                        phone: repartidor.telefono || repartidor.phone || '',
+                        vehicle: repartidor.vehiculo || repartidor.vehicle || 'Moto',
+                        status: repartidor.estado || repartidor.status || 'Disponible',
+                        destination: repartidor.dondeSeDirige || repartidor.destination || 'En base / Central',
+                        pendingOrders: Number(repartidor.pedidosPendientes ?? repartidor.pendingOrders ?? 0),
+                        deliveredOrders: Number(repartidor.cantPedidos ?? repartidor.orders ?? 0),
+                        orders: Number(repartidor.cantPedidos ?? repartidor.orders ?? 0),
+                        historicalOrders: (Number(repartidor.cantPedidos ?? repartidor.orders ?? 0)) * 4,
+                        recentOrders: repartidor.recentOrders || []
+                    }));
+                    setDrivers(repartidoresAdaptados);
+                }
+            })
+            .catch((err) => console.error('Error al cargar repartidores:', err));
+    }, []);
 
 
     // EFFECT PARA COMERCIOS (Con traducción de datos backend -> frontend)
@@ -278,6 +308,8 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
                     <CommercesSection commerces={commerces} openAddOnMount={openAddCommerce} />
+                ) : activeSection === 'drivers' ? (
+                    <RepartidoresSection drivers={drivers} />
                 ) : (
                     <>
                 <div className="admin-header-title-row">
