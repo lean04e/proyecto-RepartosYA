@@ -4,8 +4,9 @@ import './CommercesSection.css';
 
 const INITIAL_VISIBLE_COUNT = 6
 
-function CommercesSection({ commerces, openAddOnMount = false }) {
-  const [commerceList, setCommerceList] = useState(commerces)
+function CommercesSection({ commerces, onCommercesChange, openAddOnMount = false }) {
+  const commerceList = commerces
+  const setCommerceList = onCommercesChange
   const [sort, setSort] = useState({ key: 'orders', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
   const [detailCommerce, setDetailCommerce] = useState(null)
@@ -33,6 +34,7 @@ function CommercesSection({ commerces, openAddOnMount = false }) {
     const matchesSearch =
       !normalizedSearchTerm ||
       commerce.name.toLocaleLowerCase('es').includes(normalizedSearchTerm) ||
+      (commerce.rubro || '').toLocaleLowerCase('es').includes(normalizedSearchTerm) ||
       commerce.address.toLocaleLowerCase('es').includes(normalizedSearchTerm)
     const matchesMinimumOrders =
       minimumOrders === '' || commerce.orders >= Number(minimumOrders)
@@ -280,7 +282,7 @@ const handleConfirmDelete = async () => {
 
       <div className="commerce-filters" aria-label="Filtros de comercios">
         <label className="search-filter" htmlFor="commerce-search">
-          <span className="sr-only">Buscar comercio por nombre o dirección</span>
+          <span className="sr-only">Buscar comercio por nombre, rubro o dirección</span>
           <div className="filter-input-wrapper">
             <SearchIcon />
             <input
@@ -288,7 +290,7 @@ const handleConfirmDelete = async () => {
               type="search"
               value={searchTerm}
               onChange={handleSearchChange}
-              placeholder="Buscar por nombre o dirección"
+              placeholder="Buscar por nombre, rubro o dirección"
             />
           </div>
         </label>
@@ -319,8 +321,14 @@ const handleConfirmDelete = async () => {
                   onSort={handleSort}
                 />
                 <SortableHeader
+                  column="rubro"
+                  label="Rubro"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <SortableHeader
                   column="orders"
-                  label="Número de pedidos en el último mes"
+                  label="Número de pedidos"
                   sort={sort}
                   onSort={handleSort}
                   className="orders-column"
@@ -357,7 +365,8 @@ const handleConfirmDelete = async () => {
                   <th scope="row" data-label="Nombre del comercio">
                     <span className="commerce-name">{commerce.name}</span>
                   </th>
-                  <td data-label="Pedidos último mes" className="orders-cell">
+                  <td data-label="Rubro">{commerce.rubro}</td>
+                  <td data-label="Número de pedidos" className="orders-cell">
                     {commerce.orders.toLocaleString('es-AR')}
                   </td>
                   <td data-label="Teléfono">{commerce.phone}</td>
@@ -394,12 +403,12 @@ const handleConfirmDelete = async () => {
               ))}
               {visibleCommerces.length === 0 && (
                 <tr className="empty-results-row">
-                  <td colSpan="5">No se encontraron comercios con esos filtros.</td>
+                  <td colSpan="6">No se encontraron comercios con esos filtros.</td>
                 </tr>
               )}
               {canShowMore && (
                 <tr className="show-more-row">
-                  <td colSpan="5">
+                  <td colSpan="6">
                     <button
                       className="show-more-button"
                       type="button"
@@ -420,6 +429,7 @@ const handleConfirmDelete = async () => {
           commerce={detailCommerce}
           onClose={handleCloseDetail}
           onEdit={handleOpenEdit}
+          onDelete={handleOpenDelete}
         />
       )}
       {editingCommerce &&
@@ -469,7 +479,7 @@ function EditCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }
     { name: 'rubro', label: 'Rubro', type: 'text' }, // <-- Agregado para cumplir con el backend
     {
       name: 'orders',
-      label: 'Número de pedidos en el último mes',
+      label: 'Número de pedidos',
       type: 'number',
     },
     { name: 'phone', label: 'Teléfono', type: 'tel' },
@@ -542,7 +552,7 @@ function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit })
     { name: 'rubro', label: 'Rubro', type: 'text' }, // <-- CAMPO OBLIGATORIO AGREGADO
     {
       name: 'orders',
-      label: 'Número de pedidos en el último mes',
+      label: 'Número de pedidos',
       type: 'number',
     },
     { name: 'phone', label: 'Teléfono', type: 'tel' },
@@ -750,7 +760,7 @@ function StoreIcon() {
   )
 }
 
-function CommerceDetailModal({ commerce, onClose }) {
+function CommerceDetailModal({ commerce, onClose, onEdit, onDelete }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -760,13 +770,6 @@ function CommerceDetailModal({ commerce, onClose }) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
-
-  // Compatibilidad con Backend / Base de Datos:
-  // Se leen pedidos históricos y pedidos recientes con fallback seguro
-  const historicalOrders =
-    commerce.historicalOrders !== undefined
-      ? commerce.historicalOrders
-      : Math.round(Number(commerce.orders || 0) * 3)
 
   const recentOrders =
     Array.isArray(commerce.recentOrders) && commerce.recentOrders.length > 0
@@ -801,6 +804,14 @@ function CommerceDetailModal({ commerce, onClose }) {
           <div className="detail-summary-grid">
             <div className="detail-card">
               <span className="detail-card-label">
+                <StoreIcon />
+                <span>Rubro</span>
+              </span>
+              <span className="detail-card-value">{commerce.rubro || 'No especificado'}</span>
+            </div>
+
+            <div className="detail-card">
+              <span className="detail-card-label">
                 <PhoneIcon />
                 <span>Teléfono</span>
               </span>
@@ -818,22 +829,13 @@ function CommerceDetailModal({ commerce, onClose }) {
             <div className="detail-card detail-card-highlight">
               <span className="detail-card-label">
                 <CalendarMonthIcon />
-                <span>Pedidos en el último mes</span>
+                <span>Número de pedidos</span>
               </span>
               <span className="detail-card-value detail-metric-number">
                 {Number(commerce.orders || 0).toLocaleString('es-AR')}
               </span>
             </div>
 
-            <div className="detail-card detail-card-highlight">
-              <span className="detail-card-label">
-                <HistoryIcon />
-                <span>Número de pedidos histórica</span>
-              </span>
-              <span className="detail-card-value detail-metric-number">
-                {historicalOrders.toLocaleString('es-AR')}
-              </span>
-            </div>
           </div>
 
           {/* Historial de pedidos */}
@@ -877,8 +879,11 @@ function CommerceDetailModal({ commerce, onClose }) {
         </div>
 
         <div className="detail-modal-footer">
-          <button className="modal-apply" type="button" onClick={onClose}>
-            Cerrar
+          <button className="modal-apply" type="button" onClick={() => onEdit(commerce)}>
+            Modificar comercio
+          </button>
+          <button className="modal-delete" type="button" onClick={() => onDelete(commerce)}>
+            Borrar comercio
           </button>
         </div>
       </div>
@@ -940,14 +945,5 @@ function CalendarMonthIcon() {
   )
 }
 
-function HistoryIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l3 3" />
-    </svg>
-  )
-}
 
 export default CommercesSection

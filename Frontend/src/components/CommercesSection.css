@@ -946,7 +946,8 @@
   background: var(--surface);
 }
 
-.detail-modal-footer .modal-apply {
+.detail-modal-footer .modal-apply,
+.detail-modal-footer .modal-delete {
   min-height: 34px;
   padding: 6px 16px;
 }

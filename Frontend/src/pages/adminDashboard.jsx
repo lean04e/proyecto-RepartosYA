@@ -171,6 +171,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                     const comerciosAdaptados = data.map((comercio) => ({
                         id: comercio._id,
                         name: comercio.nombre,
+                        rubro: comercio.rubro || '',
                         orders: comercio.cantPedidos,
                         phone: comercio.telefono,
                         address: comercio.direccion,
@@ -321,7 +322,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
-                    <CommercesSection commerces={commerces} openAddOnMount={openAddCommerce} />
+                    <CommercesSection commerces={commerces} onCommercesChange={setCommerces} openAddOnMount={openAddCommerce} />
                 ) : activeSection === 'drivers' ? (
                     <RepartidoresSection drivers={drivers} onDriversChange={setDrivers} />
                 ) : (
