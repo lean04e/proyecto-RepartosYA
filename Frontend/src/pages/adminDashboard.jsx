@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import avatar from '../assets/jefeP.jpeg';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
+import RouteSheetSection from '../components/RouteSheetSection';
 import RepartidoresSection from '../components/RepartidoresSection';
 import OrdersSection from '../components/OrdersSection';
 import { initialCommerceData } from '../data/mockCommerces';
@@ -114,6 +115,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
     const [drivers, setDrivers] = useState(initialDriversData);
+    const [routeAssignments, setRouteAssignments] = useState({});
 
     const hasActiveDrivers = Array.isArray(drivers) && drivers.length > 0 && drivers.some((driver) => {
         const status = String(driver.status || '').trim().toLowerCase();
@@ -132,6 +134,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
             status: hasActiveDrivers ? 'Activos' : 'Inactivos',
             statusClass: hasActiveDrivers ? 'badge-status-active' : 'badge-status-inactive',
         },
+        { id: 'routes', icon: '🗺️', label: 'Hoja de Ruta', href: '#hoja-de-ruta' },
         { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
     ];
 
@@ -325,6 +328,12 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                     <CommercesSection commerces={commerces} onCommercesChange={setCommerces} openAddOnMount={openAddCommerce} />
                 ) : activeSection === 'drivers' ? (
                     <RepartidoresSection drivers={drivers} onDriversChange={setDrivers} />
+                ) : activeSection === 'routes' ? (
+                    <RouteSheetSection
+                        drivers={drivers}
+                        assignments={routeAssignments}
+                        onAssignmentsChange={setRouteAssignments}
+                    />
                 ) : (
                     <>
                 <div className="admin-header-title-row">
