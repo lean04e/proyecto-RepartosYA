@@ -408,7 +408,8 @@
     margin-left: 260px;
 }
 
-.admin-content-area:not(.sidebar-is-open) > .commerces-section {
+.admin-content-area:not(.sidebar-is-open) > .commerces-section,
+.admin-content-area:not(.sidebar-is-open) > .repartidores-section {
     margin-inline: auto;
 }
 
