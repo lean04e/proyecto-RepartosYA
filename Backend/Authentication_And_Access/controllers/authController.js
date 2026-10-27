@@ -1,55 +1,56 @@
-// Importamos el modelo que acabamos de simplificar
-const Admin = require('../../../models/Admin');
-const bcrypt = require('bcryptjs');
+const Admin = require('../../Models/Admin');
+const Repartidor = require('../../Models/Repartidor');
 const jwt = require('jsonwebtoken');
 
-// Esta es la función que procesa el intento de inicio de sesión
-const loginAdmin = async (req, res) => {
+const login = async (req, res) => {
   try {
-    // 1. Extraemos el email y la password que envió la página web
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
-    // 2. Validamos que no hayan enviado campos vacíos
-    if (!email || !password) {
-      return res.status(400).json({ mensaje: 'Debes completar el email y la contraseña' });
+    // 1. Buscamos si es un Administrador
+    let usuarioEncontrado = await Admin.findOne({ 
+      $or: [{ email: username }, { nombre: username }] 
+    });
+    let rol = 'admin';
+
+    // 2. Si no es admin, buscamos en los Repartidores por email o legajo (ej: 0001)
+    if (!usuarioEncontrado) {
+      usuarioEncontrado = await Repartidor.findOne({ 
+        $or: [{ email: username }, { legajo: username }] 
+      });
+      rol = 'repartidor';
     }
 
-    // 3. Buscamos en MongoDB si existe el Administrador con ese email
-    const adminEncontrado = await Admin.findOne({ email });
-
-    // Si no existe ningún admin con ese correo:
-    if (!adminEncontrado) {
-      return res.status(401).json({ mensaje: 'Credenciales incorrectas' });
+    if (!usuarioEncontrado) {
+      return res.status(401).json({ message: 'Usuario o credenciales incorrectas.' });
     }
 
-    // 4. Comparamos la contraseña tipeada con la encriptada en la BD
-    const esPasswordCorrecta = await bcrypt.compare(password, adminEncontrado.password);
-
-    // Si la contraseña no coincide:
-    if (!esPasswordCorrecta) {
-      return res.status(401).json({ mensaje: 'Credenciales incorrectas' });
+    // 3. Validar la contraseña (comparación directa con los datos del seed)
+    const passwordValid = password === usuarioEncontrado.password;
+    
+    if (!passwordValid) {
+      return res.status(401).json({ message: 'Contraseña incorrecta.' });
     }
 
-    // 5. Si todo está bien, generamos una credencial digital (Token JWT) para la sesión
+    // 4. Generar el Token JWT
     const token = jwt.sign(
-      { id: adminEncontrado._id, email: adminEncontrado.email },
-      'CLAVE_SECRETA_DEL_SERVIDOR',
-      { expiresIn: '8h' } // Expira en 8 horas (la jornada de trabajo)
+      { id: usuarioEncontrado._id, role: rol },
+      'CLAVE_SECRETA_SUPER_SEGURA',
+      { expiresIn: '8h' }
     );
 
-    // 6. Respondemos al Frontend confirmando el éxito y devolviendo el token
-    return res.status(200).json({
-      mensaje: '¡Bienvenido Martín!',
+    // 5. Responder con la estructura que exige el frontend
+    res.json({
       token,
-      preferenciaModoOscuro: adminEncontrado.preferenciaModoOscuro
+      user: {
+        name: usuarioEncontrado.nombre,
+        role: rol
+      }
     });
 
   } catch (error) {
-    console.error('Error en el servidor:', error);
-    return res.status(500).json({ mensaje: 'Error interno del servidor' });
+    console.error('Error en el login:', error);
+    res.status(500).json({ message: 'Error interno del servidor.' });
   }
 };
 
-module.exports = {
-  loginAdmin
-};
+module.exports = { login };

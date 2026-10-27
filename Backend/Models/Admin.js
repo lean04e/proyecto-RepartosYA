@@ -6,14 +6,14 @@ const adminSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  apellido: {
+    apellido: {
     type: String,
     required: true
   },
   email: {
     type: String,
     required: true,
-    unique: true // Para evitar duplicados de correo
+    unique: true 
   },
   password: {
     type: String,

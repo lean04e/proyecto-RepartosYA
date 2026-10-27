@@ -1,23 +1,43 @@
-require('dotenv').config();
 const express = require('express');
-const connectDB = require('./config/db'); // Asumiendo que tu archivo de conexión a Mongo está acá
+const mongoose = require('mongoose');
+const cors = require('cors'); 
 
 const app = express();
 
-// Middlewares para poder leer JSON desde el frontend
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 1. MIDDLEWARES GLOBALES (Siempre van primero)
+app.use(cors()); // Habilita la conexión con el frontend (Vite)
+app.use(express.json()); // Permite que Express entienda JSON
 
-// Conectar a la base de datos
-connectDB();
 
-// Ruta de prueba para verificar que el servidor responde
+// 2. RUTAS
+// Rutas de Repartidores
+app.use('/api/repartidores', require('./Authentication_And_Access/routes/repartidorRoutes'));
+
+// Rutas de Autenticación
+const authRoutes = require('./Authentication_And_Access/routes/authRoutes');
+app.use('/auth', authRoutes);
+
+// Rutas de Comercios
+const tradeRoutes = require('./Trade_Management/tradeRoutes');
+app.use('/comercios', tradeRoutes);
+
+// Rutas de Pedidos 
+const pedidoRoutes = require('./Order_Management/Routes/pedidoRoutes'); // Ajustá la ruta a tu carpeta
+app.use('/api/pedidos', pedidoRoutes);
+
 app.get('/', (req, res) => {
-  res.send('Servidor de RepartosYA funcionando correctamente');
+  res.send('¡El servidor de RepartosYA está funcionando al 100%!');
 });
 
-const PORT = process.env.PORT || 3000;
+// 3. CONEXIÓN A BASE DE DATOS
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('📦 Conectado exitosamente a MongoDB Atlas en la nube ☁️'))
+  .catch((err) => console.error('❌ Error al conectar a MongoDB:', err));
 
+// 4. INICIO DEL SERVIDOR
+const PORT = process.env.PORT || 3001; 
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo exitosamente en el puerto ${PORT}`);
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
 });
+
