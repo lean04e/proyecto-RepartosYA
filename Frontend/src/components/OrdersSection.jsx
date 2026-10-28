@@ -87,6 +87,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   // --- NUEVO: Estados para la Base de Datos ---
   const [dbRepartidores, setDbRepartidores] = useState([]);
   const [dbComercios, setDbComercios] = useState([]);
+  const [editErrors, setEditErrors] = useState({})
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -138,6 +139,17 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setTimeout(() => setSuccessToastMessage(''), 3500)
   }
 
+  const handleAdvanceStatus = (order, nextStatus, message) => {
+    setOrderList((currentOrders) =>
+      currentOrders.map((currentOrder) =>
+        currentOrder.id === order.id
+          ? withStatusChange(currentOrder, nextStatus)
+          : currentOrder,
+      ),
+    )
+    showSuccessToast(message)
+  }
+
   const handleConfirmCancel = () => {
     setOrderList((currentOrders) =>
       currentOrders.map((order) =>
@@ -167,15 +179,34 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setEditingOrder(null)
     setFormData(null)
     setConfirmationOpen(false)
+    setEditErrors({}) // Escenario 3: Limpiamos los errores si cancela
   }
 
   const handleFieldChange = (event) => {
     const { name, value } = event.target
     setFormData((currentData) => ({ ...currentData, [name]: value }))
+    // Limpiamos el error visual si el usuario vuelve a escribir
+    if (editErrors && editErrors[name]) {
+      setEditErrors((prev) => ({ ...prev, [name]: null }))
+    }
   }
 
   const handleApplyEdit = (event) => {
     event.preventDefault()
+
+    // Escenario 2: Validación de campos vacíos
+    const camposRequeridos = ['origin', 'destination'];
+    const errores = {};
+    for (const campo of camposRequeridos) {
+      if (!formData[campo] || formData[campo].trim() === '') {
+        errores[campo] = 'No se ha ingresado datos al campo.';
+      }
+    }
+
+    if (Object.keys(errores).length > 0) {
+      setEditErrors(errores);
+      return; 
+    }
 
     const hasChanges =
       formData.driver !== (editingOrder.driver ?? '') ||
@@ -187,19 +218,37 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
       return
     }
 
-    setConfirmationOpen(true)
+    setEditErrors({})
+    setConfirmationOpen(true) // Lanza advertencia explícita (Escenario 1 y 3)
   }
 
-  const handleConfirmEdit = () => {
-    setOrderList((currentOrders) =>
-      currentOrders.map((order) =>
-        order.id === editingOrder.id
-          ? { ...order, ...formData, driver: formData.driver || null }
-          : order,
-      ),
-    )
-    handleCloseEdit()
-    showSuccessToast('El pedido ha sido modificado exitosamente')
+    const handleConfirmEdit = async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/pedidos/modificar/${editingOrder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origen: formData.origin,
+          destino: formData.destination
+        })
+      });
+    if (response.ok) {
+        setOrderList((currentOrders) =>
+          currentOrders.map((order) =>
+            order.id === editingOrder.id
+              ? { ...order, ...formData, driver: formData.driver || null }
+              : order,
+          ),
+        )
+        handleCloseEdit()
+        showSuccessToast('El pedido ha sido modificado exitosamente')
+      } else {
+        const errorData = await response.json();
+        alert("Error al modificar en BD: " + (errorData.error || errorData.detalle || "Revisa los datos"));
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+    }
   }
 
   const handleOpenAdd = () => {
@@ -412,6 +461,40 @@ const handleAddOrder = async (event) => {
                       >
                         <EditIcon />
                       </button>
+                      {order.status === 'asignado' && (
+                        <button
+                          className="action-button"
+                          type="button"
+                          onClick={() =>
+                            handleAdvanceStatus(
+                              order,
+                              'en-camino',
+                              'El pedido ha pasado a estado En Camino',
+                            )
+                          }
+                          aria-label={`Marcar pedido ${order.id} como En Camino`}
+                          title="Marcar como En Camino"
+                        >
+                          <TruckIcon />
+                        </button>
+                      )}
+                      {order.status === 'en-camino' && (
+                        <button
+                          className="action-button"
+                          type="button"
+                          onClick={() =>
+                            handleAdvanceStatus(
+                              order,
+                              'entregado',
+                              'El pedido ha pasado a estado Entregado',
+                            )
+                          }
+                          aria-label={`Marcar pedido ${order.id} como Entregado`}
+                          title="Marcar como Entregado"
+                        >
+                          <CheckIcon />
+                        </button>
+                      )}
                       {order.status === 'cancelado' || order.status === 'entregado' ? (
                         <button
                           className="action-button action-button-danger"
@@ -479,6 +562,7 @@ const handleAddOrder = async (event) => {
           <EditOrderModal
             orderId={editingOrder.id}
             formData={formData}
+            formErrors={editErrors}
             driverOptions={driverOptions}
             commerceOptions={commerceOptions}
             onChange={handleFieldChange}
@@ -645,6 +729,7 @@ function OrderPartyCard({ title, name, commerce }) {
 function EditOrderModal({
   orderId,
   formData,
+  formErrors= {},
   driverOptions,
   commerceOptions,
   onChange,
@@ -709,7 +794,7 @@ function EditOrderModal({
               </div>
             </div>
 
-            <div className="form-field">
+<div className="form-field">
               <label htmlFor="order-origin">Origen</label>
               <div className="select-with-action">
                 <select
@@ -717,7 +802,9 @@ function EditOrderModal({
                   name="origin"
                   value={formData.origin}
                   onChange={onChange}
+                  className={formErrors.origin ? 'has-error' : ''}
                 >
+                  <option value="" disabled hidden />
                   {withCurrent(commerceOptions, formData.origin).map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -734,9 +821,15 @@ function EditOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
+              {/* ACÁ AGREGAMOS EL MENSAJE DE ERROR */}
+              {formErrors.origin && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.origin}
+                </small>
+              )}
             </div>
 
-            <div className="form-field">
+<div className="form-field">
               <label htmlFor="order-destination">Destino</label>
               <div className="select-with-action">
                 <select
@@ -744,7 +837,9 @@ function EditOrderModal({
                   name="destination"
                   value={formData.destination}
                   onChange={onChange}
+                  className={formErrors.destination ? 'has-error' : ''}
                 >
+                  <option value="" disabled hidden />
                   {withCurrent(commerceOptions, formData.destination).map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -761,6 +856,13 @@ function EditOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
+              
+              {/* ACÁ AGREGAMOS EL MENSAJE DE ERROR DE DESTINO */}
+              {formErrors.destination && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.destination}
+                </small>
+              )}
             </div>
           </div>
           <div className="modal-actions">
@@ -1061,6 +1163,23 @@ function DriverIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  )
+}
+
+function TruckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7M7 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.5 12.3 2.4 2.4 4.6-4.9" />
     </svg>
   )
 }
