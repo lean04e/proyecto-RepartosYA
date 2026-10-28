@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './CommercesSection.css'
 import './OrdersSection.css'
 
@@ -84,6 +84,27 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
 
+  // --- NUEVO: Estados para la Base de Datos ---
+  const [dbRepartidores, setDbRepartidores] = useState([]);
+  const [dbComercios, setDbComercios] = useState([]);
+
+  useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        // Traer Repartidores
+        const resRep = await fetch('http://localhost:3001/api/repartidores');
+        if (resRep.ok) setDbRepartidores(await resRep.json());
+
+        // Traer Comercios (ajustá la ruta si en tu backend es diferente, ej: /api/comercios)
+        const resCom = await fetch('http://localhost:3001/comercios');
+        if (resCom.ok) setDbComercios(await resCom.json());
+      } catch (error) {
+        console.error("Error al cargar datos de la BD:", error);
+      }
+    };
+    cargarDatos();
+  }, []);
+
   const normalizedSearchTerm = normalizeText(searchTerm.trim())
   const filteredOrders = orderList.filter((order) => {
     const matchesSearch =
@@ -139,14 +160,8 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   }
 
   // Repartidores disponibles: hasta que exista la sección de repartidores, se toman de los pedidos.
-  const driverOptions = useMemo(
-    () =>
-      [...new Set(orders.map((order) => order.driver).filter(Boolean))].sort((a, b) =>
-        a.localeCompare(b, 'es'),
-      ),
-    [orders],
-  )
-  const commerceOptions = commerces.map((commerce) => commerce.name)
+  const driverOptions = dbRepartidores.map((rep) => `${rep.nombre} ${rep.apellido}`);
+  const commerceOptions = dbComercios.map((comercio) => comercio.nombre);
   const detailOrder = orderList.find((order) => order.id === detailOrderId)
   const findCommerce = (name) => commerces.find((commerce) => commerce.name === name)
 
@@ -198,13 +213,8 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     showSuccessToast('El pedido ha sido modificado exitosamente')
   }
 
-  // TEMPORAL: el ID lo asignará la base de datos; borrar esto y el campo id de handleOpenAdd.
-  const nextOrderId = `PED-${
-    Math.max(0, ...orderList.map((order) => Number(order.id.replace(/\D/g, '')))) + 1
-  }`
-
   const handleOpenAdd = () => {
-    setNewOrderData({ id: nextOrderId, driver: '', origin: '', destination: '' })
+    setNewOrderData({ id: 'Autogenerado' , driver: '', origin: '', destination: '' })
     setNewOrderErrors({})
     setAddingOrder(true)
   }
@@ -221,36 +231,67 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setNewOrderErrors((currentErrors) => ({ ...currentErrors, [name]: false }))
   }
 
-  const handleAddOrder = (event) => {
-    event.preventDefault()
+const handleAddOrder = async (event) => {
+    event.preventDefault();
 
-    const nextErrors = {
-      origin: !newOrderData.origin,
-      destination: !newOrderData.destination,
+    // Escenario 2: Validación estricta de campos vacíos
+    const camposRequeridos = ['origin', 'destination'];
+    const nextErrors = {};
+
+    for (const campo of camposRequeridos) {
+      if (!newOrderData[campo] || newOrderData[campo].trim() === '') {
+        nextErrors[campo] = 'No se ha ingresado datos al campo.';
+      }
     }
 
-    if (Object.values(nextErrors).some(Boolean)) {
-      setNewOrderErrors(nextErrors)
-      return
+    if (Object.keys(nextErrors).length > 0) {
+      setNewOrderErrors(nextErrors);
+      return; // Frena la ejecución, se muestran los textos rojos y no se cierra la ventana
     }
 
-    // Al crearse, el pedido queda Asignado si ya tiene repartidor y Registrado si no.
-    const createdAt = new Date().toISOString()
-    const initialStatus = newOrderData.driver ? 'asignado' : 'registrado'
+    // Escenario 1: Creación de pedido exitoso
+    try {
+      const response = await fetch('http://localhost:3001/api/pedidos/cargar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origen: newOrderData.origin,
+          destino: newOrderData.destination,
+          // Rellenamos los campos obligatorios del backend que aún no están en la UI
+          destinatario: "Consumidor Final",
+          contacto: "Sin especificar",
+          email: ""
+        })
+      });
 
-    setOrderList((currentOrders) => [
-      ...currentOrders,
-      {
-        ...newOrderData,
-        driver: newOrderData.driver || null,
-        createdAt,
-        status: initialStatus,
-        statusHistory: [{ at: createdAt, from: null, to: initialStatus }],
-      },
-    ])
-    handleCloseAdd()
-    showSuccessToast('El pedido ha sido añadido exitosamente')
-  }
+      if (response.ok) {
+        const data = await response.json();
+        const createdAt = new Date().toISOString();
+        const initialStatus = newOrderData.driver ? 'asignado' : 'registrado';
+        
+        // El nuevo pedido aparece inmediatamente en la lista con el UUID real
+        setOrderList((currentOrders) => [
+          ...currentOrders,
+          {
+            ...newOrderData,
+            id: data.pedido.ID || newOrderData.id, 
+            driver: newOrderData.driver || null,
+            createdAt,
+            status: initialStatus,
+            statusHistory: [{ at: createdAt, from: null, to: initialStatus }],
+          },
+        ]);
+        
+        handleCloseAdd(); // Cierra la ventana tras éxito
+        showSuccessToast('El pedido ha sido añadido exitosamente');
+      } else {
+        const errorData = await response.json();
+        alert("Error al cargar: " + (errorData.error || errorData.detalle || "Revisa los datos"));
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+    }
+  };
 
   const handleRemoveOrder = (orderId) => {
     if (detailOrderId === orderId) setDetailOrderId(null)
@@ -877,9 +918,9 @@ function AddOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
-              {formErrors.origin && (
-                <small className="field-error" role="alert">
-                  Completa este campo.
+                {formErrors.origin && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.origin}
                 </small>
               )}
             </div>
@@ -912,9 +953,9 @@ function AddOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
-              {formErrors.destination && (
-                <small className="field-error" role="alert">
-                  Completa este campo.
+                {formErrors.destination && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.destination}
                 </small>
               )}
             </div>
