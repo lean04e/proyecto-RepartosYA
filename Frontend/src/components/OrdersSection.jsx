@@ -98,7 +98,7 @@ useEffect(() => {
         const resCom = await fetch('http://localhost:3001/comercios');
         if (resCom.ok) setDbComercios(await resCom.json());
 
-        // NUEVO: Traer Pedidos desde el backend
+        // Traer Pedidos desde el backend
         const resPed = await fetch('http://localhost:3001/api/pedidos');
         if (resPed.ok) {
           const pedidosData = await resPed.json();
@@ -110,7 +110,15 @@ useEffect(() => {
             driver: p.repartidor || null, 
             status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
             createdAt: p.createdAt || new Date().toISOString(),
-            statusHistory: []
+            
+        
+            statusHistory: p.historialEstados && p.historialEstados.length > 0 
+              ? p.historialEstados.map(h => ({
+                  at: h.fecha,
+                  from: h.estadoAnterior ? h.estadoAnterior.toLowerCase().replace('_', '-') : null,
+                  to: h.estadoNuevo.toLowerCase().replace('_', '-')
+                }))
+              : [{ at: p.createdAt || new Date().toISOString(), from: null, to: 'registrado' }]
           }));
           setOrderList(pedidosMapeados);
         }
@@ -335,6 +343,7 @@ const handleAddOrder = async (event) => {
       });
 
       if (response.ok) {
+
         const data = await response.json();
         const createdAt = new Date().toISOString();
         const initialStatus = newOrderData.driver ? 'asignado' : 'registrado';

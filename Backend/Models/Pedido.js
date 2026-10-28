@@ -32,6 +32,10 @@ const pedidoSchema = new mongoose.Schema({
         required: false,
         default: null
     },
+    historialEstados: {
+        type: Array,
+        default: []
+    },
     estado: {
         type: String,
         enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'RECHAZADO', 'CANCELADO'],
