@@ -138,17 +138,6 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setTimeout(() => setSuccessToastMessage(''), 3500)
   }
 
-  const handleAdvanceStatus = (order, nextStatus, message) => {
-    setOrderList((currentOrders) =>
-      currentOrders.map((currentOrder) =>
-        currentOrder.id === order.id
-          ? withStatusChange(currentOrder, nextStatus)
-          : currentOrder,
-      ),
-    )
-    showSuccessToast(message)
-  }
-
   const handleConfirmCancel = () => {
     setOrderList((currentOrders) =>
       currentOrders.map((order) =>
@@ -423,40 +412,6 @@ const handleAddOrder = async (event) => {
                       >
                         <EditIcon />
                       </button>
-                      {order.status === 'asignado' && (
-                        <button
-                          className="action-button"
-                          type="button"
-                          onClick={() =>
-                            handleAdvanceStatus(
-                              order,
-                              'en-camino',
-                              'El pedido ha pasado a estado En Camino',
-                            )
-                          }
-                          aria-label={`Marcar pedido ${order.id} como En Camino`}
-                          title="Marcar como En Camino"
-                        >
-                          <TruckIcon />
-                        </button>
-                      )}
-                      {order.status === 'en-camino' && (
-                        <button
-                          className="action-button"
-                          type="button"
-                          onClick={() =>
-                            handleAdvanceStatus(
-                              order,
-                              'entregado',
-                              'El pedido ha pasado a estado Entregado',
-                            )
-                          }
-                          aria-label={`Marcar pedido ${order.id} como Entregado`}
-                          title="Marcar como Entregado"
-                        >
-                          <CheckIcon />
-                        </button>
-                      )}
                       {order.status === 'cancelado' || order.status === 'entregado' ? (
                         <button
                           className="action-button action-button-danger"
@@ -1106,23 +1061,6 @@ function DriverIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" />
-    </svg>
-  )
-}
-
-function TruckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7M7 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
-    </svg>
-  )
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="m8.5 12.3 2.4 2.4 4.6-4.9" />
     </svg>
   )
 }
