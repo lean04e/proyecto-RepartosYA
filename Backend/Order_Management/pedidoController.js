@@ -2,7 +2,7 @@ const Pedido = require('../Models/Pedido');
 
 const crearPedido = async (req, res) => {
     try {
-        const { origen, destino, destinatario, contacto, email , repartidor} = req.body;
+        const { origen, destino, destinatario, contacto, email, repartidor } = req.body;
 
         const nuevoPedido = new Pedido({
             origen,
@@ -10,7 +10,13 @@ const crearPedido = async (req, res) => {
             destinatario,
             contacto,
             email,
-            repartidor
+            repartidor,
+            // Agregamos el historial inicial al crear el pedido
+            historialEstados: [{
+                fecha: new Date().toISOString(),
+                estadoAnterior: null,
+                estadoNuevo: 'REGISTRADO'
+            }]
         });
         
         await nuevoPedido.save();
@@ -37,7 +43,7 @@ const modificarPedido = async (req, res) => {
         // Busca el pedido por tu campo de UUID "ID" y actualiza los datos
         const pedidoActualizado = await Pedido.findOneAndUpdate(
             { ID: id },
-            { origen, destino },
+            { origen, destino, repartidor },
             { new: true } // Esto devuelve el documento ya actualizado
         );
 
@@ -55,18 +61,24 @@ const cancelarPedido = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Busca el pedido por su ID y le cambia el estado a 'cancelado'
-        const pedidoCancelado = await Pedido.findOneAndUpdate(
-            { ID: id },
-            { estado: 'cancelado' },
-            { new: true }
-        );
-
-        if (!pedidoCancelado) {
+        const pedido = await Pedido.findOne({ ID: id });
+        if (!pedido) {
             return res.status(404).json({ error: 'Pedido no encontrado en la base de datos' });
         }
 
-        res.status(200).json({ mensaje: 'Pedido cancelado exitosamente', pedido: pedidoCancelado });
+        const estadoAnterior = pedido.estado;
+        pedido.estado = 'cancelado';
+        
+        // Registramos el cambio de estado en el historial
+        pedido.historialEstados.push({
+            fecha: new Date().toISOString(),
+            estadoAnterior: estadoAnterior,
+            estadoNuevo: 'cancelado'
+        });
+
+        await pedido.save();
+
+        res.status(200).json({ mensaje: 'Pedido cancelado exitosamente', pedido });
     } catch (error) {
         res.status(400).json({ error: 'Error al cancelar el pedido', detalle: error.message });
     }
