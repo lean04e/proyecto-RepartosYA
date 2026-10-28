@@ -51,11 +51,19 @@ export default function OptionsScreen() {
               <View style={styles.profileAvatarHead} />
               <View style={styles.profileAvatarBody} />
             </View>
-            <Text style={[styles.profileCaption, { color: palette.secondary }]}>PERFIL DEL REPARTIDOR</Text>
+            <Text style={[styles.profileCaption, { color: palette.heading }]}>PERFIL DEL REPARTIDOR</Text>
             <Text style={[styles.profileName, { color: palette.text }]}>{fullName}</Text>
             <Text style={[styles.profileIdentifier, { color: palette.secondary }]}>
               N.º de repartidor: {id || '—'}
             </Text>
+          </View>
+
+          <View style={styles.content}>
+          <Text style={[styles.title, { color: palette.text }]}>Estado:</Text>
+          <View style={[styles.statusCard, { backgroundColor: palette.successSurface }]}>
+            <View style={styles.statusDot} />
+                <Text style={[styles.statusText, { color: palette.text }]}>Disponible</Text>
+            </View>
           </View>
 
           <Pressable

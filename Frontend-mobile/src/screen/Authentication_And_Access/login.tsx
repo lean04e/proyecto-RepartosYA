@@ -1,15 +1,15 @@
-import { useState } from 'react';
 import { router } from 'expo-router';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
+import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, LOGIN_STYLES as styles } from '../../theme/theme';
 import database from '../../data/db.json';
+import { COLORS, LOGIN_STYLES as styles } from '../../theme/theme';
 
 export default function Login() {
   const [nroRepartidor, setNroRepartidor] = useState('');
   const [contraseña, setContraseña] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  // const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
 
@@ -24,7 +24,6 @@ export default function Login() {
 
     if (!normalizedUsername || !normalizedPassword) {
       setLoginMessage('No se ingreso nro de repartidor o contraseña');
-      setNroRepartidor('');
       setContraseña('');
       return;
     }
@@ -33,12 +32,13 @@ export default function Login() {
 
     if (!repartidorEncontrado) {
       setLoginMessage(`El Número de Repartidor " ${normalizedUsername} " no corresponde con los empleados registrados en el sistema.`);
+      setNroRepartidor('');
+      setContraseña('');
       return;
     }
 
     if (normalizedPassword !== repartidorEncontrado.contra) {
       setLoginMessage('Credenciales invalidas. Por favor verifique sus datos.');
-      setNroRepartidor('');
       setContraseña('');
       return;
     }

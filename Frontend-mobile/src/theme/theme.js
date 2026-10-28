@@ -8,16 +8,20 @@ export const COLORS = {
   textPrimary: '#0F172A',   // Texto oscuro
   textSecondary: '#475569', // Texto secundario
   textMuted: '#94A3B8',     // Texto atenuado / placeholders
-  border: '#E2E8F0',        // Bordes de inputs
+  border: '#8c9aad',        // Bordes de inputs
   danger: '#EF4444',        // Mensajes de error
 };
 
 export const APP_THEMES = {
   light: {
+    primary: '#155dfc',
     background: '#FFFFFF',
     surface: '#FFFFFF',
     text: '#0F172A',
     secondary: '#475569',
+    heading: '#0369A1',
+    countBadge: '#7793f8',
+    countBadgeText: '#f5f6f9',
     textSecondary: '#60646C',
     border: '#E2E8F0',
     header: '#155dfc',
@@ -26,24 +30,28 @@ export const APP_THEMES = {
     backgroundSelected: '#E0E1E6',
   },
   dark: {
-    background: '#0F172A',
-    surface: '#1E293B',
-    text: '#F8FAFC',
-    secondary: '#CBD5E1',
-    textSecondary: '#B0B4BA',
-    border: '#334155',
+    primary: '#ffffff',
+    background: '#000000',
+    surface: '#4a37c3',
+    text: '#f3f4f7',
+    secondary: '#9bb0ca',
+    heading: '#7DD3FC',
+    countBadge: '#7793f8',
+    countBadgeText: '#ffffff',
+    textSecondary: '#040000',
+    border: '#1c63c7',
     header: '#1D4ED8',
-    successSurface: '#12352E',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
+    successSurface: '#0e342c',
+    backgroundElement: '#2059d5',
+    backgroundSelected: '#051933',
   },
 };
 
 export const FONTS = {
-  regular: '400',
-  medium: '600',
-  bold: '700',
-  heavy: '800',
+  regular: '500',
+  medium: '700',
+  bold: '800',
+  heavy: '900',
 };
 
 export const GLOBAL_STYLES = {
@@ -113,11 +121,11 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   accessBadgeIcon: {
     color: '#57d7ac',
-    fontSize: 10,
+    fontSize: 12,
   },
   accessBadgeText: {
     color: '#263b5b',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   partnerLogo: {
@@ -136,13 +144,13 @@ export const LOGIN_STYLES = StyleSheet.create({
   title: {
     marginBottom: 16,
     color: COLORS.textPrimary,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
   },
   label: {
     marginBottom: 6,
     color: COLORS.textPrimary,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
   },
   inputContainer: {
@@ -160,7 +168,7 @@ export const LOGIN_STYLES = StyleSheet.create({
   inputIcon: {
     width: 15,
     color: COLORS.textSecondary,
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
   },
   input: {
@@ -168,12 +176,12 @@ export const LOGIN_STYLES = StyleSheet.create({
     height: '100%',
     padding: 0,
     color: COLORS.textPrimary,
-    fontSize: 14,
+    fontSize: 16,
   },
   passwordToggle: {
     paddingHorizontal: 3,
     color: COLORS.textPrimary,
-    fontSize: 18,
+    fontSize: 20,
   },
   optionsRow: {
     flexDirection: 'row',
@@ -203,16 +211,16 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   checkboxCheck: {
     color: COLORS.textPrimary,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
   },
   rememberText: {
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 14,
   },
   forgotPassword: {
     color: '#1e3153',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   button: {
@@ -229,12 +237,12 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   buttonText: {
     color: COLORS.textPrimary,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
   },
   buttonArrow: {
     color: COLORS.textPrimary,
-    fontSize: 19,
+    fontSize: 21,
   },
   credentialsNotice: {
     alignItems: 'center',
@@ -246,7 +254,7 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   credentialsText: {
     color: '#6a717d',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
   },
   terminalFooter: {
@@ -260,12 +268,12 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   terminalIcon: {
     color: '#166c56',
-    fontSize: 14,
+    fontSize: 16,
   },
   terminalText: {
     flex: 1,
     color: COLORS.textSecondary,
-    fontSize: 11,
+    fontSize: 13,
   },
   version: {
     paddingHorizontal: 6,
@@ -273,7 +281,7 @@ export const LOGIN_STYLES = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: COLORS.loginButton,
     color: COLORS.textPrimary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   legalFooter: {
@@ -287,17 +295,17 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   legalText: {
     color: '#475569',
-    fontSize: 11,
+    fontSize: 13,
   },
   legalSeparator: {
     color: '#64748b',
-    fontSize: 11,
+    fontSize: 13,
   },
   copyright: {
     width: '100%',
     marginTop: 4,
     color: '#64748b',
-    fontSize: 11,
+    fontSize: 13,
     textAlign: 'center',
   },
   messageBackdrop: {
@@ -318,7 +326,7 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   messageText: {
     color: COLORS.textPrimary,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     lineHeight: 24,
     textAlign: 'center',
@@ -334,7 +342,7 @@ export const LOGIN_STYLES = StyleSheet.create({
   },
   messageButtonText: {
     color: COLORS.textPrimary,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
   },
 });
@@ -364,25 +372,161 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 24,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  dashboardContent: {
+    gap: 12,
+    paddingBottom: 12,
+  },
+  sectionCard: {
+    padding: 15,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    backgroundColor: COLORS.cardBackground,
+    ...GLOBAL_STYLES.shadow,
+  },
+  sectionHeader: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 12,
+  },
+  sectionHeadingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionTitle: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  sectionBadge: {
+    overflow: 'hidden',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sectionCount: {
+    minWidth: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  inlineEmpty: {
+    paddingVertical: 8,
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  activeOrderCard: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  etaValue: {
+    color: COLORS.primary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  detailEta: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  sectionAction: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  orderCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  queueCard: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  queueCardText: {
+    flex: 1,
+  },
+  queueCardTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  distanceBadge: {
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderRadius: 9,
+    backgroundColor: COLORS.cardBackground,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  queueAddress: {
+    marginTop: 2,
+    fontSize: 13,
+  },
+  queueChevron: {
+    fontSize: 24,
+    fontWeight: '400',
+  },
+  historyDate: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  historyStatus: {
+    overflow: 'hidden',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '700',
   },
   eyebrow: {
     marginTop: 16,
     color: COLORS.loginButton,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
   title: {
     marginTop: 10,
     color: COLORS.textPrimary,
-    fontSize: 27,
+    fontSize: 29,
     fontWeight: '800',
   },
   subtitle: {
     marginTop: 8,
     color: COLORS.textSecondary,
-    fontSize: 16,
+    fontSize: 18,
     lineHeight: 23,
   },
   infoCard: {
@@ -396,14 +540,14 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   infoLabel: {
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.7,
   },
   infoValue: {
     marginTop: 8,
     color: COLORS.textPrimary,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
   },
   statusCard: {
@@ -423,7 +567,7 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   statusText: {
     color: COLORS.textPrimary,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   buttonPressed: {
@@ -453,11 +597,11 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   menuIcon: {
     color: COLORS.textPrimary,
-    fontSize: 18,
+    fontSize: 20,
   },
   menuLabel: {
     color: COLORS.textSecondary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   optionsPopover: {
@@ -475,19 +619,19 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   optionsTitle: {
     marginBottom: 10,
     color: COLORS.textPrimary,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '800',
   },
   optionLabel: {
     marginTop: 8,
     color: COLORS.textSecondary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   optionValue: {
     marginTop: 2,
     color: COLORS.textPrimary,
-    fontSize: 14,
+    fontSize: 16,
   },
   modalBackdrop: {
     flex: 1,
@@ -505,6 +649,70 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     ...GLOBAL_STYLES.shadow,
   },
+  startDialog: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '90%',
+    padding: 18,
+    borderWidth: 1,
+    borderRadius: 20,
+    ...GLOBAL_STYLES.shadow,
+  },
+  startSubtitle: {
+    marginTop: 3,
+    fontSize: 14,
+  },
+  startPrompt: {
+    marginBottom: 10,
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  startOrderSummary: {
+    marginBottom: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  orderDetailScroll: {
+    flexGrow: 0,
+    maxHeight: '78%',
+  },
+  mapSectionLabel: {
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  startWarning: {
+    marginBottom: 10,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 11,
+    backgroundColor: '#FFFBEB',
+  },
+  startWarningText: {
+    color: '#B45309',
+    fontSize: 14,
+    lineHeight: 17,
+  },
+  startButton: {
+    alignItems: 'center',
+    marginTop: 3,
+    paddingVertical: 12,
+    borderRadius: GLOBAL_STYLES.inputRadius,
+  },
+  startButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cancelStartButton: {
+    alignItems: 'center',
+    marginTop: 7,
+    paddingVertical: 9,
+  },
+  cancelStartText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -514,16 +722,165 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   modalTitle: {
     flex: 1,
     color: COLORS.textPrimary,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
   },
   modalClose: {
     paddingHorizontal: 8,
     color: COLORS.textSecondary,
-    fontSize: 26,
+    fontSize: 28,
   },
   modalBody: {
     flexGrow: 0,
+  },
+  mapPreview: {
+    height: 190,
+    marginTop: 8,
+    marginBottom: 14,
+    overflow: 'hidden',
+    borderRadius: 12,
+    backgroundColor: '#DCE8D5',
+  },
+  mapRoadHorizontal: {
+    position: 'absolute',
+    top: 52,
+    left: -20,
+    right: -20,
+    height: 22,
+    backgroundColor: '#FFFFFF',
+    transform: [{ rotate: '-8deg' }],
+  },
+  mapRoadVertical: {
+    position: 'absolute',
+    top: -20,
+    left: '57%',
+    width: 20,
+    height: 240,
+    backgroundColor: '#FFFFFF',
+    transform: [{ rotate: '14deg' }],
+  },
+  mapRoadDiagonal: {
+    position: 'absolute',
+    top: 124,
+    left: -20,
+    right: -20,
+    height: 16,
+    backgroundColor: '#FFFFFF',
+    transform: [{ rotate: '12deg' }],
+  },
+  mapRouteFirst: {
+    position: 'absolute',
+    top: '59%',
+    left: '18%',
+    width: '30%',
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#2563EB',
+    transform: [{ rotate: '-19deg' }],
+  },
+  mapRouteSecond: {
+    position: 'absolute',
+    top: '48%',
+    left: '42%',
+    width: '24%',
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#2563EB',
+    transform: [{ rotate: '-9deg' }],
+  },
+  mapRouteThird: {
+    position: 'absolute',
+    top: '34%',
+    left: '61%',
+    width: '22%',
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#2563EB',
+    transform: [{ rotate: '-37deg' }],
+  },
+  mapOriginMarker: {
+    position: 'absolute',
+    top: '53%',
+    left: '7%',
+    alignItems: 'center',
+  },
+  mapDestinationMarker: {
+    position: 'absolute',
+    top: '13%',
+    left: '76%',
+    alignItems: 'center',
+  },
+  mapMarkerDot: {
+    color: '#047857',
+    fontSize: 26,
+    lineHeight: 26,
+    textShadowColor: '#FFFFFF',
+    textShadowRadius: 3,
+  },
+  mapDestinationDot: {
+    color: '#DC2626',
+  },
+  mapMarkerLabel: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    color: COLORS.textPrimary,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  mapMarker: {
+    position: 'absolute',
+    top: 70,
+    left: '48%',
+    fontSize: 30,
+  },
+  mapAddressBadge: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    left: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+  },
+  mapAddressLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  mapAddress: {
+    marginTop: 2,
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  queueRow: {
+    marginBottom: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+  },
+  queueOrderCode: {
+    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  queueRecipient: {
+    marginTop: 4,
+    color: COLORS.textSecondary,
+    fontSize: 15,
+  },
+  showMoreButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  showMoreText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: '800',
   },
   orderRow: {
     marginBottom: 10,
@@ -541,29 +898,29 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   orderCode: {
     color: COLORS.textPrimary,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
   },
   orderStatus: {
     color: COLORS.textSecondary,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
   },
   orderFieldLabel: {
     marginTop: 8,
     color: COLORS.textSecondary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   orderFieldValue: {
     marginTop: 2,
     color: COLORS.textPrimary,
-    fontSize: 14,
+    fontSize: 16,
   },
   modalEmpty: {
     paddingVertical: 20,
     color: COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
     lineHeight: 21,
     textAlign: 'center',
   },
@@ -571,7 +928,7 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
     marginTop: 8,
     marginBottom: 10,
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
@@ -584,13 +941,13 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   completeButtonText: {
     color: COLORS.textPrimary,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
   },
   orderError: {
     marginTop: 10,
     color: COLORS.danger,
-    fontSize: 13,
+    fontSize: 15,
   },
   optionsContent: {
     flex: 1,
@@ -607,7 +964,7 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   optionsBackText: {
     color: COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   profileCard: {
@@ -649,21 +1006,21 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   profileCaption: {
     marginTop: 18,
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
   profileName: {
     marginTop: 6,
     color: COLORS.textPrimary,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     textAlign: 'center',
   },
   profileIdentifier: {
     marginTop: 6,
     color: COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
   },
   logoutAction: {
     width: '100%',
@@ -678,7 +1035,7 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   logoutActionText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
   },
   logoutDialog: {
@@ -694,14 +1051,14 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   logoutDialogTitle: {
     color: COLORS.danger,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     textAlign: 'center',
   },
   logoutDialogMessage: {
     marginTop: 12,
     color: COLORS.textSecondary,
-    fontSize: 15,
+    fontSize: 17,
     lineHeight: 22,
     textAlign: 'center',
   },
@@ -720,7 +1077,7 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   logoutCancelText: {
     color: '#0F172A',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   logoutConfirmButton: {
@@ -733,7 +1090,7 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   logoutConfirmText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
   },
 
@@ -745,12 +1102,12 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   },
   logoutIconHighlight: {
     color: '#FFFFFF', // Logo / Icono en blanco
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
   },
   logoutLabelHighlight: {
     color: '#FFFFFF', // Texto en blanco
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
   },
