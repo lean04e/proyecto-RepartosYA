@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import './CommercesSection.css'
 import './OrdersSection.css'
 
-const INITIAL_VISIBLE_COUNT = 6
-const VISIBLE_COUNT_STEP = 4
+const INITIAL_VISIBLE_COUNT = 20
+const VISIBLE_COUNT_STEP = 20
 const ALL_STATUSES = 'todos'
 
 const STATUS_CONFIG = {
@@ -89,16 +89,31 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const [dbComercios, setDbComercios] = useState([]);
   const [editErrors, setEditErrors] = useState({})
 
-  useEffect(() => {
+useEffect(() => {
     const cargarDatos = async () => {
       try {
-        // Traer Repartidores
         const resRep = await fetch('http://localhost:3001/api/repartidores');
         if (resRep.ok) setDbRepartidores(await resRep.json());
 
-        // Traer Comercios (ajustá la ruta si en tu backend es diferente, ej: /api/comercios)
         const resCom = await fetch('http://localhost:3001/comercios');
         if (resCom.ok) setDbComercios(await resCom.json());
+
+        // NUEVO: Traer Pedidos desde el backend
+        const resPed = await fetch('http://localhost:3001/api/pedidos');
+        if (resPed.ok) {
+          const pedidosData = await resPed.json();
+          // Adaptamos el formato de MongoDB al de React
+          const pedidosMapeados = pedidosData.map(p => ({
+            id: p.ID,
+            origin: p.origen,
+            destination: p.destino,
+            driver: p.repartidor || null, 
+            status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
+            createdAt: p.createdAt || new Date().toISOString(),
+            statusHistory: []
+          }));
+          setOrderList(pedidosMapeados);
+        }
       } catch (error) {
         console.error("Error al cargar datos de la BD:", error);
       }
@@ -314,7 +329,8 @@ const handleAddOrder = async (event) => {
           // Rellenamos los campos obligatorios del backend que aún no están en la UI
           destinatario: "Consumidor Final",
           contacto: "Sin especificar",
-          email: ""
+          email: "",
+          repartidor: newOrderData.driver || null
         })
       });
 
@@ -536,7 +552,14 @@ const handleAddOrder = async (event) => {
                   </td>
                 </tr>
               ))}
-              {visibleOrders.length === 0 && (
+              {/* Escenario 1: No hay pedidos cargados */}
+              {orderList.length === 0 && (
+                <tr className="empty-results-row">
+                  <td colSpan="7">No hay pedidos cargados</td>
+                </tr>
+              )}
+              {/* Escenario 4: Hay pedidos pero la búsqueda/filtros no encontró nada */}
+              {orderList.length > 0 && visibleOrders.length === 0 && (
                 <tr className="empty-results-row">
                   <td colSpan="7">No se encontraron pedidos con esos filtros.</td>
                 </tr>

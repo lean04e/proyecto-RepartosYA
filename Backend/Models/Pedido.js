@@ -27,6 +27,11 @@ const pedidoSchema = new mongoose.Schema({
         type: String,
         required: false // Corregido aquí
     },
+    repartidor: {
+        type: String,
+        required: false,
+        default: null
+    },
     estado: {
         type: String,
         enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'RECHAZADO', 'CANCELADO'],

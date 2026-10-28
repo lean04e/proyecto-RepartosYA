@@ -2,14 +2,15 @@ const Pedido = require('../Models/Pedido');
 
 const crearPedido = async (req, res) => {
     try {
-        const { origen, destino, destinatario, contacto, email } = req.body;
+        const { origen, destino, destinatario, contacto, email , repartidor} = req.body;
 
         const nuevoPedido = new Pedido({
             origen,
             destino,
             destinatario,
             contacto,
-            email
+            email,
+            repartidor
         });
         
         await nuevoPedido.save();
