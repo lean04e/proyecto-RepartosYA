@@ -22,7 +22,7 @@ const crearPedido = async (req, res) => {
 
 const obtenerPedidos = async (req, res) => {
     try {
-        const pedidos = await Pedido.find().sort({ _id: -1 }); // Ordena mostrando los más nuevos primero
+        const pedidos = await Pedido.find({ borrado: { $ne: true } }).sort({ _id: -1 }); // Ordena mostrando los más nuevos primero
         res.status(200).json(pedidos);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener los pedidos' });
@@ -72,4 +72,25 @@ const cancelarPedido = async (req, res) => {
     }
 };
 
-module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido };
+const eliminarPedido = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Borrado lógico: se marca como borrado en lugar de eliminarlo físicamente
+        const pedidoBorrado = await Pedido.findOneAndUpdate(
+            { ID: id, borrado: { $ne: true } },
+            { borrado: true },
+            { new: true }
+        );
+
+        if (!pedidoBorrado) {
+            return res.status(404).json({ error: 'Pedido no encontrado en la base de datos' });
+        }
+
+        res.status(200).json({ mensaje: 'Pedido borrado exitosamente', pedido: pedidoBorrado });
+    } catch (error) {
+        res.status(400).json({ error: 'Error al borrar el pedido', detalle: error.message });
+    }
+};
+
+module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido, eliminarPedido };

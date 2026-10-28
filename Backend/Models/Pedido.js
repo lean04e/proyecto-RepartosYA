@@ -36,6 +36,10 @@ const pedidoSchema = new mongoose.Schema({
         type: String,
         enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'RECHAZADO', 'CANCELADO'],
         default: 'REGISTRADO'
+    },
+    borrado: {
+        type: Boolean,
+        default: false
     }
 });
 

@@ -85,16 +85,12 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const [statusFilter, setStatusFilter] = useState('')
 
   // --- NUEVO: Estados para la Base de Datos ---
-  const [dbRepartidores, setDbRepartidores] = useState([]);
   const [dbComercios, setDbComercios] = useState([]);
   const [editErrors, setEditErrors] = useState({})
 
 useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const resRep = await fetch('http://localhost:3001/api/repartidores');
-        if (resRep.ok) setDbRepartidores(await resRep.json());
-
         const resCom = await fetch('http://localhost:3001/comercios');
         if (resCom.ok) setDbComercios(await resCom.json());
 
@@ -154,17 +150,6 @@ useEffect(() => {
     setTimeout(() => setSuccessToastMessage(''), 3500)
   }
 
-  const handleAdvanceStatus = (order, nextStatus, message) => {
-    setOrderList((currentOrders) =>
-      currentOrders.map((currentOrder) =>
-        currentOrder.id === order.id
-          ? withStatusChange(currentOrder, nextStatus)
-          : currentOrder,
-      ),
-    )
-    showSuccessToast(message)
-  }
-
   const handleConfirmCancel = async () => {
 try {
       // Hacemos la petición PUT a tu nueva ruta del backend
@@ -191,8 +176,6 @@ try {
     }
   }
 
-  // Repartidores disponibles: hasta que exista la sección de repartidores, se toman de los pedidos.
-  const driverOptions = dbRepartidores.map((rep) => `${rep.nombre} ${rep.apellido}`);
   const commerceOptions = dbComercios.map((comercio) => comercio.nombre);
   const detailOrder = orderList.find((order) => order.id === detailOrderId)
   const findCommerce = (name) => commerces.find((commerce) => commerce.name === name)
@@ -200,7 +183,6 @@ try {
   const handleOpenEdit = (order) => {
     setEditingOrder(order)
     setFormData({
-      driver: order.driver ?? '',
       origin: order.origin,
       destination: order.destination,
     })
@@ -240,7 +222,6 @@ try {
     }
 
     const hasChanges =
-      formData.driver !== (editingOrder.driver ?? '') ||
       formData.origin !== editingOrder.origin ||
       formData.destination !== editingOrder.destination
 
@@ -267,7 +248,7 @@ try {
         setOrderList((currentOrders) =>
           currentOrders.map((order) =>
             order.id === editingOrder.id
-              ? { ...order, ...formData, driver: formData.driver || null }
+              ? { ...order, ...formData }
               : order,
           ),
         )
@@ -283,7 +264,7 @@ try {
   }
 
   const handleOpenAdd = () => {
-    setNewOrderData({ id: 'Autogenerado' , driver: '', origin: '', destination: '' })
+    setNewOrderData({ id: 'Autogenerado', origin: '', destination: '' })
     setNewOrderErrors({})
     setAddingOrder(true)
   }
@@ -329,15 +310,14 @@ const handleAddOrder = async (event) => {
           // Rellenamos los campos obligatorios del backend que aún no están en la UI
           destinatario: "Consumidor Final",
           contacto: "Sin especificar",
-          email: "",
-          repartidor: newOrderData.driver || null
+          email: ""
         })
       });
 
       if (response.ok) {
         const data = await response.json();
         const createdAt = new Date().toISOString();
-        const initialStatus = newOrderData.driver ? 'asignado' : 'registrado';
+        const initialStatus = 'registrado';
         
         // El nuevo pedido aparece inmediatamente en la lista con el UUID real
         setOrderList((currentOrders) => [
@@ -345,7 +325,7 @@ const handleAddOrder = async (event) => {
           {
             ...newOrderData,
             id: data.pedido.ID || newOrderData.id, 
-            driver: newOrderData.driver || null,
+            driver: null,
             createdAt,
             status: initialStatus,
             statusHistory: [{ at: createdAt, from: null, to: initialStatus }],
@@ -363,9 +343,24 @@ const handleAddOrder = async (event) => {
     }
   };
 
-  const handleRemoveOrder = (orderId) => {
-    if (detailOrderId === orderId) setDetailOrderId(null)
-    setOrderList((currentOrders) => currentOrders.filter((order) => order.id !== orderId))
+  const handleRemoveOrder = async (orderId) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/pedidos/${orderId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        alert('Hubo un error al intentar borrar el pedido en la base de datos.')
+        return
+      }
+
+      if (detailOrderId === orderId) setDetailOrderId(null)
+      setOrderList((currentOrders) => currentOrders.filter((order) => order.id !== orderId))
+      showSuccessToast('El pedido ha sido borrado exitosamente')
+    } catch (error) {
+      console.error('Error de conexión:', error)
+      alert('Hubo un error al intentar borrar el pedido en la base de datos.')
+    }
   }
 
   const handleSort = (key) => {
@@ -493,40 +488,6 @@ const handleAddOrder = async (event) => {
                       >
                         <EditIcon />
                       </button>
-                      {order.status === 'asignado' && (
-                        <button
-                          className="action-button"
-                          type="button"
-                          onClick={() =>
-                            handleAdvanceStatus(
-                              order,
-                              'en-camino',
-                              'El pedido ha pasado a estado En Camino',
-                            )
-                          }
-                          aria-label={`Marcar pedido ${order.id} como En Camino`}
-                          title="Marcar como En Camino"
-                        >
-                          <TruckIcon />
-                        </button>
-                      )}
-                      {order.status === 'en-camino' && (
-                        <button
-                          className="action-button"
-                          type="button"
-                          onClick={() =>
-                            handleAdvanceStatus(
-                              order,
-                              'entregado',
-                              'El pedido ha pasado a estado Entregado',
-                            )
-                          }
-                          aria-label={`Marcar pedido ${order.id} como Entregado`}
-                          title="Marcar como Entregado"
-                        >
-                          <CheckIcon />
-                        </button>
-                      )}
                       {order.status === 'cancelado' || order.status === 'entregado' ? (
                         <button
                           className="action-button action-button-danger"
@@ -588,6 +549,15 @@ const handleAddOrder = async (event) => {
           origin={findCommerce(detailOrder.origin)}
           destination={findCommerce(detailOrder.destination)}
           onClose={() => setDetailOrderId(null)}
+          onEdit={(order) => {
+            setDetailOrderId(null)
+            handleOpenEdit(order)
+          }}
+          onCancelOrder={(order) => {
+            setDetailOrderId(null)
+            setCancelingOrder(order)
+          }}
+          onRemove={handleRemoveOrder}
         />
       )}
       {editingOrder &&
@@ -602,7 +572,6 @@ const handleAddOrder = async (event) => {
             orderId={editingOrder.id}
             formData={formData}
             formErrors={editErrors}
-            driverOptions={driverOptions}
             commerceOptions={commerceOptions}
             onChange={handleFieldChange}
             onClose={handleCloseEdit}
@@ -614,7 +583,6 @@ const handleAddOrder = async (event) => {
         <AddOrderModal
           formData={newOrderData}
           formErrors={newOrderErrors}
-          driverOptions={driverOptions}
           commerceOptions={commerceOptions}
           onChange={handleNewOrderFieldChange}
           onClose={handleCloseAdd}
@@ -638,7 +606,15 @@ const handleAddOrder = async (event) => {
   )
 }
 
-function OrderDetailModal({ order, origin, destination, onClose }) {
+function OrderDetailModal({
+  order,
+  origin,
+  destination,
+  onClose,
+  onEdit,
+  onCancelOrder,
+  onRemove,
+}) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
@@ -736,9 +712,20 @@ function OrderDetailModal({ order, origin, destination, onClose }) {
         </div>
 
         <div className="detail-modal-footer">
-          <button className="modal-apply" type="button" onClick={onClose}>
-            Cerrar
-          </button>
+          {order.status === 'cancelado' || order.status === 'entregado' ? (
+            <button className="modal-delete" type="button" onClick={() => onRemove(order.id)}>
+              Borrar pedido
+            </button>
+          ) : (
+            <>
+              <button className="modal-apply" type="button" onClick={() => onEdit(order)}>
+                Modificar pedido
+              </button>
+              <button className="modal-delete" type="button" onClick={() => onCancelOrder(order)}>
+                Cancelar pedido
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -769,7 +756,6 @@ function EditOrderModal({
   orderId,
   formData,
   formErrors= {},
-  driverOptions,
   commerceOptions,
   onChange,
   onClose,
@@ -805,34 +791,6 @@ function EditOrderModal({
 
         <form className="edit-form" onSubmit={onSubmit} noValidate>
           <div className="form-fields">
-            <div className="form-field">
-              <label htmlFor="order-driver">Repartidor</label>
-              <div className="select-with-action">
-                <select
-                  id="order-driver"
-                  name="driver"
-                  value={formData.driver}
-                  onChange={onChange}
-                >
-                  <option value="">Sin asignar</option>
-                  {withCurrent(driverOptions, formData.driver).map((driver) => (
-                    <option key={driver} value={driver}>
-                      {driver}
-                    </option>
-                  ))}
-                </select>
-                {/* Sin funcionalidad hasta que se implemente la sección de repartidores. */}
-                <button
-                  className="field-link-button"
-                  type="button"
-                  aria-label="Ir a repartidores"
-                  title="Ir a repartidores"
-                >
-                  <ExternalLinkIcon />
-                </button>
-              </div>
-            </div>
-
 <div className="form-field">
               <label htmlFor="order-origin">Origen</label>
               <div className="select-with-action">
@@ -921,7 +879,6 @@ function EditOrderModal({
 function AddOrderModal({
   formData,
   formErrors,
-  driverOptions,
   commerceOptions,
   onChange,
   onClose,
@@ -956,34 +913,6 @@ function AddOrderModal({
             <div className="form-field">
               <label htmlFor="new-order-id">ID</label>
               <input id="new-order-id" name="id" type="text" value={formData.id} readOnly />
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="new-order-driver">Repartidor</label>
-              <div className="select-with-action">
-                <select
-                  id="new-order-driver"
-                  name="driver"
-                  value={formData.driver}
-                  onChange={onChange}
-                >
-                  <option value="">Sin asignar</option>
-                  {driverOptions.map((driver) => (
-                    <option key={driver} value={driver}>
-                      {driver}
-                    </option>
-                  ))}
-                </select>
-                {/* Sin funcionalidad hasta que se implemente la sección de repartidores. */}
-                <button
-                  className="field-link-button"
-                  type="button"
-                  aria-label="Ir a repartidores"
-                  title="Ir a repartidores"
-                >
-                  <ExternalLinkIcon />
-                </button>
-              </div>
             </div>
 
             <div className="form-field">
@@ -1202,23 +1131,6 @@ function DriverIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" />
-    </svg>
-  )
-}
-
-function TruckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7M7 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM17 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
-    </svg>
-  )
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="m8.5 12.3 2.4 2.4 4.6-4.9" />
     </svg>
   )
 }
