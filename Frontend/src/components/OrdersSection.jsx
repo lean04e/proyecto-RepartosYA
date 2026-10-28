@@ -150,14 +150,30 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     showSuccessToast(message)
   }
 
-  const handleConfirmCancel = () => {
-    setOrderList((currentOrders) =>
-      currentOrders.map((order) =>
-        order.id === cancelingOrder.id ? withStatusChange(order, 'cancelado') : order,
-      ),
-    )
-    setCancelingOrder(null)
-    showSuccessToast('El pedido ha sido cancelado exitosamente')
+  const handleConfirmCancel = async () => {
+try {
+      // Hacemos la petición PUT a tu nueva ruta del backend
+      const response = await fetch(`http://localhost:3001/api/pedidos/cancelar/${cancelingOrder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        // Si MongoDB lo actualiza bien, lo actualizamos visualmente en React
+        setOrderList((currentOrders) =>
+          currentOrders.map((order) =>
+            order.id === cancelingOrder.id ? withStatusChange(order, 'cancelado') : order,
+          ),
+        )
+        setCancelingOrder(null)
+        showSuccessToast('El pedido ha sido cancelado exitosamente')
+      } else {
+        const errorData = await response.json();
+        alert("Error al cancelar en BD: " + (errorData.error || errorData.detalle || "Ocurrió un error"));
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+    }
   }
 
   // Repartidores disponibles: hasta que exista la sección de repartidores, se toman de los pedidos.

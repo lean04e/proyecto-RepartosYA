@@ -50,4 +50,25 @@ const modificarPedido = async (req, res) => {
     }
 };
 
-module.exports = { crearPedido, obtenerPedidos, modificarPedido };
+const cancelarPedido = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Busca el pedido por su ID y le cambia el estado a 'cancelado'
+        const pedidoCancelado = await Pedido.findOneAndUpdate(
+            { ID: id },
+            { estado: 'cancelado' },
+            { new: true }
+        );
+
+        if (!pedidoCancelado) {
+            return res.status(404).json({ error: 'Pedido no encontrado en la base de datos' });
+        }
+
+        res.status(200).json({ mensaje: 'Pedido cancelado exitosamente', pedido: pedidoCancelado });
+    } catch (error) {
+        res.status(400).json({ error: 'Error al cancelar el pedido', detalle: error.message });
+    }
+};
+
+module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido };
