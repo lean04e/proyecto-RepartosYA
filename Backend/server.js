@@ -22,7 +22,7 @@ const tradeRoutes = require('./Trade_Management/tradeRoutes');
 app.use('/comercios', tradeRoutes);
 
 // Rutas de Pedidos 
-const pedidoRoutes = require('./Order_Management/Routes/pedidoRoutes'); // Ajustá la ruta a tu carpeta
+const pedidoRoutes = require('./Order_Management/routes/pedidoRoutes');
 app.use('/api/pedidos', pedidoRoutes);
 
 app.get('/', (req, res) => {
