@@ -67,7 +67,7 @@ function withStatusChange(order, nextStatus) {
   }
 }
 
-function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
+function OrdersSection({ orders, onGoToCommerces }) {
   const [orderList, setOrderList] = useState(orders)
   const [cancelingOrder, setCancelingOrder] = useState(null)
   const [detailOrderId, setDetailOrderId] = useState(null)
@@ -178,7 +178,10 @@ try {
 
   const commerceOptions = dbComercios.map((comercio) => comercio.nombre);
   const detailOrder = orderList.find((order) => order.id === detailOrderId)
-  const findCommerce = (name) => commerces.find((commerce) => commerce.name === name)
+  const findCommerce = (name) => {
+    const commerce = dbComercios.find((comercio) => comercio.nombre === name)
+    return commerce && { address: commerce.direccion, phone: commerce.telefono }
+  }
 
   const handleOpenEdit = (order) => {
     setEditingOrder(order)

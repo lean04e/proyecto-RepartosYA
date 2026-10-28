@@ -5,7 +5,6 @@ import CommercesSection from '../components/CommercesSection';
 import RouteSheetSection from '../components/RouteSheetSection';
 import RepartidoresSection from '../components/RepartidoresSection';
 import OrdersSection from '../components/OrdersSection';
-import { initialCommerceData } from '../data/mockCommerces';
 import { initialDriversData } from '../data/mockDrivers';
 import { initialOrdersData } from '../data/mockOrders';
 import { getAll } from '../services/api';
@@ -415,7 +414,6 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
                 <OrdersSection
                     orders={initialOrdersData}
-                    commerces={initialCommerceData}
                     onGoToCommerces={() => {
                         setOpenAddCommerce(true);
                         setActiveSection('commerces');
