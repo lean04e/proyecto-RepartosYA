@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import avatar from '../assets/jefeP.jpeg';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
@@ -96,6 +96,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [activeOrderView, setActiveOrderView] = useState(null);
     const [requestedOrderId, setRequestedOrderId] = useState(null);
     const [addOrderRequest, setAddOrderRequest] = useState(0);
+    const [ordersVersion, setOrdersVersion] = useState(0);
     const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
     const [drivers, setDrivers] = useState(initialDriversData);
@@ -179,10 +180,17 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
         return () => window.clearInterval(dateRefreshInterval);
     }, []);
 
+    const refreshOrders = useCallback(() => setOrdersVersion((version) => version + 1), []);
+
+    // Carga al montar, al volver a la seccion de pedidos, ante cambios (ordersVersion) y cada ORDER_REFRESH_INTERVAL
     useEffect(() => {
+        if (activeSection !== 'orders') {
+            return undefined;
+        }
+
         let isMounted = true;
 
-        const refreshOrders = async () => {
+        const loadOrders = async () => {
             try {
                 const latestOrders = await getPedidos();
                 if (!Array.isArray(latestOrders)) {
@@ -199,14 +207,14 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
             }
         };
 
-        refreshOrders();
-        const ordersRefreshInterval = window.setInterval(refreshOrders, ORDER_REFRESH_INTERVAL);
+        loadOrders();
+        const ordersRefreshInterval = window.setInterval(loadOrders, ORDER_REFRESH_INTERVAL);
 
         return () => {
             isMounted = false;
             window.clearInterval(ordersRefreshInterval);
         };
-    }, []);
+    }, [activeSection, ordersVersion]);
 
     useEffect(() => {
         if (!activeOrderView) {
@@ -408,6 +416,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                     orders={initialOrdersData}
                     openOrderId={requestedOrderId}
                     addOrderRequest={addOrderRequest}
+                    onOrdersChanged={refreshOrders}
                     onOrderOpened={() => setRequestedOrderId(null)}
                     onGoToCommerces={() => {
                         setOpenAddCommerce(true);

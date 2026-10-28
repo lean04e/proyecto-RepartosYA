@@ -67,7 +67,7 @@ function withStatusChange(order, nextStatus) {
   }
 }
 
-function OrdersSection({ orders, onGoToCommerces, openOrderId, onOrderOpened, addOrderRequest }) {
+function OrdersSection({ orders, onGoToCommerces, openOrderId, onOrderOpened, addOrderRequest, onOrdersChanged }) {
   const [orderList, setOrderList] = useState(orders)
   const [cancelingOrder, setCancelingOrder] = useState(null)
   const [detailOrderId, setDetailOrderId] = useState(null)
@@ -156,7 +156,9 @@ useEffect(() => {
   const visibleOrders = sortedOrders.slice(0, visibleCount)
   const canShowMore = visibleCount < sortedOrders.length
 
+  // Solo se llama despues de una operacion exitosa sobre pedidos: avisa al dashboard para actualizar las tarjetas
   const showSuccessToast = (message) => {
+    onOrdersChanged?.()
     setSuccessToastMessage(message)
     setTimeout(() => setSuccessToastMessage(''), 3500)
   }

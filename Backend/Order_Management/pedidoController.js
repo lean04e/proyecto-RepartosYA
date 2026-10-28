@@ -43,7 +43,7 @@ const modificarPedido = async (req, res) => {
         // Busca el pedido por tu campo de UUID "ID" y actualiza los datos
         const pedidoActualizado = await Pedido.findOneAndUpdate(
             { ID: id },
-            { origen, destino, repartidor },
+            { origen, destino },
             { new: true } // Esto devuelve el documento ya actualizado
         );
 
@@ -67,13 +67,13 @@ const cancelarPedido = async (req, res) => {
         }
 
         const estadoAnterior = pedido.estado;
-        pedido.estado = 'cancelado';
+        pedido.estado = 'CANCELADO';
         
         // Registramos el cambio de estado en el historial
         pedido.historialEstados.push({
             fecha: new Date().toISOString(),
             estadoAnterior: estadoAnterior,
-            estadoNuevo: 'cancelado'
+            estadoNuevo: 'CANCELADO'
         });
 
         await pedido.save();
