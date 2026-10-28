@@ -105,11 +105,72 @@ const eliminarPedido = async (req, res) => {
     }
 };
 
+const asignarRepartidor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { repartidor } = req.body;
+
+        const pedido = await Pedido.findOne({ ID: id });
+        if (!pedido) {
+            return res.status(404).json({ error: 'Pedido no encontrado' });
+        }
+
+        const estadoAnterior = pedido.estado;
+        
+        // Actualizamos los datos
+        pedido.repartidor = repartidor;
+        pedido.estado = 'EN_CAMINO';
+
+        // Registramos el cambio en la cronología
+        pedido.historialEstados.push({
+            fecha: new Date().toISOString(),
+            estadoAnterior: estadoAnterior,
+            estadoNuevo: 'EN_CAMINO'
+        });
+
+        await pedido.save();
+
+        res.status(200).json({ mensaje: 'Repartidor asignado exitosamente', pedido });
+    } catch (error) {
+        res.status(400).json({ error: 'Error al asignar el repartidor', detalle: error.message });
+    }
+};
+
+const desasignarRepartidor = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const pedido = await Pedido.findOne({ ID: id });
+        if (!pedido) {
+            return res.status(404).json({ error: 'Pedido no encontrado' });
+        }
+
+        const estadoAnterior = pedido.estado;
+        
+        // Volvemos el pedido a su estado original
+        pedido.repartidor = null;
+        pedido.estado = 'REGISTRADO';
+
+        // Registramos que se canceló la asignación
+        pedido.historialEstados.push({
+            fecha: new Date().toISOString(),
+            estadoAnterior: estadoAnterior,
+            estadoNuevo: 'REGISTRADO'
+        });
+
+        await pedido.save();
+
+        res.status(200).json({ mensaje: 'Repartidor desasignado exitosamente', pedido });
+    } catch (error) {
+        res.status(400).json({ error: 'Error al desasignar el repartidor', detalle: error.message });
+    }
+};
+
 const obtenerPedidosEntregadosPorRepartidor = async (req, res) => {
     try {
         const { nombreRepartidor } = req.params;
 
-        // Busca los pedidos que le pertenezcan a este repartidor y cuyo estado sea ENTREGADO
+        // Busca los pedidos de este repartidor que estén en estado ENTREGADO
         const pedidosEntregados = await Pedido.find({
             repartidor: nombreRepartidor,
             estado: { $in: ['ENTREGADO', 'entregado'] }
@@ -121,4 +182,4 @@ const obtenerPedidosEntregadosPorRepartidor = async (req, res) => {
     }
 };
 
-module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido, eliminarPedido, obtenerPedidosEntregadosPorRepartidor };
+module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido, eliminarPedido, asignarRepartidor, desasignarRepartidor, obtenerPedidosEntregadosPorRepartidor };

@@ -8,8 +8,8 @@ const ASSIGNED_TAB = 'assigned'
 const shortId = (pedido) => String(pedido.ID || pedido._id).slice(0, 8)
 
 const isDriverAvailable = (driver) => {
-  const status = String(driver.status || '').trim().toLowerCase()
-  return !status.includes('inactiv') && !status.includes('finalizado')
+  const status = String(driver.status || 'Activo').trim().toLowerCase()
+  return status === 'activo'
 }
 
 // assignments: { [pedido._id]: driverId }. Por ahora vive solo en el front;
@@ -22,18 +22,61 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
   const [selectedByOrigin, setSelectedByOrigin] = useState({})
   const [driverByOrigin, setDriverByOrigin] = useState({})
   const [driverErrors, setDriverErrors] = useState({})
-
-  useEffect(() => {
+  const [localDrivers, setLocalDrivers] = useState(drivers || [])
+ 
+useEffect(() => {
     let isMounted = true
 
-    getPedidos()
-      .then((data) => {
+    // Hacemos las dos peticiones a la BD en simultáneo
+    Promise.all([
+      getPedidos(),
+      fetch('http://localhost:3001/api/repartidores').then(res => res.json())
+    ])
+      .then(([dataPedidos, dataRepartidores]) => {
         if (!isMounted) return
-        if (!Array.isArray(data)) {
+
+        // 1. Guardamos los repartidores reales
+        if (Array.isArray(dataRepartidores)) {
+          setLocalDrivers(dataRepartidores)
+        }
+
+        if (!Array.isArray(dataPedidos)) {
           throw new Error('La respuesta de pedidos no tiene un formato válido.')
         }
-        setPedidos(data.filter((pedido) => pedido.estado === 'REGISTRADO'))
+        
+        // 2. Traemos los pedidos pendientes Y los que ya están en viaje
+        const pedidosValidos = dataPedidos.filter((pedido) => 
+          pedido.estado === 'REGISTRADO' || pedido.estado === 'EN_CAMINO'
+        )
+        setPedidos(pedidosValidos)
         setLoadError('')
+
+// 3. Sincronizamos las asignaciones reales que vienen del backend
+        const asignacionesBackend = {}
+        pedidosValidos.forEach((p) => {
+          if (p.repartidor && p.estado === 'EN_CAMINO') {
+            
+            const repartidorBd = String(p.repartidor).trim().toLowerCase();
+            
+            const driverMatch = dataRepartidores.find(d => {
+              const fullName = String(d.name || `${d.nombre || ''} ${d.apellido || ''}`).trim().toLowerCase();
+              const justName = String(d.nombre || '').trim().toLowerCase();
+              
+              // Coincide si es exactamente igual al nombre completo o aunque sea al primer nombre
+              return fullName === repartidorBd || justName === repartidorBd;
+            });
+
+            if (driverMatch) {
+              const pId = p.ID || p._id;
+              const dId = driverMatch.id || driverMatch._id;
+              asignacionesBackend[pId] = String(dId);
+            }
+          }
+        })
+        
+        if (Object.keys(asignacionesBackend).length > 0) {
+          onAssignmentsChange(current => ({ ...current, ...asignacionesBackend }))
+        }
       })
       .catch((error) => {
         if (isMounted) setLoadError(error.message)
@@ -45,12 +88,12 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [onAssignmentsChange])
 
-  const availableDrivers = useMemo(() => drivers.filter(isDriverAvailable), [drivers])
+  const availableDrivers = useMemo(() => localDrivers.filter(isDriverAvailable), [localDrivers])
   const driversById = useMemo(
-    () => Object.fromEntries(drivers.map((driver) => [String(driver.id), driver])),
-    [drivers],
+    () => Object.fromEntries(localDrivers.map((driver) => [String(driver.id || driver._id || driver.ID), driver])),
+    [localDrivers],
   )
 
   const assignedCountByDriver = useMemo(() => {
@@ -61,10 +104,10 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
     return counts
   }, [assignments])
 
-  const unassignedGroups = useMemo(() => {
+const unassignedGroups = useMemo(() => {
     const groups = new Map()
     pedidos
-      .filter((pedido) => !assignments[pedido._id])
+      .filter((pedido) => !assignments[pedido.ID || pedido._id])
       .forEach((pedido) => {
         if (!groups.has(pedido.origen)) groups.set(pedido.origen, [])
         groups.get(pedido.origen).push(pedido)
@@ -75,9 +118,9 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
   const assignedGroups = useMemo(() => {
     const groups = new Map()
     pedidos
-      .filter((pedido) => assignments[pedido._id])
+      .filter((pedido) => assignments[pedido.ID || pedido._id])
       .forEach((pedido) => {
-        const driverId = assignments[pedido._id]
+        const driverId = assignments[pedido.ID || pedido._id]
         if (!groups.has(driverId)) groups.set(driverId, [])
         groups.get(driverId).push(pedido)
       })
@@ -104,34 +147,74 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
     setDriverErrors((current) => ({ ...current, [origin]: false }))
   }
 
-  const handleAssign = (origin, groupPedidos) => {
+const handleAssign = async (origin, groupPedidos) => {
     const driverId = driverByOrigin[origin]
     if (!driverId) {
       setDriverErrors((current) => ({ ...current, [origin]: true }))
       return
     }
 
+    // ARREGLO: Buscamos el nombre completo (nombre + apellido) para mandarlo a la BD
+    const d = driversById[driverId];
+    const driverName = d?.name || `${d?.nombre || ''} ${d?.apellido || ''}`.trim() || driverId;
+
     const selectedIds = selectedByOrigin[origin] || []
     const toAssign = selectedIds.length > 0
-      ? groupPedidos.filter((pedido) => selectedIds.includes(pedido._id))
+      ? groupPedidos.filter((pedido) => selectedIds.includes(pedido.ID || pedido._id))
       : groupPedidos
 
-    onAssignmentsChange((current) => {
-      const next = { ...current }
-      toAssign.forEach((pedido) => {
-        next[pedido._id] = driverId
+    try {
+      // Mandamos la orden al backend para cada pedido seleccionado
+      await Promise.all(toAssign.map(async (pedido) => {
+        const idPedido = pedido.ID || pedido._id;
+        const response = await fetch(`http://localhost:3001/api/pedidos/asignar/${idPedido}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repartidor: driverName }) // Enviamos el nombre completo
+        });
+        
+        if (!response.ok) {
+          console.error(`Falló la asignación del pedido ${idPedido}`);
+        }
+      }));
+
+      // Lo movemos visualmente a la pestaña "Asignados"
+      onAssignmentsChange((current) => {
+        const next = { ...current }
+        toAssign.forEach((pedido) => {
+          next[pedido.ID || pedido._id] = String(driverId)
+        })
+        return next
       })
-      return next
-    })
-    setSelectedByOrigin((current) => ({ ...current, [origin]: [] }))
+      setSelectedByOrigin((current) => ({ ...current, [origin]: [] }))
+      
+    } catch (error) {
+      console.error("Error al conectar con la base de datos:", error);
+      alert("Ocurrió un error al asignar los pedidos.");
+    }
   }
 
-  const handleUnassign = (pedidoId) => {
-    onAssignmentsChange((current) => {
-      const next = { ...current }
-      delete next[pedidoId]
-      return next
-    })
+const handleUnassign = async (pedidoId) => {
+    try {
+      // Le avisamos a MongoDB que devuelva el pedido a estado REGISTRADO
+      const response = await fetch(`http://localhost:3001/api/pedidos/desasignar/${pedidoId}`, {
+        method: 'PUT'
+      });
+
+      if (response.ok) {
+        // Si sale bien, lo borramos de la pestaña "Asignados" en pantalla
+        onAssignmentsChange((current) => {
+          const next = { ...current }
+          delete next[pedidoId]
+          return next
+        });
+      } else {
+        alert("Error al quitar el pedido en la base de datos.");
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+      alert("Error de conexión al intentar desasignar el pedido.");
+    }
   }
 
   return (
@@ -197,11 +280,15 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
                       aria-invalid={hasError ? 'true' : undefined}
                     >
                       <option value="">Seleccionar repartidor</option>
-                      {availableDrivers.map((driver) => (
-                        <option key={driver.id} value={driver.id}>
-                          {driver.name} ({assignedCountByDriver[driver.id] || 0} asignados)
-                        </option>
-                      ))}
+                        {availableDrivers.map((driver) => {
+                        const driverId = String(driver.id || driver._id || driver.ID);
+                        const driverName = driver.name || `${driver.nombre || ''} ${driver.apellido || ''}`.trim() || 'Repartidor';
+                        return (
+                          <option key={driverId} value={driverId}>
+                            {driverName} ({assignedCountByDriver[driverId] || 0} asignados)
+                          </option>
+                        );
+                      })}
                     </select>
                     <button
                       className="modal-apply"
@@ -232,22 +319,25 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
                       <th scope="col">Destino</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {groupPedidos.map((pedido) => (
-                      <tr key={pedido._id}>
-                        <td className="route-check-col">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(pedido._id)}
-                            onChange={() => togglePedido(origin, pedido._id)}
-                            aria-label={`Seleccionar pedido ${shortId(pedido)}`}
-                          />
-                        </td>
-                        <td><code>{shortId(pedido)}</code></td>
-                        <td>{pedido.origen}</td>
-                        <td>{pedido.destino}</td>
-                      </tr>
-                    ))}
+                    <tbody>
+                    {groupPedidos.map((pedido) => {
+                      const idReal = pedido.ID || pedido._id;
+                      return (
+                        <tr key={idReal}>
+                          <td className="route-check-col">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(idReal)}
+                              onChange={() => togglePedido(origin, idReal)}
+                              aria-label={`Seleccionar pedido ${shortId(pedido)}`}
+                            />
+                          </td>
+                          <td><code>{shortId(pedido)}</code></td>
+                          <td>{pedido.origen}</td>
+                          <td>{pedido.destino}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </article>
@@ -265,7 +355,9 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
               <header className="route-group-header">
                 <div>
                   <h2 className="route-group-title">
-                    {driversById[driverId]?.name || 'Repartidor desconocido'}
+                    {driversById[driverId] 
+                      ? (driversById[driverId].name || `${driversById[driverId].nombre || ''} ${driversById[driverId].apellido || ''}`.trim() || 'Repartidor')
+                      : 'Repartidor desconocido'}
                   </h2>
                   <span className="route-group-count">
                     {groupPedidos.length} {groupPedidos.length === 1 ? 'pedido' : 'pedidos'}
@@ -285,24 +377,27 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
                     </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {groupPedidos.map((pedido) => (
-                    <tr key={pedido._id}>
-                      <td><code>{shortId(pedido)}</code></td>
-                      <td>{pedido.origen}</td>
-                      <td>{pedido.destino}</td>
-                      <td className="route-action-col">
-                        <button
-                          className="modal-cancel"
-                          type="button"
-                          onClick={() => handleUnassign(pedido._id)}
-                        >
-                          Quitar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+                    <tbody>
+                    {groupPedidos.map((pedido) => {
+                      const idReal = pedido.ID || pedido._id;
+                      return (
+                        <tr key={idReal}>
+                          <td><code>{shortId(pedido)}</code></td>
+                          <td>{pedido.origen}</td>
+                          <td>{pedido.destino}</td>
+                          <td className="route-action-col">
+                            <button
+                              className="modal-cancel"
+                              type="button"
+                              onClick={() => handleUnassign(idReal)}
+                            >
+                              Quitar
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
               </table>
             </article>
           ))
