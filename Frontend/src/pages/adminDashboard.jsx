@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import avatar from '../assets/jefeP.jpeg';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
+import RouteSheetSection from '../components/RouteSheetSection';
+import RepartidoresSection from '../components/RepartidoresSection';
 import OrdersSection from '../components/OrdersSection';
 import { initialCommerceData } from '../data/mockCommerces';
+import { initialDriversData } from '../data/mockDrivers';
 import { initialOrdersData } from '../data/mockOrders';
-import avatar from '../assets/jefeP.jpeg';
 import { getAll } from '../services/api';
 import '../styles/admin.css';
 
@@ -85,13 +88,7 @@ function getOrderLabel(order, index) {
     return identifier ? `Pedido ${identifier}` : `Pedido ${index + 1}`;
 }
 
-const sections = [
-    { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos', badge: '0' },
-    { icon: '📊', label: 'Reportes', href: '#dashboard',  badge: '0'},
-    { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
-    { icon: '🚚', label: 'Repartidores', href: '#repartidores', status: 'Activos' },
-    { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
-];
+
 
 const metricTitles = [
     { id: 'pending', title: 'Total Pendientes' },
@@ -115,10 +112,84 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [ordersError, setOrdersError] = useState('');
     const [activeOrderView, setActiveOrderView] = useState(null);
     const [pedidos, setPedidos] = useState([]);
+    const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
+    const [drivers, setDrivers] = useState(initialDriversData);
+    const [routeAssignments, setRouteAssignments] = useState({});
 
+    const hasActiveDrivers = Array.isArray(drivers) && drivers.length > 0 && drivers.some((driver) => {
+        const status = String(driver.status || '').trim().toLowerCase();
+        return !status.includes('inactiv') && !status.includes('finalizado');
+    });
+
+    const sections = [
+        { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos', badge: '0' },
+        { icon: '📊', label: 'Reportes', href: '#dashboard', badge: '0' },
+        { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
+        {
+            id: 'drivers',
+            icon: '🚚',
+            label: 'Repartidores',
+            href: '#repartidores',
+            status: hasActiveDrivers ? 'Activos' : 'Inactivos',
+            statusClass: hasActiveDrivers ? 'badge-status-active' : 'badge-status-inactive',
+        },
+        { id: 'routes', icon: '🗺️', label: 'Hoja de Ruta', href: '#hoja-de-ruta' },
+        { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
+    ];
+
+    // EFFECT PARA REPARTIDORES
     useEffect(() => {
-        fetch('http:localhost:3001/pedidos')
+        getAll('repartidores')
+            .then((data) => {
+                if (Array.isArray(data) && data.length > 0) {
+                    const repartidoresAdaptados = data.map((repartidor) => ({
+                        id: repartidor._id || repartidor.id,
+                        name: `${repartidor.nombre || ''} ${repartidor.apellido || ''}`.trim() || repartidor.name,
+                        firstName: repartidor.nombre || repartidor.firstName || '',
+                        lastName: repartidor.apellido || repartidor.lastName || '',
+                        email: repartidor.email || '',
+                        phone: repartidor.telefono || repartidor.phone || '',
+                        vehicle: repartidor.vehiculo || repartidor.vehicle || 'Moto',
+                        status: repartidor.estado || repartidor.status || 'Activo',
+                        destination: repartidor.dondeSeDirige || repartidor.destination || 'En base / Central',
+                        pendingOrders: Number(repartidor.pedidosPendientes ?? repartidor.pendingOrders ?? 0),
+                        deliveredOrders: Number(repartidor.cantPedidos ?? repartidor.orders ?? 0),
+                        orders: Number(repartidor.cantPedidos ?? repartidor.orders ?? 0),
+                        historicalOrders: (Number(repartidor.cantPedidos ?? repartidor.orders ?? 0)) * 4,
+                        recentOrders: repartidor.recentOrders || []
+                    }));
+                    setDrivers(repartidoresAdaptados);
+                }
+            })
+            .catch((err) => console.error('Error al cargar repartidores:', err));
+    }, []);
+
+
+    // EFFECT PARA COMERCIOS (Con traducción de datos backend -> frontend)
+    useEffect(() => {
+        getAll('comercios')
+            .then((data) => {
+                if (Array.isArray(data)) {
+                    const comerciosAdaptados = data.map((comercio) => ({
+                        id: comercio._id,
+                        name: comercio.nombre,
+                        rubro: comercio.rubro || '',
+                        orders: comercio.cantPedidos,
+                        phone: comercio.telefono,
+                        address: comercio.direccion,
+                        historicalOrders: (comercio.cantPedidos || 0) * 5, 
+                        recentOrders: [] 
+                    }));
+                    setCommerces(comerciosAdaptados);
+                }
+            })
+            .catch((err) => console.error('Error al cargar los comercios:', err));
+    }, []);
+
+    // EFFECT PARA PEDIDOS
+    useEffect(() => {
+        fetch('http://localhost:3001/pedidos')
             .then((res) => res.json())
             .then((data) => {
                 setPedidos(data);
@@ -230,7 +301,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                                     <span className="sidebar-item-icon" aria-hidden="true">{section.icon}</span>
                                     <span className="sidebar-item-label">{section.label}</span>
                                     {section.badge && <span className="badge-counter">{section.badge}</span>}
-                                    {section.status && <span className="badge-status-active">{section.status}</span>}
+                                    {section.status && <span className={section.statusClass || 'badge-status-active'}>{section.status}</span>}
                                 </a>
                             ))}
                         </nav>
@@ -254,7 +325,15 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
-                    <CommercesSection commerces={initialCommerceData} openAddOnMount={openAddCommerce} />
+                    <CommercesSection commerces={commerces} onCommercesChange={setCommerces} openAddOnMount={openAddCommerce} />
+                ) : activeSection === 'drivers' ? (
+                    <RepartidoresSection drivers={drivers} onDriversChange={setDrivers} />
+                ) : activeSection === 'routes' ? (
+                    <RouteSheetSection
+                        drivers={drivers}
+                        assignments={routeAssignments}
+                        onAssignmentsChange={setRouteAssignments}
+                    />
                 ) : (
                     <>
                 <div className="admin-header-title-row">
@@ -264,25 +343,11 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         <p className="subtitle-date">Hoy, {today} <span>•</span> {pedidos.length} {pedidos.length === 1 ? 'registro de pedido' : 'registros de pedidos'} en el turno</p>
                     </div>
 
-                    {/* Este bloque pertenece a un estilo que profundizaremos en el sprint 2 */}
-
-                    {/* 
-
-                    <div className="search-box-inline">
-                        <span className="search-icon">🌐</span>
-                        <input type="text" placeholder="Código #RY o cliente..." />
-                    </div>
-                    <div className="view-switcher">
-                        <button className="view-btn active">
-                            <span className="icon">🗄️</span> Tablero
-                        </button>
-                        <button className="view-btn">
-                            <span className="icon">📜</span> Lista
-                        </button>
-                    </div>
-
-                     */}
-
+                    <button type="button" className="new-order-button">
+                        <span className= "btn-icon">➕</span>
+                        <span className= "btn-text">Nuevo Pedido</span>
+                        <span className= "btn-badge">Despacho</span>
+                    </button>
                 </div>
 
                 <section className="metrics-grid" aria-label="Indicadores">

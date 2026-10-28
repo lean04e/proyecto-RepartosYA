@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './CommercesSection.css'
 import './OrdersSection.css'
 
-const INITIAL_VISIBLE_COUNT = 6
-const VISIBLE_COUNT_STEP = 4
+const INITIAL_VISIBLE_COUNT = 20
+const VISIBLE_COUNT_STEP = 20
 const ALL_STATUSES = 'todos'
 
 const STATUS_CONFIG = {
@@ -84,6 +84,43 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
 
+  // --- NUEVO: Estados para la Base de Datos ---
+  const [dbRepartidores, setDbRepartidores] = useState([]);
+  const [dbComercios, setDbComercios] = useState([]);
+  const [editErrors, setEditErrors] = useState({})
+
+useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        const resRep = await fetch('http://localhost:3001/api/repartidores');
+        if (resRep.ok) setDbRepartidores(await resRep.json());
+
+        const resCom = await fetch('http://localhost:3001/comercios');
+        if (resCom.ok) setDbComercios(await resCom.json());
+
+        // NUEVO: Traer Pedidos desde el backend
+        const resPed = await fetch('http://localhost:3001/api/pedidos');
+        if (resPed.ok) {
+          const pedidosData = await resPed.json();
+          // Adaptamos el formato de MongoDB al de React
+          const pedidosMapeados = pedidosData.map(p => ({
+            id: p.ID,
+            origin: p.origen,
+            destination: p.destino,
+            driver: p.repartidor || null, 
+            status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
+            createdAt: p.createdAt || new Date().toISOString(),
+            statusHistory: []
+          }));
+          setOrderList(pedidosMapeados);
+        }
+      } catch (error) {
+        console.error("Error al cargar datos de la BD:", error);
+      }
+    };
+    cargarDatos();
+  }, []);
+
   const normalizedSearchTerm = normalizeText(searchTerm.trim())
   const filteredOrders = orderList.filter((order) => {
     const matchesSearch =
@@ -128,25 +165,35 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     showSuccessToast(message)
   }
 
-  const handleConfirmCancel = () => {
-    setOrderList((currentOrders) =>
-      currentOrders.map((order) =>
-        order.id === cancelingOrder.id ? withStatusChange(order, 'cancelado') : order,
-      ),
-    )
-    setCancelingOrder(null)
-    showSuccessToast('El pedido ha sido cancelado exitosamente')
+  const handleConfirmCancel = async () => {
+try {
+      // Hacemos la petición PUT a tu nueva ruta del backend
+      const response = await fetch(`http://localhost:3001/api/pedidos/cancelar/${cancelingOrder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        // Si MongoDB lo actualiza bien, lo actualizamos visualmente en React
+        setOrderList((currentOrders) =>
+          currentOrders.map((order) =>
+            order.id === cancelingOrder.id ? withStatusChange(order, 'cancelado') : order,
+          ),
+        )
+        setCancelingOrder(null)
+        showSuccessToast('El pedido ha sido cancelado exitosamente')
+      } else {
+        const errorData = await response.json();
+        alert("Error al cancelar en BD: " + (errorData.error || errorData.detalle || "Ocurrió un error"));
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+    }
   }
 
   // Repartidores disponibles: hasta que exista la sección de repartidores, se toman de los pedidos.
-  const driverOptions = useMemo(
-    () =>
-      [...new Set(orders.map((order) => order.driver).filter(Boolean))].sort((a, b) =>
-        a.localeCompare(b, 'es'),
-      ),
-    [orders],
-  )
-  const commerceOptions = commerces.map((commerce) => commerce.name)
+  const driverOptions = dbRepartidores.map((rep) => `${rep.nombre} ${rep.apellido}`);
+  const commerceOptions = dbComercios.map((comercio) => comercio.nombre);
   const detailOrder = orderList.find((order) => order.id === detailOrderId)
   const findCommerce = (name) => commerces.find((commerce) => commerce.name === name)
 
@@ -163,15 +210,34 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setEditingOrder(null)
     setFormData(null)
     setConfirmationOpen(false)
+    setEditErrors({}) // Escenario 3: Limpiamos los errores si cancela
   }
 
   const handleFieldChange = (event) => {
     const { name, value } = event.target
     setFormData((currentData) => ({ ...currentData, [name]: value }))
+    // Limpiamos el error visual si el usuario vuelve a escribir
+    if (editErrors && editErrors[name]) {
+      setEditErrors((prev) => ({ ...prev, [name]: null }))
+    }
   }
 
   const handleApplyEdit = (event) => {
     event.preventDefault()
+
+    // Escenario 2: Validación de campos vacíos
+    const camposRequeridos = ['origin', 'destination'];
+    const errores = {};
+    for (const campo of camposRequeridos) {
+      if (!formData[campo] || formData[campo].trim() === '') {
+        errores[campo] = 'No se ha ingresado datos al campo.';
+      }
+    }
+
+    if (Object.keys(errores).length > 0) {
+      setEditErrors(errores);
+      return; 
+    }
 
     const hasChanges =
       formData.driver !== (editingOrder.driver ?? '') ||
@@ -183,28 +249,41 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
       return
     }
 
-    setConfirmationOpen(true)
+    setEditErrors({})
+    setConfirmationOpen(true) // Lanza advertencia explícita (Escenario 1 y 3)
   }
 
-  const handleConfirmEdit = () => {
-    setOrderList((currentOrders) =>
-      currentOrders.map((order) =>
-        order.id === editingOrder.id
-          ? { ...order, ...formData, driver: formData.driver || null }
-          : order,
-      ),
-    )
-    handleCloseEdit()
-    showSuccessToast('El pedido ha sido modificado exitosamente')
+    const handleConfirmEdit = async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/pedidos/modificar/${editingOrder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origen: formData.origin,
+          destino: formData.destination
+        })
+      });
+    if (response.ok) {
+        setOrderList((currentOrders) =>
+          currentOrders.map((order) =>
+            order.id === editingOrder.id
+              ? { ...order, ...formData, driver: formData.driver || null }
+              : order,
+          ),
+        )
+        handleCloseEdit()
+        showSuccessToast('El pedido ha sido modificado exitosamente')
+      } else {
+        const errorData = await response.json();
+        alert("Error al modificar en BD: " + (errorData.error || errorData.detalle || "Revisa los datos"));
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+    }
   }
-
-  // TEMPORAL: el ID lo asignará la base de datos; borrar esto y el campo id de handleOpenAdd.
-  const nextOrderId = `PED-${
-    Math.max(0, ...orderList.map((order) => Number(order.id.replace(/\D/g, '')))) + 1
-  }`
 
   const handleOpenAdd = () => {
-    setNewOrderData({ id: nextOrderId, driver: '', origin: '', destination: '' })
+    setNewOrderData({ id: 'Autogenerado' , driver: '', origin: '', destination: '' })
     setNewOrderErrors({})
     setAddingOrder(true)
   }
@@ -221,36 +300,68 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
     setNewOrderErrors((currentErrors) => ({ ...currentErrors, [name]: false }))
   }
 
-  const handleAddOrder = (event) => {
-    event.preventDefault()
+const handleAddOrder = async (event) => {
+    event.preventDefault();
 
-    const nextErrors = {
-      origin: !newOrderData.origin,
-      destination: !newOrderData.destination,
+    // Escenario 2: Validación estricta de campos vacíos
+    const camposRequeridos = ['origin', 'destination'];
+    const nextErrors = {};
+
+    for (const campo of camposRequeridos) {
+      if (!newOrderData[campo] || newOrderData[campo].trim() === '') {
+        nextErrors[campo] = 'No se ha ingresado datos al campo.';
+      }
     }
 
-    if (Object.values(nextErrors).some(Boolean)) {
-      setNewOrderErrors(nextErrors)
-      return
+    if (Object.keys(nextErrors).length > 0) {
+      setNewOrderErrors(nextErrors);
+      return; // Frena la ejecución, se muestran los textos rojos y no se cierra la ventana
     }
 
-    // Al crearse, el pedido queda Asignado si ya tiene repartidor y Registrado si no.
-    const createdAt = new Date().toISOString()
-    const initialStatus = newOrderData.driver ? 'asignado' : 'registrado'
+    // Escenario 1: Creación de pedido exitoso
+    try {
+      const response = await fetch('http://localhost:3001/api/pedidos/cargar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origen: newOrderData.origin,
+          destino: newOrderData.destination,
+          // Rellenamos los campos obligatorios del backend que aún no están en la UI
+          destinatario: "Consumidor Final",
+          contacto: "Sin especificar",
+          email: "",
+          repartidor: newOrderData.driver || null
+        })
+      });
 
-    setOrderList((currentOrders) => [
-      ...currentOrders,
-      {
-        ...newOrderData,
-        driver: newOrderData.driver || null,
-        createdAt,
-        status: initialStatus,
-        statusHistory: [{ at: createdAt, from: null, to: initialStatus }],
-      },
-    ])
-    handleCloseAdd()
-    showSuccessToast('El pedido ha sido añadido exitosamente')
-  }
+      if (response.ok) {
+        const data = await response.json();
+        const createdAt = new Date().toISOString();
+        const initialStatus = newOrderData.driver ? 'asignado' : 'registrado';
+        
+        // El nuevo pedido aparece inmediatamente en la lista con el UUID real
+        setOrderList((currentOrders) => [
+          ...currentOrders,
+          {
+            ...newOrderData,
+            id: data.pedido.ID || newOrderData.id, 
+            driver: newOrderData.driver || null,
+            createdAt,
+            status: initialStatus,
+            statusHistory: [{ at: createdAt, from: null, to: initialStatus }],
+          },
+        ]);
+        
+        handleCloseAdd(); // Cierra la ventana tras éxito
+        showSuccessToast('El pedido ha sido añadido exitosamente');
+      } else {
+        const errorData = await response.json();
+        alert("Error al cargar: " + (errorData.error || errorData.detalle || "Revisa los datos"));
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+    }
+  };
 
   const handleRemoveOrder = (orderId) => {
     if (detailOrderId === orderId) setDetailOrderId(null)
@@ -441,7 +552,14 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
                   </td>
                 </tr>
               ))}
-              {visibleOrders.length === 0 && (
+              {/* Escenario 1: No hay pedidos cargados */}
+              {orderList.length === 0 && (
+                <tr className="empty-results-row">
+                  <td colSpan="7">No hay pedidos cargados</td>
+                </tr>
+              )}
+              {/* Escenario 4: Hay pedidos pero la búsqueda/filtros no encontró nada */}
+              {orderList.length > 0 && visibleOrders.length === 0 && (
                 <tr className="empty-results-row">
                   <td colSpan="7">No se encontraron pedidos con esos filtros.</td>
                 </tr>
@@ -483,6 +601,7 @@ function OrdersSection({ orders, commerces = [], onGoToCommerces }) {
           <EditOrderModal
             orderId={editingOrder.id}
             formData={formData}
+            formErrors={editErrors}
             driverOptions={driverOptions}
             commerceOptions={commerceOptions}
             onChange={handleFieldChange}
@@ -649,6 +768,7 @@ function OrderPartyCard({ title, name, commerce }) {
 function EditOrderModal({
   orderId,
   formData,
+  formErrors= {},
   driverOptions,
   commerceOptions,
   onChange,
@@ -713,7 +833,7 @@ function EditOrderModal({
               </div>
             </div>
 
-            <div className="form-field">
+<div className="form-field">
               <label htmlFor="order-origin">Origen</label>
               <div className="select-with-action">
                 <select
@@ -721,7 +841,9 @@ function EditOrderModal({
                   name="origin"
                   value={formData.origin}
                   onChange={onChange}
+                  className={formErrors.origin ? 'has-error' : ''}
                 >
+                  <option value="" disabled hidden />
                   {withCurrent(commerceOptions, formData.origin).map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -738,9 +860,15 @@ function EditOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
+              {/* ACÁ AGREGAMOS EL MENSAJE DE ERROR */}
+              {formErrors.origin && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.origin}
+                </small>
+              )}
             </div>
 
-            <div className="form-field">
+<div className="form-field">
               <label htmlFor="order-destination">Destino</label>
               <div className="select-with-action">
                 <select
@@ -748,7 +876,9 @@ function EditOrderModal({
                   name="destination"
                   value={formData.destination}
                   onChange={onChange}
+                  className={formErrors.destination ? 'has-error' : ''}
                 >
+                  <option value="" disabled hidden />
                   {withCurrent(commerceOptions, formData.destination).map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -765,6 +895,13 @@ function EditOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
+              
+              {/* ACÁ AGREGAMOS EL MENSAJE DE ERROR DE DESTINO */}
+              {formErrors.destination && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.destination}
+                </small>
+              )}
             </div>
           </div>
           <div className="modal-actions">
@@ -877,9 +1014,9 @@ function AddOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
-              {formErrors.origin && (
-                <small className="field-error" role="alert">
-                  Completa este campo.
+                {formErrors.origin && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.origin}
                 </small>
               )}
             </div>
@@ -912,9 +1049,9 @@ function AddOrderModal({
                   <ExternalLinkIcon />
                 </button>
               </div>
-              {formErrors.destination && (
-                <small className="field-error" role="alert">
-                  Completa este campo.
+                {formErrors.destination && (
+                <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
+                  {formErrors.destination}
                 </small>
               )}
             </div>

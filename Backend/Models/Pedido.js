@@ -1,33 +1,42 @@
 const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
+
 const pedidoSchema = new mongoose.Schema({
-    codigo: {
-        type: Number,
-        requiered: true
+    ID: {
+        type: String,
+        default: uuidv4, // Se rellena solo con un código único automáticamente
+        unique: true     // Garantiza que no se repita en la base de datos
     },
     origen: {
         type: String,
-        requiered: true
+        required: true // Corregido aquí
     },
     destino: {
         type: String,
-        requiered: true
+        required: true // Corregido aquí
     },
     destinatario: {
         type: String,
-        requiered: true
+        required: true // Corregido aquí
     },
     contacto: {
         type: String,
-        requiered: true
+        required: true // Corregido aquí
     },
     email: {
         type: String,
-        requiered: false
+        required: false // Corregido aquí
+    },
+    repartidor: {
+        type: String,
+        required: false,
+        default: null
     },
     estado: {
         type: String,
-        enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'RECHAZADO'],
+        enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'RECHAZADO', 'CANCELADO'],
         default: 'REGISTRADO'
-    },
-})
+    }
+});
+
 module.exports = mongoose.model('Pedido', pedidoSchema);
