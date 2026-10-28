@@ -67,7 +67,7 @@ function withStatusChange(order, nextStatus) {
   }
 }
 
-function OrdersSection({ orders, onGoToCommerces }) {
+function OrdersSection({ orders, onGoToCommerces, openOrderId, onOrderOpened, addOrderRequest }) {
   const [orderList, setOrderList] = useState(orders)
   const [cancelingOrder, setCancelingOrder] = useState(null)
   const [detailOrderId, setDetailOrderId] = useState(null)
@@ -99,13 +99,16 @@ useEffect(() => {
         if (resPed.ok) {
           const pedidosData = await resPed.json();
           // Adaptamos el formato de MongoDB al de React
+          // Los pedidos viejos no tienen createdAt: la fecha de creacion esta en los primeros 4 bytes del _id
+          const fechaCreacion = (p) => p.createdAt
+            || (p._id ? new Date(parseInt(p._id.substring(0, 8), 16) * 1000).toISOString() : new Date().toISOString());
           const pedidosMapeados = pedidosData.map(p => ({
             id: p.ID,
             origin: p.origen,
             destination: p.destino,
             driver: p.repartidor || null, 
             status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
-            createdAt: p.createdAt || new Date().toISOString(),
+            createdAt: fechaCreacion(p),
             
         
             statusHistory: p.historialEstados && p.historialEstados.length > 0 
@@ -114,7 +117,7 @@ useEffect(() => {
                   from: h.estadoAnterior ? h.estadoAnterior.toLowerCase().replace('_', '-') : null,
                   to: h.estadoNuevo.toLowerCase().replace('_', '-')
                 }))
-              : [{ at: p.createdAt || new Date().toISOString(), from: null, to: 'registrado' }]
+              : [{ at: fechaCreacion(p), from: null, to: 'registrado' }]
           }));
           setOrderList(pedidosMapeados);
         }
@@ -186,6 +189,16 @@ try {
 
   const commerceOptions = dbComercios.map((comercio) => comercio.nombre);
   const detailOrder = orderList.find((order) => order.id === detailOrderId)
+
+  // Abre el detalle de un pedido pedido desde afuera (tarjetas del dashboard)
+  const [lastOpenOrderId, setLastOpenOrderId] = useState(null)
+  if (openOrderId !== lastOpenOrderId) {
+    setLastOpenOrderId(openOrderId)
+    if (openOrderId) setDetailOrderId(openOrderId)
+  }
+  useEffect(() => {
+    if (openOrderId) onOrderOpened?.()
+  }, [openOrderId, onOrderOpened])
   const findCommerce = (name) => {
     const commerce = dbComercios.find((comercio) => comercio.nombre === name)
     return commerce && { address: commerce.direccion, phone: commerce.telefono }
@@ -278,6 +291,13 @@ try {
     setNewOrderData({ id: 'Autogenerado', origin: '', destination: '' })
     setNewOrderErrors({})
     setAddingOrder(true)
+  }
+
+  // Abre el formulario de alta cuando el boton "Nuevo Pedido" del dashboard incrementa addOrderRequest
+  const [lastAddRequest, setLastAddRequest] = useState(addOrderRequest)
+  if (addOrderRequest !== lastAddRequest) {
+    setLastAddRequest(addOrderRequest)
+    handleOpenAdd()
   }
 
   const handleCloseAdd = () => {
@@ -397,10 +417,6 @@ const handleAddOrder = async (event) => {
     <section className="orders-section" aria-labelledby="orders-list-title">
       <div className="orders-list-heading">
         <h2 id="orders-list-title" className="orders-list-title">Listado de pedidos</h2>
-        <button type="button" className="new-order-button" onClick={handleOpenAdd}>
-          <PackageIcon />
-          <span className="btn-text">Nuevo Pedido</span>
-        </button>
       </div>
 
       <div className="commerce-filters" aria-label="Filtros de pedidos">
@@ -1156,7 +1172,7 @@ function CancelIcon() {
   )
 }
 
-function PackageIcon() {
+export function PackageIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9M8 5.3l8 4.5" />
