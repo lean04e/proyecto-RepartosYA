@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getPedidos } from '../services/api'
+import { getAll, getPedidos } from '../services/api'
 import './RouteSheetSection.css'
 
 const UNASSIGNED_TAB = 'unassigned'
@@ -12,10 +12,19 @@ const isDriverAvailable = (driver) => {
   return !status.includes('inactiv') && !status.includes('finalizado')
 }
 
-// assignments: { [pedido._id]: driverId }. Por ahora vive solo en el front;
-// cuando el backend exponga la asignacion, handleAssign/handleUnassign deben llamarla.
-function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
+const API_PEDIDOS = 'http://localhost:3001/api/pedidos'
+
+const toDriver = (repartidor) => ({
+  id: repartidor._id || repartidor.id,
+  name: `${repartidor.nombre || ''} ${repartidor.apellido || ''}`.trim(),
+  status: repartidor.status || repartidor.estado || 'Activo',
+})
+
+// La asignacion se guarda en el pedido (repartidor + estado ASIGNADO); la lista se arma desde el backend.
+function RouteSheetSection() {
+  const [drivers, setDrivers] = useState([])
   const [pedidos, setPedidos] = useState([])
+  const [actionError, setActionError] = useState('')
   const [loadError, setLoadError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState(UNASSIGNED_TAB)
@@ -26,13 +35,18 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
   useEffect(() => {
     let isMounted = true
 
-    getPedidos()
-      .then((data) => {
+    Promise.all([getPedidos(), getAll('repartidores')])
+      .then(([pedidosData, repartidoresData]) => {
         if (!isMounted) return
-        if (!Array.isArray(data)) {
+        if (!Array.isArray(pedidosData)) {
           throw new Error('La respuesta de pedidos no tiene un formato válido.')
         }
-        setPedidos(data.filter((pedido) => pedido.estado === 'REGISTRADO'))
+        setPedidos(
+          pedidosData.filter(
+            (pedido) => pedido.estado === 'REGISTRADO' || pedido.estado === 'ASIGNADO',
+          ),
+        )
+        setDrivers(Array.isArray(repartidoresData) ? repartidoresData.map(toDriver) : [])
         setLoadError('')
       })
       .catch((error) => {
@@ -48,44 +62,42 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
   }, [])
 
   const availableDrivers = useMemo(() => drivers.filter(isDriverAvailable), [drivers])
-  const driversById = useMemo(
-    () => Object.fromEntries(drivers.map((driver) => [String(driver.id), driver])),
-    [drivers],
-  )
 
   const assignedCountByDriver = useMemo(() => {
     const counts = {}
-    Object.values(assignments).forEach((driverId) => {
-      counts[driverId] = (counts[driverId] || 0) + 1
+    pedidos.forEach((pedido) => {
+      if (pedido.estado === 'ASIGNADO' && pedido.repartidor) {
+        counts[pedido.repartidor] = (counts[pedido.repartidor] || 0) + 1
+      }
     })
     return counts
-  }, [assignments])
+  }, [pedidos])
 
   const unassignedGroups = useMemo(() => {
     const groups = new Map()
     pedidos
-      .filter((pedido) => !assignments[pedido._id])
+      .filter((pedido) => pedido.estado === 'REGISTRADO')
       .forEach((pedido) => {
         if (!groups.has(pedido.origen)) groups.set(pedido.origen, [])
         groups.get(pedido.origen).push(pedido)
       })
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, 'es'))
-  }, [pedidos, assignments])
+  }, [pedidos])
 
   const assignedGroups = useMemo(() => {
     const groups = new Map()
     pedidos
-      .filter((pedido) => assignments[pedido._id])
+      .filter((pedido) => pedido.estado === 'ASIGNADO')
       .forEach((pedido) => {
-        const driverId = assignments[pedido._id]
-        if (!groups.has(driverId)) groups.set(driverId, [])
-        groups.get(driverId).push(pedido)
+        const driverName = pedido.repartidor || 'Repartidor desconocido'
+        if (!groups.has(driverName)) groups.set(driverName, [])
+        groups.get(driverName).push(pedido)
       })
-    return [...groups.entries()].map(([driverId, list]) => [
-      driverId,
+    return [...groups.entries()].map(([driverName, list]) => [
+      driverName,
       [...list].sort((a, b) => a.origen.localeCompare(b.origen, 'es')),
     ])
-  }, [pedidos, assignments])
+  }, [pedidos])
 
   const unassignedCount = unassignedGroups.reduce((total, [, list]) => total + list.length, 0)
   const assignedCount = assignedGroups.reduce((total, [, list]) => total + list.length, 0)
@@ -104,9 +116,10 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
     setDriverErrors((current) => ({ ...current, [origin]: false }))
   }
 
-  const handleAssign = (origin, groupPedidos) => {
+  const handleAssign = async (origin, groupPedidos) => {
     const driverId = driverByOrigin[origin]
-    if (!driverId) {
+    const driver = drivers.find((candidate) => String(candidate.id) === String(driverId))
+    if (!driver) {
       setDriverErrors((current) => ({ ...current, [origin]: true }))
       return
     }
@@ -116,22 +129,45 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
       ? groupPedidos.filter((pedido) => selectedIds.includes(pedido._id))
       : groupPedidos
 
-    onAssignmentsChange((current) => {
-      const next = { ...current }
-      toAssign.forEach((pedido) => {
-        next[pedido._id] = driverId
+    try {
+      const response = await fetch(`${API_PEDIDOS}/asignar`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: toAssign.map((pedido) => pedido.ID), repartidor: driver.name }),
       })
-      return next
-    })
-    setSelectedByOrigin((current) => ({ ...current, [origin]: [] }))
+      if (!response.ok) throw new Error('No se pudieron asignar los pedidos.')
+
+      const assignedIds = new Set(toAssign.map((pedido) => pedido._id))
+      setPedidos((current) =>
+        current.map((pedido) =>
+          assignedIds.has(pedido._id)
+            ? { ...pedido, estado: 'ASIGNADO', repartidor: driver.name }
+            : pedido,
+        ),
+      )
+      setSelectedByOrigin((current) => ({ ...current, [origin]: [] }))
+      setActionError('')
+    } catch (error) {
+      setActionError(error.message)
+    }
   }
 
-  const handleUnassign = (pedidoId) => {
-    onAssignmentsChange((current) => {
-      const next = { ...current }
-      delete next[pedidoId]
-      return next
-    })
+  const handleUnassign = async (pedido) => {
+    try {
+      const response = await fetch(`${API_PEDIDOS}/desasignar/${pedido.ID}`, { method: 'PUT' })
+      if (!response.ok) throw new Error('No se pudo quitar la asignación del pedido.')
+
+      setPedidos((current) =>
+        current.map((candidate) =>
+          candidate._id === pedido._id
+            ? { ...candidate, estado: 'REGISTRADO', repartidor: null }
+            : candidate,
+        ),
+      )
+      setActionError('')
+    } catch (error) {
+      setActionError(error.message)
+    }
   }
 
   return (
@@ -164,6 +200,11 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
         </button>
       </div>
 
+      {actionError && (
+        <p className="route-message route-message-error" role="alert">
+          {actionError}
+        </p>
+      )}
       {isLoading && <p className="route-message">Cargando pedidos...</p>}
       {loadError && (
         <p className="route-message route-message-error" role="alert">
@@ -199,7 +240,7 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
                       <option value="">Seleccionar repartidor</option>
                       {availableDrivers.map((driver) => (
                         <option key={driver.id} value={driver.id}>
-                          {driver.name} ({assignedCountByDriver[driver.id] || 0} asignados)
+                          {driver.name} ({assignedCountByDriver[driver.name] || 0} asignados)
                         </option>
                       ))}
                     </select>
@@ -260,13 +301,11 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
         assignedGroups.length === 0 ? (
           <p className="route-message">Todavía no asignaste ningún pedido.</p>
         ) : (
-          assignedGroups.map(([driverId, groupPedidos]) => (
-            <article className="route-group" key={driverId}>
+          assignedGroups.map(([driverName, groupPedidos]) => (
+            <article className="route-group" key={driverName}>
               <header className="route-group-header">
                 <div>
-                  <h2 className="route-group-title">
-                    {driversById[driverId]?.name || 'Repartidor desconocido'}
-                  </h2>
+                  <h2 className="route-group-title">{driverName}</h2>
                   <span className="route-group-count">
                     {groupPedidos.length} {groupPedidos.length === 1 ? 'pedido' : 'pedidos'}
                   </span>
@@ -295,7 +334,7 @@ function RouteSheetSection({ drivers = [], assignments, onAssignmentsChange }) {
                         <button
                           className="modal-cancel"
                           type="button"
-                          onClick={() => handleUnassign(pedido._id)}
+                          onClick={() => handleUnassign(pedido)}
                         >
                           Quitar
                         </button>

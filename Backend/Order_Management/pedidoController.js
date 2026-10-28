@@ -93,4 +93,53 @@ const eliminarPedido = async (req, res) => {
     }
 };
 
-module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido, eliminarPedido };
+// Asigna un repartidor a varios pedidos REGISTRADOS (Hoja de Ruta)
+const asignarPedidos = async (req, res) => {
+    try {
+        const { ids, repartidor } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0 || !repartidor) {
+            return res.status(400).json({ error: 'Se requieren los pedidos y el repartidor a asignar' });
+        }
+
+        const resultado = await Pedido.updateMany(
+            { ID: { $in: ids }, estado: 'REGISTRADO', borrado: { $ne: true } },
+            { repartidor, estado: 'ASIGNADO' }
+        );
+
+        res.status(200).json({ mensaje: 'Pedidos asignados exitosamente', asignados: resultado.modifiedCount });
+    } catch (error) {
+        res.status(400).json({ error: 'Error al asignar los pedidos', detalle: error.message });
+    }
+};
+
+// Quita el repartidor de un pedido ASIGNADO y lo vuelve a REGISTRADO
+const desasignarPedido = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const pedidoDesasignado = await Pedido.findOneAndUpdate(
+            { ID: id, estado: 'ASIGNADO', borrado: { $ne: true } },
+            { repartidor: null, estado: 'REGISTRADO' },
+            { new: true }
+        );
+
+        if (!pedidoDesasignado) {
+            return res.status(404).json({ error: 'Pedido asignado no encontrado en la base de datos' });
+        }
+
+        res.status(200).json({ mensaje: 'Pedido desasignado exitosamente', pedido: pedidoDesasignado });
+    } catch (error) {
+        res.status(400).json({ error: 'Error al desasignar el pedido', detalle: error.message });
+    }
+};
+
+module.exports = {
+    crearPedido,
+    obtenerPedidos,
+    modificarPedido,
+    cancelarPedido,
+    eliminarPedido,
+    asignarPedidos,
+    desasignarPedido
+};
