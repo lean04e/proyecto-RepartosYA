@@ -105,4 +105,20 @@ const eliminarPedido = async (req, res) => {
     }
 };
 
-module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido, eliminarPedido };
+const obtenerPedidosEntregadosPorRepartidor = async (req, res) => {
+    try {
+        const { nombreRepartidor } = req.params;
+
+        // Busca los pedidos que le pertenezcan a este repartidor y cuyo estado sea ENTREGADO
+        const pedidosEntregados = await Pedido.find({
+            repartidor: nombreRepartidor,
+            estado: { $in: ['ENTREGADO', 'entregado'] }
+        }).sort({ _id: -1 }); // Los más recientes primero
+
+        res.status(200).json(pedidosEntregados);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener los pedidos del repartidor', detalle: error.message });
+    }
+};
+
+module.exports = { crearPedido, obtenerPedidos, modificarPedido, cancelarPedido, eliminarPedido, obtenerPedidosEntregadosPorRepartidor };

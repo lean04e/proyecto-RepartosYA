@@ -112,8 +112,37 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
   };
 
   // HU #24: Ver detalle
-  const handleOpenDetail = (driver) => {
-    setDetailDriver(driver);
+  const handleOpenDetail = async (driver) => {
+    const displayName = driver.name || `${driver.nombre || driver.firstName || ''} ${driver.apellido || driver.lastName || ''}`.trim();
+    
+    try {
+      const response = await fetch(`http://localhost:3001/api/pedidos/repartidor/${encodeURIComponent(displayName)}/entregados`);
+      if (response.ok) {
+        const pedidosBackend = await response.json();
+        
+        // Mapeamos los datos de MongoDB al formato que espera tu tabla modal
+        const pedidosAdaptados = pedidosBackend.map(p => ({
+            id: p.ID,
+            date: p.createdAt ? new Intl.DateTimeFormat('es-AR').format(new Date(p.createdAt)) : 'Reciente',
+            origin: p.origen,
+            destination: p.destino,
+            status: 'entregado'
+        }));
+
+        // Abrimos el modal inyectándole los pedidos reales en 'recentOrders'
+        setDetailDriver({
+            ...driver,
+            recentOrders: pedidosAdaptados,
+            deliveredOrders: pedidosAdaptados.length // Actualizamos la métrica real
+        });
+      } else {
+        // Si falla la búsqueda, lo abrimos sin historial
+        setDetailDriver(driver);
+      }
+    } catch (error) {
+      console.error("Error al buscar pedidos del repartidor:", error);
+      setDetailDriver(driver);
+    }
   };
 
   const handleCloseDetail = () => {
