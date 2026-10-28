@@ -115,6 +115,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
     const [drivers, setDrivers] = useState(initialDriversData);
+    const [routeAssignments, setRouteAssignments] = useState({});
 
     const hasActiveDrivers = Array.isArray(drivers) && drivers.length > 0 && drivers.some((driver) => {
         const status = String(driver.status || '').trim().toLowerCase();
@@ -328,7 +329,11 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                 ) : activeSection === 'drivers' ? (
                     <RepartidoresSection drivers={drivers} onDriversChange={setDrivers} />
                 ) : activeSection === 'routes' ? (
-                    <RouteSheetSection />
+                    <RouteSheetSection
+                        drivers={drivers}
+                        assignments={routeAssignments}
+                        onAssignmentsChange={setRouteAssignments}
+                    />
                 ) : (
                     <>
                 <div className="admin-header-title-row">
