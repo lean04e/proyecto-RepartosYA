@@ -16,6 +16,31 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
+## Mobile backend login
+
+The mobile login uses the courier-only `POST /auth/mobile/login` endpoint in
+`Backend`. Start that server with `node server.js` from the `Backend` directory.
+The courier record in MongoDB must have its `legajo` and password populated.
+
+Create `Frontend-mobile/.env.local` with the backend URL:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.20:3001
+```
+
+Replace the example IP with the computer's IPv4 address. A physical phone and
+the computer running the backend must be on the same network, and the computer's
+firewall must allow incoming connections on the backend port. `localhost` on a
+phone points to the phone itself, not the computer.
+
+Restart Expo after changing `.env.local`. This public URL is bundled into the
+app, so do not put credentials or other secrets in `EXPO_PUBLIC_` variables.
+
+The demo panel requests the first courier with a configured `legajo` from the
+backend. Passwords are stored as hashes and cannot be displayed; use the known
+demo password configured for that account separately. If no courier has a
+legajo, the panel indicates that no mobile login is configured.
+
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)

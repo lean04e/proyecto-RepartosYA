@@ -3,74 +3,53 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import database from '../../data/db.json';
+import { loginCourier } from '../../services/auth';
 import { COLORS, LOGIN_STYLES as styles } from '../../theme/theme';
 
 export default function Login() {
   const [nroRepartidor, setNroRepartidor] = useState('');
   const [contraseña, setContraseña] = useState('');
-  // const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. OBTENEMOS EL PRIMER REPARTIDOR DE LA BASE DE DATOS LOCAL
-  const primerRepartidor = database.repartidores && database.repartidores.length > 0 
-    ? database.repartidores[0] 
-    : null;
-
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const normalizedUsername = nroRepartidor.trim();
-    const normalizedPassword = contraseña.trim();
+    const enteredPassword = contraseña;
 
-    if (!normalizedUsername || !normalizedPassword) {
-      setLoginMessage('No se ingreso nro de repartidor o contraseña');
-      setContraseña('');
+    if (!normalizedUsername || !enteredPassword) {
+      setLoginMessage('Ingrese el número de repartidor y la contraseña.');
       return;
     }
 
-    const repartidorEncontrado = database.repartidores.find((rep) => rep.id === normalizedUsername);
-
-    if (!repartidorEncontrado) {
-      setLoginMessage(`El Número de Repartidor " ${normalizedUsername} " no corresponde con los empleados registrados en el sistema.`);
-      setNroRepartidor('');
-      setContraseña('');
+    if (enteredPassword.length < 4 || enteredPassword.length > 20) {
+      setLoginMessage('La contraseña debe tener entre 4 y 20 caracteres.');
       return;
     }
 
-    if (normalizedPassword !== repartidorEncontrado.contra) {
-      setLoginMessage('Credenciales invalidas. Por favor verifique sus datos.');
-      setContraseña('');
-      return;
-    }
-
-    {/* try {
-      const userData = {
-        id: repartidorEncontrado.id,
-        nombre: repartidorEncontrado.nombre,
-        apellido: repartidorEncontrado.apellido,
-        isLoggedIn: false,
+    setIsSubmitting(true);
+    try {
+      const session = await loginCourier(normalizedUsername, enteredPassword);
+      router.replace({
+        pathname: '/repartidorDashboard',
+        params: {
+          id: session.user.id,
+          nombre: session.user.name,
+          apellido: session.user.surname,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Credenciales Invalidas. Por favor, verifique sus credenciales.') {
+        setContraseña('');
+        setLoginMessage(error.message);
+      } else {
+        setLoginMessage(
+          error instanceof Error ? error.message : 'Ocurrió un error al intentar conectar con el servidor.',
+        );
       }
-
-      //Se evalua con un if el estado del usuario
-      if(userData.isLoggedIn) {
-        setErrorMessage('El usuario ya se encuentra con una sesiónactiva en otro dispositivo.');
-        return;
-      }
-
-      console.log('Login Exitoso. Redirigiendo...');
-      router.replace('/repartidorDashboard');
-    } catch(error) {
-      setErrorMessage('Ocurrió un error al intentar conectar con el servidor.');
-    } */}
-
-    router.replace({
-      pathname: '/repartidorDashboard',
-      params: {
-        id: repartidorEncontrado.id,
-        nombre: repartidorEncontrado.nombre,
-        apellido: repartidorEncontrado.apellido,
-      },
-    });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -167,11 +146,17 @@ export default function Login() {
             </View>
 
             <Pressable
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              style={({ pressed }) => [
+                styles.button,
+                (pressed || isSubmitting) && styles.buttonPressed,
+              ]}
               accessibilityRole="button"
-              onPress={handleLogin}>
-              <Text style={styles.buttonText}>Iniciar Sesión</Text>
-              <Text style={styles.buttonArrow}>→</Text>
+              onPress={handleLogin}
+              disabled={isSubmitting}>
+              <Text style={styles.buttonText}>
+                {isSubmitting ? 'Conectando...' : 'Iniciar Sesión'}
+              </Text>
+              {!isSubmitting && <Text style={styles.buttonArrow}>→</Text>}
             </Pressable>
 
             <View style={styles.terminalFooter}>
@@ -182,10 +167,17 @@ export default function Login() {
           </View>
 
           <View style={styles.credentialsNotice}>
-              <Text style={styles.credentialsText}>Datos de Prueba</Text>
-              <Text style={styles.credentialsText}>Nro de Repartidor: {primerRepartidor?.id}</Text>
-              <Text style={styles.credentialsText}>Contraseña: {primerRepartidor?.contra}</Text>
-            </View>
+            <Text style={styles.credentialsText}>Datos de prueba para la demo 1</Text>
+            <Text style={styles.credentialsText}> </Text>
+            <Text style={styles.credentialsText}>Usuario Existente en el Sistema</Text>
+            <Text style={styles.credentialsText} selectable>Nro de Repartidor: 0001</Text>
+            <Text style={styles.credentialsText} selectable>Contraseña: RepartidorNro1SoyYo</Text>
+            <Text style={styles.credentialsText}> - - - - - - - - - - - - - - - -</Text>
+            <Text style={styles.credentialsText}> </Text>
+            <Text style={styles.credentialsText}>Usuario inexistente</Text>
+            <Text style={styles.credentialsText} selectable>Nro de Repartidor: 9999</Text>
+            <Text style={styles.credentialsText} selectable>Contraseña: 123456</Text>
+          </View>
 
           <View style={styles.legalFooter}>
             <Text style={styles.legalText}>Términos de Servicio</Text>
