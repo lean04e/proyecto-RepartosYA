@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import Login from './pages/login';
 import AdminDashboard from './pages/adminDashboard';
+import ResetPassword from './pages/ResetPassword';
 
 function getStoredAdminSession() {
     const storedSession = sessionStorage.getItem('repartosya_session');
@@ -45,15 +47,26 @@ function App() {
 
     return (
         <div style={{ width: '100%', minHeight: '100vh', margin: 0, padding: 0 }}>
-            {!session ? (
-                <Login onLoginSuccess={handleLoginSuccess} />
-            ) : (
-                <AdminDashboard
-                    onLogout={handleLogout}
-                    isDarkMode={isDarkMode}
-                    onToggleTheme={handleToggleTheme}
+            <Routes>
+                <Route
+                    path="/reset-password"
+                    element={<ResetPassword />}
                 />
-            )}
+                <Route
+                    path="/*"
+                    element={
+                        !session ? (
+                            <Login onLoginSuccess={handleLoginSuccess} />
+                        ) : (
+                            <AdminDashboard
+                                onLogout={handleLogout}
+                                isDarkMode={isDarkMode}
+                                onToggleTheme={handleToggleTheme}
+                            />
+                        )
+                    }
+                />
+            </Routes>
         </div>
     );
 }

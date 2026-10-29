@@ -164,7 +164,7 @@ useEffect(() => {
         const pedidosAdaptados = entregados.map(p => ({
             id: p.ID || p._id,
             date: p.createdAt ? new Intl.DateTimeFormat('es-AR').format(new Date(p.createdAt)) : 'Reciente',
-            origin: p.origen,
+            origin: p.nombreOrigen || p.comercioOrigen || p.origen,
             destination: p.destino,
             status: 'entregado'
         })).reverse(); // Invertimos para que los más recientes queden arriba

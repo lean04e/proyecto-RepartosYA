@@ -104,8 +104,8 @@ useEffect(() => {
             || (p._id ? new Date(parseInt(p._id.substring(0, 8), 16) * 1000).toISOString() : new Date().toISOString());
           const pedidosMapeados = pedidosData.map(p => ({
             id: p.ID,
-            origin: p.origen,
-            destination: p.destino,
+            origin: p.nombreOrigen || p.comercioOrigen || p.origen,
+            destination: p.nombreDestino || (p.destinatario && p.destinatario !== 'Consumidor Final' ? p.destinatario : null) || p.destino,
             driver: p.repartidor || null, 
             status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
             createdAt: fechaCreacion(p),
@@ -262,12 +262,14 @@ try {
 
     const handleConfirmEdit = async () => {
     try {
+      const selectedCommerceOrigin = dbComercios.find(c => c.nombre === formData.origin);
+      const selectedCommerceDest = dbComercios.find(c => c.nombre === formData.destination);
       const response = await fetch(`http://localhost:3001/api/pedidos/modificar/${editingOrder.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          origen: formData.origin,
-          destino: formData.destination
+          comercioOrigen: selectedCommerceOrigin?._id || formData.origin,
+          comercioDestino: selectedCommerceDest?._id || formData.destination
         })
       });
     if (response.ok) {
@@ -334,16 +336,14 @@ const handleAddOrder = async (event) => {
 
     // Escenario 1: Creación de pedido exitoso
     try {
+      const selectedCommerceOrigin = dbComercios.find(c => c.nombre === newOrderData.origin);
+      const selectedCommerceDest = dbComercios.find(c => c.nombre === newOrderData.destination);
       const response = await fetch('http://localhost:3001/api/pedidos/cargar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          origen: newOrderData.origin,
-          destino: newOrderData.destination,
-          // Rellenamos los campos obligatorios del backend que aún no están en la UI
-          destinatario: "Consumidor Final",
-          contacto: "Sin especificar",
-          email: ""
+          comercioOrigen: selectedCommerceOrigin?._id || newOrderData.origin,
+          comercioDestino: selectedCommerceDest?._id || newOrderData.destination
         })
       });
 

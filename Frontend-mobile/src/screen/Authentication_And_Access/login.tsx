@@ -7,18 +7,18 @@ import { loginCourier } from '../../services/auth';
 import { COLORS, LOGIN_STYLES as styles } from '../../theme/theme';
 
 export default function Login() {
-  const [nroRepartidor, setNroRepartidor] = useState('');
+  const [email, setEmail] = useState('');
   const [contraseña, setContraseña] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async () => {
-    const normalizedUsername = nroRepartidor.trim();
+    const normalizedEmail = email.trim();
     const enteredPassword = contraseña;
 
-    if (!normalizedUsername || !enteredPassword) {
-      setLoginMessage('Ingrese el número de repartidor y la contraseña.');
+    if (!normalizedEmail || !enteredPassword) {
+      setLoginMessage('Ingrese su correo electrónico y la contraseña.');
       return;
     }
 
@@ -29,7 +29,7 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      const session = await loginCourier(normalizedUsername, enteredPassword);
+      const session = await loginCourier(normalizedEmail, enteredPassword);
       router.replace({
         pathname: '/repartidorDashboard',
         params: {
@@ -88,21 +88,21 @@ export default function Login() {
 
             <Text style={styles.title}>Acceso al Sistema</Text>
 
-            <Text style={styles.label}>Nro de Repartidor</Text>
+            <Text style={styles.label}>Correo Electrónico</Text>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>👤</Text>
+              <Text style={styles.inputIcon}>✉️</Text>
               <TextInput
                 style={styles.input}
-                value={nroRepartidor}
-                onChangeText={setNroRepartidor}
-                placeholder="Por ej. 0001"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="ejemplo@correo.com"
                 placeholderTextColor={COLORS.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType="number-pad"
-                autoComplete="username"
+                keyboardType="email-address"
+                autoComplete="email"
                 returnKeyType="next"
-                accessibilityLabel="Nro de Repartidor"
+                accessibilityLabel="Correo Electrónico"
               />
             </View>
 
@@ -130,16 +130,6 @@ export default function Login() {
             </View>
 
             <View style={styles.optionsRow}>
-              {/*<Pressable
-                style={styles.rememberButton}
-                onPress={() => setRememberMe((remembered) => !remembered)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: rememberMe }}>
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Text style={styles.checkboxCheck}>✓</Text>}
-                </View>
-                <Text style={styles.rememberText}>Recordar</Text>
-              </Pressable> */}
               <Pressable accessibilityRole="button">
                 <Text style={styles.forgotPassword}>¿Olvidó su contraseña?</Text>
               </Pressable>
@@ -170,12 +160,12 @@ export default function Login() {
             <Text style={styles.credentialsText}>Datos de prueba para la demo 1</Text>
             <Text style={styles.credentialsText}> </Text>
             <Text style={styles.credentialsText}>Usuario Existente en el Sistema</Text>
-            <Text style={styles.credentialsText} selectable>Nro de Repartidor: 0001</Text>
+            <Text style={styles.credentialsText} selectable>Correo: carlos@repartosya.com</Text>
             <Text style={styles.credentialsText} selectable>Contraseña: RepartidorNro1SoyYo</Text>
             <Text style={styles.credentialsText}> - - - - - - - - - - - - - - - -</Text>
             <Text style={styles.credentialsText}> </Text>
             <Text style={styles.credentialsText}>Usuario inexistente</Text>
-            <Text style={styles.credentialsText} selectable>Nro de Repartidor: 9999</Text>
+            <Text style={styles.credentialsText} selectable>Correo: inexistente@repartosya.com</Text>
             <Text style={styles.credentialsText} selectable>Contraseña: 123456</Text>
           </View>
 

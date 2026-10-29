@@ -19,12 +19,6 @@ function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme }) {
                 >
                     ☰
                 </button>
-                <button
-                    type="button"
-                    className="top-icon-btn-png menu-toggle-btn"
-                >
-                    📄 PNG
-                </button>
             </div>
 
             <div className="top-search-box">
@@ -34,10 +28,6 @@ function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme }) {
             </div>
 
             <div className="top-nav-right">
-                <button type="button" className="top-icon-btn notification-btn" aria-label="Notificaciones">
-                    🔔
-                    <span className="notification-badge" />
-                </button>
                 <button
                     type="button"
                     onClick={onToggleTheme}

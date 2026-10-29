@@ -109,8 +109,9 @@ const unassignedGroups = useMemo(() => {
     pedidos
       .filter((pedido) => !assignments[pedido.ID || pedido._id])
       .forEach((pedido) => {
-        if (!groups.has(pedido.origen)) groups.set(pedido.origen, [])
-        groups.get(pedido.origen).push(pedido)
+        const origenKey = pedido.comercioOrigen || pedido.nombreOrigen || pedido.origen;
+        if (!groups.has(origenKey)) groups.set(origenKey, [])
+        groups.get(origenKey).push(pedido)
       })
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, 'es'))
   }, [pedidos, assignments])
@@ -334,7 +335,7 @@ const handleUnassign = async (pedidoId) => {
                             />
                           </td>
                           <td><code>{shortId(pedido)}</code></td>
-                          <td>{pedido.origen}</td>
+                          <td>{pedido.comercioOrigen || pedido.nombreOrigen || pedido.origen}</td>
                           <td>{pedido.destino}</td>
                         </tr>
                       )
@@ -384,7 +385,7 @@ const handleUnassign = async (pedidoId) => {
                       return (
                         <tr key={idReal}>
                           <td><code>{shortId(pedido)}</code></td>
-                          <td>{pedido.origen}</td>
+                          <td>{pedido.comercioOrigen || pedido.nombreOrigen || pedido.origen}</td>
                           <td>{pedido.destino}</td>
                           <td className="route-action-col">
                             <button

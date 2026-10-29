@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const Admin = require('./Models/Admin');
 const Repartidor = require('./Models/Repartidor');
-const Comercio = require('./Models/Comercio'); // 1. Importamos el modelo de Comercio
+const Comercio = require('./Models/Comercio');
+const Pedido = require('./Models/Pedido');
 
 // Conexión directa a MongoDB Atlas
 const MONGO_URI = 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
@@ -11,12 +12,14 @@ async function cargarDatosBase() {
     await mongoose.connect(MONGO_URI);
     console.log('📦 Conectado a MongoDB Atlas para cargar datos base...');
 
-    // Limpiar colecciones anteriores para evitar duplicados al reiniciar
+    // Limpiar colecciones anteriores para reiniciar de cero
     await Admin.deleteMany({});
     await Repartidor.deleteMany({});
-    await Comercio.deleteMany({}); // Limpiamos comercios anteriores
+    await Comercio.deleteMany({});
+    await Pedido.deleteMany({}); // Borra absolutamente todos los pedidos
+    console.log('🧹 Colección de pedidos limpiada por completo.');
 
-    // 1. Crear el Admin predeterminado del Frontend
+    // 1. Crear el Admin predeterminado
     const adminBase = new Admin({
       nombre: 'AdminMartin',
       apellido: 'Principal',
@@ -27,13 +30,13 @@ async function cargarDatosBase() {
     await adminBase.save();
     console.log('✅ Administrador base creado.');
 
-    // 2. Crear el Repartidor predeterminado del Frontend
+    // 2. Crear el Repartidor predeterminado
     const repartidorBase = new Repartidor({
-      legajo: '0001', // O el campo ID/legajo que use tu schema de Repartidor
+      legajo: '0001',
       nombre: 'Carlos',
       apellido: 'Gómez',
       email: 'carlos@repartosya.com',
-      password: 'RepartidorNro1',
+      password: 'RepartidorNro1SoyYo',
       telefono: '2211111111',
       vehiculo: 'Moto',
       estado: 'DISPONIBLE'
@@ -41,7 +44,7 @@ async function cargarDatosBase() {
     await repartidorBase.save();
     console.log('✅ Repartidor base creado.');
 
-    // 3. Crear los comercios de prueba basados en la interfaz de la tabla
+    // 3. Crear los comercios de prueba
     const comerciosMock = [
       {
         nombre: 'pepe',
