@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import avatar from '../assets/jefeP.jpeg';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
-import RouteSheetSection from '../components/RouteSheetSection';
-import RepartidoresSection from '../components/RepartidoresSection';
 import OrdersSection, { PackageIcon } from '../components/OrdersSection';
+import RepartidoresSection from '../components/RepartidoresSection';
+import RouteSheetSection from '../components/RouteSheetSection';
 import { initialDriversData } from '../data/mockDrivers';
 import { initialOrdersData } from '../data/mockOrders';
 import { getAll, getPedidos } from '../services/api';
@@ -105,7 +105,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const sections = [
         { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos' },
         { icon: '📊', label: 'Reportes', href: '#dashboard' },
-        { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
+        { id: 'commerces', icon: '🏪', label: 'Comercios', href: '#comercios' },
         {
             id: 'drivers',
             icon: '🚚',
@@ -156,8 +156,8 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         orders: comercio.cantPedidos,
                         phone: comercio.telefono,
                         address: comercio.direccion,
-                        historicalOrders: (comercio.cantPedidos || 0) * 5, 
-                        recentOrders: [] 
+                        historicalOrders: (comercio.cantPedidos || 0) * 5,
+                        recentOrders: []
                     }));
                     setCommerces(comerciosAdaptados);
                 }
@@ -252,7 +252,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
         : selectedTodayOrders.filter((order) => matchesOrderView(order, activeOrderView?.id));
     const deliveredTodayOrders = (orders ?? []).filter((order) => (
         getOrderDateKey(order, 'delivered') === todayDateKey
-            && matchesOrderView(order, 'delivered')
+        && matchesOrderView(order, 'delivered')
     ));
     const deliveredTodayCount = todayOrders.filter((order) => matchesOrderView(order, 'delivered')).length;
     const effectiveBase = todayOrders.filter((order) => order.estado !== 'CANCELADO');
@@ -327,94 +327,94 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                     />
                 ) : (
                     <>
-                <div className="admin-header-title-row">
-                    <div>
-                        <p className="eyebrow"><span className="green-dot" /> DESPACHO CENTRAL · TIEMPO REAL</p>
-                        <h1 className="main-title">Gestión de Pedidos en Vivo</h1>
-                        <p className="subtitle-date">Hoy, {today} <span>•</span> {todayOrders.length} {todayOrders.length === 1 ? 'pedido' : 'pedidos'} en el turno</p>
-                    </div>
-
-                    <button type="button" className="new-order-button" onClick={() => setAddOrderRequest((count) => count + 1)}>
-                        <PackageIcon />
-                        <span className= "btn-text">Nuevo Pedido</span>
-                    </button>
-                </div>
-
-                <section className="metrics-grid" aria-label="Indicadores">
-                    {metricTitles.map((metric) => (
-                        <button
-                            className="metric-card metric-card-button"
-                            key={metric.id}
-                            type="button"
-                            aria-haspopup="dialog"
-                            onClick={() => setActiveOrderView(metric)}
-                        >
-                            <h2 className="metric-title">{metric.title}</h2>
-                            {metric.id === 'effectiveness' && orders !== null && (
-                                <span className="metric-value">{effectiveness}%</span>
-                            )}
-                            {metric.id !== 'effectiveness' && orders !== null && (
-                                <span className="metric-value">
-                                    {(metric.id === 'delivered' ? deliveredTodayOrders : todayOrders
-                                        .filter((order) => matchesOrderView(order, metric.id))).length}
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </section>
-
-                <section className="kanban-columns-grid" aria-label="Estado de pedidos">
-                    {orderSections.map((section) => (
-                        <article
-                            className="kanban-column"
-                            key={section.id}
-                        >
-                            <div className="kanban-column-header">
-                                <h2><span className={`status-dot ${section.color}`} />{section.title}</h2>
-                                <span>{section.note}</span>
+                        <div className="admin-header-title-row">
+                            <div>
+                                <p className="eyebrow"><span className="green-dot" /> DESPACHO CENTRAL · TIEMPO REAL</p>
+                                <h1 className="main-title">Gestión de Pedidos en Vivo</h1>
+                                <p className="subtitle-date">Hoy, {today} <span>•</span> {todayOrders.length} {todayOrders.length === 1 ? 'pedido' : 'pedidos'} en el turno</p>
                             </div>
-                            {ordersError ? (
-                                <p className="kanban-state-message kanban-state-error" role="alert">
-                                    {ordersError}
-                                </p>
-                            ) : orders === null ? (
-                                <p className="kanban-state-message" role="status">Cargando pedidos...</p>
-                            ) : ordersBySection[section.id].length === 0 ? (
-                                <p className="kanban-state-message" role="status">
-                                    {orders.length === 0
-                                        ? 'No hay pedidos cargados en la base de datos.'
-                                        : 'No hay pedidos cargados en este estado.'}
-                                </p>
-                            ) : (
-                                <ul className="kanban-order-list">
-                                    {ordersBySection[section.id].map((order, index) => (
-                                        <li key={order.ID ?? `${section.id}-${index}`} {...getOrderItemProps(order)}>
-                                            <span>{getOrderLabel(order, index)}</span>
-                                            {order.estado && (
-                                                <span className="kanban-order-status">
-                                                    {order.estado}
-                                                </span>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </article>
-                    ))}
-                </section>
 
-                <OrdersSection
-                    orders={initialOrdersData}
-                    openOrderId={requestedOrderId}
-                    addOrderRequest={addOrderRequest}
-                    onOrdersChanged={refreshOrders}
-                    onOrderOpened={() => setRequestedOrderId(null)}
-                    onGoToCommerces={() => {
-                        setOpenAddCommerce(true);
-                        setActiveSection('commerces');
-                        setActiveOrderView(null);
-                    }}
-                />
+                            <button type="button" className="new-order-button" onClick={() => setAddOrderRequest((count) => count + 1)}>
+                                <PackageIcon />
+                                <span className="btn-text">Nuevo Pedido</span>
+                            </button>
+                        </div>
+
+                        <section className="metrics-grid" aria-label="Indicadores">
+                            {metricTitles.map((metric) => (
+                                <button
+                                    className="metric-card metric-card-button"
+                                    key={metric.id}
+                                    type="button"
+                                    aria-haspopup="dialog"
+                                    onClick={() => setActiveOrderView(metric)}
+                                >
+                                    <h2 className="metric-title">{metric.title}</h2>
+                                    {metric.id === 'effectiveness' && orders !== null && (
+                                        <span className="metric-value">{effectiveness}%</span>
+                                    )}
+                                    {metric.id !== 'effectiveness' && orders !== null && (
+                                        <span className="metric-value">
+                                            {(metric.id === 'delivered' ? deliveredTodayOrders : todayOrders
+                                                .filter((order) => matchesOrderView(order, metric.id))).length}
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
+                        </section>
+
+                        <section className="kanban-columns-grid" aria-label="Estado de pedidos">
+                            {orderSections.map((section) => (
+                                <article
+                                    className="kanban-column"
+                                    key={section.id}
+                                >
+                                    <div className="kanban-column-header">
+                                        <h2><span className={`status-dot ${section.color}`} />{section.title}</h2>
+                                        <span>{section.note}</span>
+                                    </div>
+                                    {ordersError ? (
+                                        <p className="kanban-state-message kanban-state-error" role="alert">
+                                            {ordersError}
+                                        </p>
+                                    ) : orders === null ? (
+                                        <p className="kanban-state-message" role="status">Cargando pedidos...</p>
+                                    ) : ordersBySection[section.id].length === 0 ? (
+                                        <p className="kanban-state-message" role="status">
+                                            {orders.length === 0
+                                                ? 'No hay pedidos cargados en la base de datos.'
+                                                : 'No hay pedidos cargados en este estado.'}
+                                        </p>
+                                    ) : (
+                                        <ul className="kanban-order-list">
+                                            {ordersBySection[section.id].map((order, index) => (
+                                                <li key={order.ID ?? `${section.id}-${index}`} {...getOrderItemProps(order)}>
+                                                    <span>{getOrderLabel(order, index)}</span>
+                                                    {order.estado && (
+                                                        <span className="kanban-order-status">
+                                                            {order.estado}
+                                                        </span>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </article>
+                            ))}
+                        </section>
+
+                        <OrdersSection
+                            orders={initialOrdersData}
+                            openOrderId={requestedOrderId}
+                            addOrderRequest={addOrderRequest}
+                            onOrdersChanged={refreshOrders}
+                            onOrderOpened={() => setRequestedOrderId(null)}
+                            onGoToCommerces={() => {
+                                setOpenAddCommerce(true);
+                                setActiveSection('commerces');
+                                setActiveOrderView(null);
+                            }}
+                        />
                     </>
                 )}
             </main>
