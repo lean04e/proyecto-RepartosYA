@@ -38,23 +38,50 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
   const [statusFilter, setStatusFilter] = useState('');
   const [minimumOrders, setMinimumOrders] = useState('');
 
-  useEffect(() => {
+useEffect(() => {
     const obtenerRepartidores = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/repartidores');
-        if (response.ok) {
-          const data = await response.json();
-          // Guarda los datos reales de MongoDB en tu tabla visual
-          setDriverList(data);
-          if (onDriversChange) onDriversChange(data);
+        // Hacemos las dos peticiones al mismo tiempo
+        const [resRepartidores, resPedidos] = await Promise.all([
+          fetch('http://localhost:3001/api/repartidores'),
+          fetch('http://localhost:3001/api/pedidos')
+        ]);
+
+        if (resRepartidores.ok && resPedidos.ok) {
+          const dataRepartidores = await resRepartidores.json();
+          const dataPedidos = await resPedidos.json();
+
+          // Calculamos las métricas para cada repartidor
+          const repartidoresConMetricas = dataRepartidores.map(driver => {
+            const displayName = driver.name || `${driver.nombre || ''} ${driver.apellido || ''}`.trim();
+
+            const misPedidos = dataPedidos.filter(p => {
+              const nombreRep = String(p.repartidor || '').trim().toLowerCase();
+              return nombreRep === displayName.toLowerCase() || nombreRep === String(driver.nombre).trim().toLowerCase();
+            });
+
+            const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
+            const entregados = misPedidos.filter(p => p.estado === 'ENTREGADO' || p.estado === 'entregado');
+
+            return {
+              ...driver,
+              pendingOrders: pendientes.length,
+              deliveredOrders: entregados.length,
+              destination: pendientes.length > 0 ? pendientes[0].destino : 'En base'
+            };
+          });
+
+          // Guardamos la lista ya procesada en tu tabla visual
+          setDriverList(repartidoresConMetricas);
+          if (onDriversChange) onDriversChange(repartidoresConMetricas);
         }
       } catch (error) {
-        console.error("Error al cargar repartidores de la base de datos:", error);
+        console.error("Error al cargar repartidores y pedidos:", error);
       }
     };
 
     obtenerRepartidores();
-  }, []);
+  }, [onDriversChange]);
 
 
   const showSuccessToast = (message) => {
