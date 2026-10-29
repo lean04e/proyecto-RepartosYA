@@ -43,13 +43,18 @@ export default function RepartidorDashboard() {
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
   const palette = APP_THEMES[isDarkMode ? 'dark' : 'light'];
   const courierOrders = orders.filter((order) => order.repartidorId === id);
-  const activeOrder = courierOrders.find((order) => order.estado === 'EN_CURSO');
+  const activeOrder = courierOrders.find((order) => order.estado === 'EN_CAMINO');
+
+  // La cola incluye todos los pedidos asignados/en camino EXCEPTO el activo de arriba
   const queuedOrders = courierOrders
-    .filter((order) => (
-      order.estado === 'PENDIENTE'
-      || order.estado === 'ASIGNADO'
-      || order.estado === 'MODIFICADO'
-    ))
+    .filter((order) => 
+      order.id !== activeOrder?.id && (
+        order.estado === 'PENDIENTE'
+        || order.estado === 'ASIGNADO'
+        || order.estado === 'MODIFICADO'
+        || order.estado === 'EN_CAMINO' 
+      )
+    )
     .sort((first, second) => (
       (first.distancia ?? Number.POSITIVE_INFINITY) - (second.distancia ?? Number.POSITIVE_INFINITY)
       || first.codigo.localeCompare(second.codigo)
@@ -129,7 +134,7 @@ export default function RepartidorDashboard() {
 
     try {
       setIsStartingOrder(true);
-      const updatedOrders = await updateOrderStatus(selectedOrder.id, 'EN_CURSO');
+      const updatedOrders = await updateOrderStatus(selectedOrder.id, 'EN_CAMINO');
       setOrders(updatedOrders);
       setOrdersError(null);
       setActiveModal(null);

@@ -1,11 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import database from './db.json';
 
 export type OrderStatus =
   | 'PENDIENTE'
   | 'ASIGNADO'
   | 'MODIFICADO'
-  | 'EN_CURSO'
+  | 'EN_CAMINO'
   | 'CANCELADO'
   | 'ENTREGADO';
 
@@ -23,157 +21,53 @@ export type DeliveryOrder = {
   fechaEstado?: string;
 };
 
-const STORAGE_KEY = 'repartosya_mobile_orders';
-const seedOrders = database.pedidos as DeliveryOrder[];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isDeliveryOrder(value: unknown): value is DeliveryOrder {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    typeof value.id === 'string'
-    && typeof value.codigo === 'string'
-    && typeof value.repartidorId === 'string'
-    && typeof value.origen === 'string'
-    && typeof value.destino === 'string'
-    && typeof value.destinatario === 'string'
-    && typeof value.contacto === 'string'
-    && (value.comercioOrigen === undefined || typeof value.comercioOrigen === 'string')
-    && (value.distancia === undefined
-      || ((typeof value.distancia === 'number' || typeof value.distancia === 'string')
-        && Number.isFinite(Number(value.distancia))
-        && Number(value.distancia) >= 0))
-    && (value.fechaEstado === undefined
-      || (typeof value.fechaEstado === 'string' && !Number.isNaN(Date.parse(value.fechaEstado))))
-    && (value.estado === 'PENDIENTE'
-      || value.estado === 'ASIGNADO'
-      || value.estado === 'MODIFICADO'
-      || value.estado === 'EN_CURSO'
-      || value.estado === 'CANCELADO'
-      || value.estado === 'ENTREGADO')
-  );
-}
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
 
 export async function getOrders(): Promise<DeliveryOrder[]> {
-  const savedOrders = await AsyncStorage.getItem(STORAGE_KEY);
-  if (savedOrders === null) {
-    const initialOrders = seedOrders.map((order) => {
-      if (order.estado === 'CANCELADO' || order.estado === 'ENTREGADO') {
-        return { ...order, fechaEstado: new Date().toISOString() };
-      }
+  try {
+    const response = await fetch(`${API_URL}/api/pedidos`);
+    if (!response.ok) throw new Error('Error al obtener pedidos del servidor');
 
-      if (order.estado === 'EN_CURSO' && !order.fechaEstado) {
-        return { ...order, fechaEstado: new Date().toISOString() };
-      }
+    const data = await response.json();
 
-      return order;
-    });
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(initialOrders));
-    return initialOrders;
+    return data.map((pedido: any): DeliveryOrder => ({
+      id: pedido._id || pedido.ID,
+      codigo: pedido.codigo || `PED-${String(pedido._id || '').slice(-4)}`,
+      repartidorId: pedido.repartidor?._id ? String(pedido.repartidor._id) : String(pedido.repartidor || ''),
+      // Si no viene comercioOrigen explícito, usamos la ubicación de origen como nombre del comercio
+      comercioOrigen: pedido.comercioOrigen || pedido.origen || 'Comercio no especificado',
+      origen: pedido.origen || 'Dirección no especificada',
+      destino: pedido.destino || 'Sin destino',
+      destinatario: pedido.destinatario || 'Consumidor Final',
+      contacto: pedido.contacto || 'Sin especificar',
+      estado: (pedido.estado || 'PENDIENTE').toUpperCase() as OrderStatus,
+      distancia: pedido.distancia ?? 3.0,
+      fechaEstado: pedido.updatedAt || pedido.createdAt || new Date().toISOString(),
+  }));
+  } catch (error) {
+    console.error('Error al conectar con el backend:', error);
+    return [];
   }
-
-  const parsedOrders: unknown = JSON.parse(savedOrders);
-  if (!Array.isArray(parsedOrders) || !parsedOrders.every(isDeliveryOrder)) {
-    throw new Error('Los pedidos guardados localmente tienen un formato inválido.');
-  }
-
-  let migratedOrders = false;
-  const today = new Date().toDateString();
-  const ordersWithStatusDates = parsedOrders.map((order): DeliveryOrder => {
-    const seedOrder = seedOrders.find((item) => item.id === order.id);
-    const seededDistance = seedOrder?.distancia;
-    const distance = order.distancia === undefined ? seededDistance : Number(order.distancia);
-    if (order.distancia !== distance && distance !== undefined) {
-      migratedOrders = true;
-    }
-    const originParts = order.origen.split(',');
-    const comercioOrigen = seedOrder?.comercioOrigen
-      ?? order.comercioOrigen
-      ?? (seedOrder && originParts.length > 1 ? originParts[0] : undefined);
-    const origen = seedOrder?.origen
-      ?? (seedOrder && !order.comercioOrigen && originParts.length > 1
-        ? originParts.slice(1).join(',').trim()
-        : order.origen);
-    const destino = seedOrder?.destino ?? order.destino;
-    const destinatario = seedOrder?.destinatario ?? order.destinatario;
-    if (
-      order.comercioOrigen !== comercioOrigen
-      || order.origen !== origen
-      || order.destino !== destino
-      || order.destinatario !== destinatario
-    ) {
-      migratedOrders = true;
-    }
-
-    if (
-      order.estado === 'EN_CURSO'
-      && order.fechaEstado
-      && new Date(order.fechaEstado).toDateString() !== today
-    ) {
-      migratedOrders = true;
-      return {
-        ...order,
-        comercioOrigen,
-        origen,
-        destino,
-        destinatario,
-        distancia: distance,
-        estado: 'PENDIENTE',
-        fechaEstado: undefined,
-      };
-    }
-
-    if (
-      (order.estado === 'EN_CURSO' || order.estado === 'CANCELADO' || order.estado === 'ENTREGADO')
-      && !order.fechaEstado
-    ) {
-      migratedOrders = true;
-      return {
-        ...order,
-        comercioOrigen,
-        origen,
-        destino,
-        destinatario,
-        distancia: distance,
-        fechaEstado: new Date().toISOString(),
-      };
-    }
-
-    return { ...order, comercioOrigen, origen, destino, destinatario, distancia: distance };
-  });
-
-  if (migratedOrders) {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(ordersWithStatusDates));
-  }
-
-  return ordersWithStatusDates;
 }
 
 export async function updateOrderStatus(
   orderId: string,
   estado: OrderStatus,
 ): Promise<DeliveryOrder[]> {
-  const orders = await getOrders();
-  if (!orders.some((order) => order.id === orderId)) {
-    throw new Error('No se encontró el pedido que intentas actualizar.');
-  }
+  try {
+    // Enviamos la actualización directamente a la base de datos
+    await fetch(`${API_URL}/api/pedidos/asignar/${orderId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ estado }),
+    });
 
-  const updatedOrders = orders.map((order) => (
-    order.id === orderId
-      ? {
-        ...order,
-        estado,
-        fechaEstado: estado === 'EN_CURSO' || estado === 'CANCELADO' || estado === 'ENTREGADO'
-          ? new Date().toISOString()
-          : undefined,
-      }
-      : order
-  ));
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedOrders));
-  return updatedOrders;
+    // Retornamos la lista actualizada desde la BD
+    return await getOrders();
+  } catch (error) {
+    console.error('Error al actualizar estado en el servidor:', error);
+    throw error;
+  }
 }

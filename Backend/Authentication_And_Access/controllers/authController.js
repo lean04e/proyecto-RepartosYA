@@ -93,7 +93,10 @@ const mobileLogin = async (req, res) => {
     return res.json({
       token,
       user: {
-        id: repartidor.legajo || repartidor.ID || repartidor._id.toString(),
+        // ✅ CORREGIDO: Devolvemos siempre el _id de Mongo en id
+        _id: repartidor._id.toString(),
+        id: repartidor._id.toString(),
+        legajo: repartidor.legajo,
         name: repartidor.nombre,
         surname: repartidor.apellido,
         role: 'repartidor',
