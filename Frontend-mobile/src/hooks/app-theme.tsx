@@ -1,5 +1,4 @@
 import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
-import { useColorScheme } from 'react-native';
 
 type AppThemeContextValue = {
   isDarkMode: boolean;
@@ -9,8 +8,11 @@ type AppThemeContextValue = {
 const AppThemeContext = createContext<AppThemeContextValue | null>(null);
 
 export function AppThemeProvider({ children }: PropsWithChildren) {
-  const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
+  // const systemColorScheme = useColorScheme();
+  // const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
+
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
   const value = useMemo(
     () => ({
       isDarkMode,

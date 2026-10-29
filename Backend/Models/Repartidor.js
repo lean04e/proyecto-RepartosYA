@@ -7,6 +7,12 @@ const repartidorSchema = new mongoose.Schema({
         default: uuidv4, // Se rellena solo con un código único automáticamente
         unique: true     // Garantiza que no se repita en la base de datos
     },
+    legajo: {
+        type: String,
+        trim: true,
+        unique: true,
+        sparse: true
+    },
     nombre: {
         type: String,
         required: true
