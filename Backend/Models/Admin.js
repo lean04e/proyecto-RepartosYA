@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
-// Definimos la estructura exacta que tendrá el Administrador en MongoDB
+// Definición del esquema para el Administrador en MongoDB
 const adminSchema = new mongoose.Schema({
   nombre: {
     type: String,
     required: true
   },
-    apellido: {
+  apellido: {
     type: String,
     required: true
   },
@@ -17,11 +17,17 @@ const adminSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true // Se guardará encriptada con bcrypt
+    required: true
   },
   telefono: {
     type: String,
     required: true
+  },
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpires: {
+    type: Date
   }
 });
 
