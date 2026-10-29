@@ -46,11 +46,28 @@ export function requestPasswordReset(identifier) {
     });
 }
 
-export function resetPassword(username, newPassword) {
+export function resetPassword(data, optionalNewPassword) {
+    let payload;
+    if (typeof data === 'object' && data !== null) {
+        payload = data;
+    } else if (optionalNewPassword !== undefined) {
+        if (typeof data === 'string' && (data.includes('@') || data.length < 30)) {
+            payload = { username: data, newPassword: optionalNewPassword };
+        } else {
+            payload = { token: data, newPassword: optionalNewPassword };
+        }
+    } else {
+        payload = { newPassword: data };
+    }
+
     return request('/auth/reset-password', {
         method: 'POST',
-        body: JSON.stringify({ username, newPassword }),
+        body: JSON.stringify(payload),
     });
+}
+
+export function verifyResetToken(token) {
+    return request(`/auth/verify-reset-token/${encodeURIComponent(token)}`);
 }
 
 // El backend expone los pedidos en /api/pedidos (a diferencia de comercios y repartidores).

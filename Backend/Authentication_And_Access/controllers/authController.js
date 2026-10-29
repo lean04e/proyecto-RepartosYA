@@ -15,15 +15,15 @@ const login = async (req, res) => {
     const { username, password } = req.body;
 
     // 1. Buscamos si es un Administrador
-    let usuarioEncontrado = await Admin.findOne({ 
-      $or: [{ email: username }, { nombre: username }] 
+    let usuarioEncontrado = await Admin.findOne({
+      $or: [{ email: username }, { nombre: username }]
     });
     let rol = 'admin';
 
     // 2. Si no es admin, buscamos en los Repartidores por email o legajo (ej: 0001)
     if (!usuarioEncontrado) {
-      usuarioEncontrado = await Repartidor.findOne({ 
-        $or: [{ email: username }, { legajo: username }] 
+      usuarioEncontrado = await Repartidor.findOne({
+        $or: [{ email: username }, { legajo: username }]
       });
       rol = 'repartidor';
     }
@@ -34,7 +34,7 @@ const login = async (req, res) => {
 
     // 3. Validar la contraseña
     const passwordValid = password === usuarioEncontrado.password;
-    
+
     if (!passwordValid) {
       return res.status(401).json({ message: 'Contraseña incorrecta.' });
     }
@@ -100,10 +100,10 @@ const forgotPassword = async (req, res) => {
 
     // =========================================================================
     // ESCENARIO 1: El correo coincide con un Admin en la base de datos
-    // Generar token seguro, guardar expiración (1 hora) y despachar email/enlace
+    // Generar token seguro, guardar expiración (30 minutos) y despachar email/enlace
     // =========================================================================
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpires = new Date(Date.now() + 3600000); // 1 hora de validez
+    const resetTokenExpires = new Date(Date.now() + 1800000); // 30 minutos de validez
 
     adminEncontrado.resetPasswordToken = resetToken;
     adminEncontrado.resetPasswordExpires = resetTokenExpires;

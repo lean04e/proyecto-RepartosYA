@@ -23,3 +23,4 @@ const sendRecoveryEmail = async ({ to, name, resetLink, resetToken }) => {
 module.exports = {
   sendRecoveryEmail
 };
+
