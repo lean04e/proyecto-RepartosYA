@@ -33,7 +33,9 @@
           "image": "./assets/images/repartosYA-version-Osc.png",
           "imageWidth": 220
         }
-      ]
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

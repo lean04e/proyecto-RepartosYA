@@ -415,19 +415,20 @@ const handleConfirmDelete = async () => {
 
   return (
     <section className="repartidores-section" aria-labelledby="drivers-title">
-      <div className="section-heading">
+      <div className="admin-header-title-row">
         <div>
-          <p className="eyebrow">Gestion de operaciones</p>
-          <h1 id="drivers-title">Repartidores</h1>
+          <p className="eyebrow"><span className="green-dot" /> DESPACHO CENTRAL · TIEMPO REAL</p>
+          <h1 className="main-title" id="drivers-title">Repartidores</h1>
+          <p className="subtitle-date">Administración de flota y personal de entrega</p>
         </div>
         <button
-          className="add-driver-button"
+          className="new-order-button"
           type="button"
           onClick={handleOpenAdd}
           aria-label="Cargar Repartidor"
         >
           <DeliveryIcon />
-          <span>Cargar repartidor</span>
+          <span className="btn-text">Cargar repartidor</span>
         </button>
       </div>
 

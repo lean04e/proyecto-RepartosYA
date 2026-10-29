@@ -219,10 +219,11 @@ const handleUnassign = async (pedidoId) => {
 
   return (
     <section className="route-sheet-section" aria-labelledby="route-sheet-title">
-      <div className="section-heading">
+      <div className="admin-header-title-row">  
         <div>
-          <p className="eyebrow">Gestion de operaciones</p>
-          <h1 id="route-sheet-title">Hoja de Ruta</h1>
+          <p className="eyebrow"><span className="green-dot" /> DESPACHO CENTRAL · TIEMPO REAL</p>
+          <h1 className="main-title" id="route-sheet-title">Hoja de Ruta</h1>
+          <p className="subtitle-date">Asignación de pedidos y trazabilidad de rutas</p>
         </div>
       </div>
 

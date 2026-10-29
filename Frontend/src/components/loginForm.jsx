@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { login } from '../services/api';
-import PasswordRecoveryModal from './PasswordRecoveryModal';
 import '../styles/passwordRecovery.css';
+import PasswordRecoveryModal from './PasswordRecoveryModal';
 
 function LoginForm({ onLoginSuccess }) {
     const [usuario, setUsuario] = useState('');
@@ -81,17 +81,17 @@ function LoginForm({ onLoginSuccess }) {
             }}>
                 <strong style={{ display: 'block', marginBottom: '4px', fontSize: '13px' }}>Credenciales de Prueba (Testing):</strong>
                 <div>🔹 <strong>Admin:</strong> AdminMartin / SoyElAdmin</div>
-                <div>🔹 <strong>Repartidor:</strong> 0001 / RepartidorNro1</div>
+              {/*  <div>🔹 <strong>Repartidor:</strong> 0001 / RepartidorNro1</div> */}
             </div>
 
             <form onSubmit={handleSubmit}>
                 <div style={{ marginBottom: '20px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', fontSize: '12px', color:'var(--color-text-primary)', fontWeight:'600', marginBottom: '6px', textTransform: 'uppercase' }}>Usuario / Nro de Repartidor</label>
+                    <label style={{ display: 'block', fontSize: '12px', color:'var(--color-text-primary)', fontWeight:'600', marginBottom: '6px', textTransform: 'uppercase' }}>Usuario</label>
                     <input
                         type="text"
                         value={usuario}
                         onChange={(e) => setUsuario(e.target.value)}
-                        placeholder="Ej: AdminMartin o 0001"
+                        placeholder="Ej: AdminMartin"
                         style={{ 
                             width: '100%', 
                             padding: '12px 14px', 

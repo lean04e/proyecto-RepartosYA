@@ -269,14 +269,15 @@ const handleConfirmDelete = async () => {
 
   return (
     <section className="commerces-section" aria-labelledby="commerces-title">
-      <div className="section-heading">
+      <div className="admin-header-title-row">
         <div>
           <p className="eyebrow">Gestion de operaciones</p>
-          <h1 id="commerces-title">Comercios</h1>
+          <h1 className="main-title" id="commerces-title">Comercios</h1>
+          <p className="subtitle-date">Gestión de locales y sucursales adheridas</p>
         </div>
-        <button className="add-commerce-button" type="button" onClick={handleOpenAdd}>
+        <button className="new-order-button" type="button" onClick={handleOpenAdd}>
           <StoreIcon />
-          <span>Cargar comercio</span>
+          <span className="btn-text">Cargar comercio</span>
         </button>
       </div>
 
