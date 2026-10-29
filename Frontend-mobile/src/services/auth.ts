@@ -2,6 +2,7 @@ type CourierLoginResponse = {
   token: string;
   user: {
     id: string;
+    email?: string;
     name: string;
     surname: string;
     role: 'repartidor';
@@ -56,7 +57,7 @@ export async function getMobileDemoCourier(): Promise<MobileDemoCourier> {
   }
 
   if (!isRecord(responseData.user) || typeof responseData.user.id !== 'string') {
-    throw new Error('El backend devolvió un legajo de demostración inválido.');
+    throw new Error('El backend devolvió un usuario de demostración inválido.');
   }
 
   return { id: responseData.user.id };
@@ -98,32 +99,25 @@ export async function loginCourier(username: string, password: string): Promise<
     throw new Error(message);
   }
 
-  // 1. Validamos la estructura general
   if (
     !isRecord(responseData)
     || typeof responseData.token !== 'string'
     || !isRecord(responseData.user)
+    || typeof responseData.user.id !== 'string'
     || typeof responseData.user.name !== 'string'
     || typeof responseData.user.surname !== 'string'
     || responseData.user.role !== 'repartidor'
   ) {
-    throw new Error('El backend devolvió datos de sesión incompletos o inválidos.');
-  }
-
-  // 2. Extraemos los valores forzando el tipo string seguro para TypeScript
-  const userObj = responseData.user;
-  const userId = String(userObj._id || userObj.id || '');
-
-  if (!userId) {
-    throw new Error('El backend no devolvió un ID válido para el usuario.');
+    throw new Error('El backend devolvió una sesión de repartidor incompleta o inválida.');
   }
 
   return {
     token: responseData.token,
     user: {
-      id: userId,
-      name: String(userObj.name),
-      surname: String(userObj.surname),
+      id: responseData.user.id,
+      email: typeof responseData.user.email === 'string' ? responseData.user.email : undefined,
+      name: responseData.user.name,
+      surname: responseData.user.surname,
       role: 'repartidor',
     },
   };

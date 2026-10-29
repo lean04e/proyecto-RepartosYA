@@ -1,26 +1,21 @@
 const Pedido = require('../Models/Pedido'); 
 const Repartidor = require('../Models/Repartidor');
+const Comercio = require('../Models/Comercio');
 
-// Función auxiliar con logs para resolver el _id de Mongo
+// Función auxiliar para resolver el _id de Mongo de Repartidor
 async function resolverIdRepartidor(repartidorInput) {
     if (!repartidorInput) return null;
     
     const inputStr = String(repartidorInput).trim();
 
-    // 1. Si ya es un ObjectId hexadecimal de 24 caracteres, se devuelve tal cual
     if (inputStr.match(/^[0-9a-fA-F]{24}$/)) {
-        console.log(`✅ [RESOLVER REPARTIDOR] Recibido _id directo: ${inputStr}`);
         return inputStr;
     }
 
-    console.log(`🔍 [RESOLVER REPARTIDOR] Se recibió texto/legajo ("${inputStr}"), buscando en MongoDB...`);
-
-    // 2. Extraemos partes por si enviaron "Nombre Apellido"
     const parts = inputStr.split(' ').filter(Boolean);
     const primerNombre = parts[0] || '';
     const apellido = parts.slice(1).join(' ') || '';
 
-    // Condicionales de búsqueda
     const orConditions = [
         { legajo: inputStr },
         { email: inputStr },
@@ -38,31 +33,45 @@ async function resolverIdRepartidor(repartidorInput) {
         orConditions.push({ nombre: new RegExp(primerNombre, 'i') });
     }
 
-    // 3. Buscamos en la colección de repartidores
     const repEncontrado = await Repartidor.findOne({ $or: orConditions });
+    return repEncontrado ? repEncontrado._id.toString() : inputStr;
+}
 
-    if (repEncontrado) {
-        console.log(`✅ [RESOLVER REPARTIDOR] Encontrado "${repEncontrado.nombre} ${repEncontrado.apellido}" -> _id: ${repEncontrado._id}`);
-        return repEncontrado._id.toString();
+// Función para obtener todos los datos de un comercio por su ID
+async function obtenerComercio(id) {
+    if (!id) return null;
+    const input = String(id).trim();
+
+    // 1. Si es el ObjectId de MongoDB (24 caracteres hexadecimales)
+    if (input.match(/^[0-9a-fA-F]{24}$/)) {
+        return await Comercio.findById(input).lean();
     }
 
-    console.warn(`⚠️ [RESOLVER REPARTIDOR] No se encontró repartidor para "${inputStr}". Se guardará el texto original.`);
-    return inputStr;
+    // 2. Si viene el nombre del comercio (por compatibilidad si el frontend manda el nombre)
+    return await Comercio.findOne({
+        nombre: new RegExp(`^${input}$`, 'i'),
+        borrado: { $ne: true }
+    }).lean();
 }
 
 const crearPedido = async (req, res) => {
     try {
-        const { origen, destino, destinatario, contacto, email, repartidor, comercioOrigen } = req.body;
+        const { origen, destino, comercioOrigen, comercioDestino, repartidor } = req.body;
 
         const repartidorId = await resolverIdRepartidor(repartidor);
 
+        // Obtenemos los datos de ambos comercios usando la función obtenerComercio
+        const comercioOrigenDoc = await obtenerComercio(comercioOrigen || origen);
+        const comercioDestinoDoc = await obtenerComercio(comercioDestino || destino);
+
+        if (!comercioOrigenDoc || !comercioDestinoDoc) {
+            return res.status(400).json({ error: 'Comercio de origen o destino inválido' });
+        }
+
+        // Guardamos ÚNICAMENTE las 2 IDs de los comercios en el pedido (cero datos duplicados)
         const nuevoPedido = new Pedido({
-            comercioOrigen: comercioOrigen || origen,
-            origen,
-            destino,
-            destinatario,
-            contacto,
-            email,
+            comercioOrigen: comercioOrigenDoc._id,
+            comercioDestino: comercioDestinoDoc._id,
             repartidor: repartidorId,
             historialEstados: [{
                 fecha: new Date().toISOString(),
@@ -72,6 +81,10 @@ const crearPedido = async (req, res) => {
         });
         
         await nuevoPedido.save();
+
+        // Incrementamos la cantidad de pedidos del comercio origen
+        await Comercio.findByIdAndUpdate(comercioOrigenDoc._id, { $inc: { cantPedidos: 1 } });
+
         res.status(201).json({ mensaje: 'Pedido creado exitosamente', pedido: nuevoPedido });
     } catch (error) {
         res.status(400).json({ error: 'Error al crear el pedido', detalle: error.message });
@@ -80,9 +93,40 @@ const crearPedido = async (req, res) => {
 
 const obtenerPedidos = async (req, res) => {
     try {
-        const pedidos = await Pedido.find({ borrado: { $ne: true } }).sort({ _id: -1 });
-        res.status(200).json(pedidos);
+        // Traemos los pedidos de la base de datos
+        const pedidos = await Pedido.find({ borrado: { $ne: true } })
+            .populate('comercioOrigen')
+            .populate('comercioDestino')
+            .sort({ _id: -1 })
+            .lean();
+
+        // Enriquecemos cada pedido con los datos traídos desde el propio comercio mediante obtenerComercio
+        const pedidosFormateados = await Promise.all(pedidos.map(async (p) => {
+            const origenDoc = p.comercioOrigen && p.comercioOrigen.nombre
+                ? p.comercioOrigen
+                : await obtenerComercio(p.comercioOrigen || p.origen);
+
+            const destinoDoc = p.comercioDestino && p.comercioDestino.nombre
+                ? p.comercioDestino
+                : await obtenerComercio(p.comercioDestino || p.destino);
+
+            return {
+                ...p,
+                // Datos del origen obtenidos directamente de Comercio
+                comercioOrigen: origenDoc ? origenDoc.nombre : 'Comercio no especificado',
+                origen: origenDoc ? origenDoc.direccion : 'Dirección no especificada',
+
+                // Datos del destino obtenidos directamente de Comercio
+                comercioDestino: destinoDoc ? destinoDoc.nombre : 'Comercio no especificado',
+                destinatario: destinoDoc ? destinoDoc.nombre : 'Comercio no especificado',
+                destino: destinoDoc ? destinoDoc.direccion : 'Dirección no especificada',
+                contacto: destinoDoc ? destinoDoc.telefono : 'Sin especificar'
+            };
+        }));
+
+        res.status(200).json(pedidosFormateados);
     } catch (error) {
+        console.error('Error al obtener los pedidos:', error);
         res.status(500).json({ error: 'Error al obtener los pedidos' });
     }
 };
@@ -90,13 +134,24 @@ const obtenerPedidos = async (req, res) => {
 const modificarPedido = async (req, res) => {
     try {
         const { id } = req.params;
-        const { origen, destino } = req.body;
+        const { origen, destino, comercioOrigen, comercioDestino } = req.body;
 
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { ID: id };
+        const updateData = {};
+
+        if (comercioOrigen || origen) {
+            const origenDoc = await obtenerComercio(comercioOrigen || origen);
+            if (origenDoc) updateData.comercioOrigen = origenDoc._id;
+        }
+
+        if (comercioDestino || destino) {
+            const destinoDoc = await obtenerComercio(comercioDestino || destino);
+            if (destinoDoc) updateData.comercioDestino = destinoDoc._id;
+        }
 
         const pedidoActualizado = await Pedido.findOneAndUpdate(
             query,
-            { origen, destino },
+            updateData,
             { new: true }
         );
 
@@ -245,6 +300,7 @@ const obtenerPedidosEntregadosPorRepartidor = async (req, res) => {
 module.exports = { 
     crearPedido, 
     obtenerPedidos, 
+    obtenerComercio,
     modificarPedido, 
     cancelaPedido: cancelarPedido, 
     cancelarPedido, 

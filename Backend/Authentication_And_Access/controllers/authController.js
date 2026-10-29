@@ -9,16 +9,16 @@ const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // 1. Buscamos si es un Administrador
+    // 1. Buscamos si es un Administrador (no se toca absolutamente nada)
     let usuarioEncontrado = await Admin.findOne({ 
       $or: [{ email: username }, { nombre: username }] 
     });
     let rol = 'admin';
 
-    // 2. Si no es admin, buscamos en los Repartidores por email o legajo (ej: 0001)
+    // 2. Si no es admin, buscamos en los Repartidores por email
     if (!usuarioEncontrado) {
       usuarioEncontrado = await Repartidor.findOne({ 
-        $or: [{ email: username }, { legajo: username }] 
+        email: new RegExp(`^${username.trim()}$`, 'i') 
       });
       rol = 'repartidor';
     }
@@ -27,8 +27,17 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Usuario o credenciales incorrectas.' });
     }
 
-    // 3. Validar la contraseña (comparación directa con los datos del seed)
-    const passwordValid = password === usuarioEncontrado.password;
+    // 3. Validar la contraseña (soporta contraseñas con hash bcrypt o texto plano)
+    let passwordValid = false;
+    try {
+      passwordValid = await bcrypt.compare(password, usuarioEncontrado.password);
+    } catch {
+      passwordValid = false;
+    }
+    // Fallback por si la contraseña en la BD está en texto plano (como en el seed)
+    if (!passwordValid) {
+      passwordValid = (password === usuarioEncontrado.password);
+    }
     
     if (!passwordValid) {
       return res.status(401).json({ message: 'Contraseña incorrecta.' });
@@ -63,14 +72,20 @@ const mobileLogin = async (req, res) => {
     const password = typeof body.password === 'string' ? body.password : '';
 
     if (!username || !password) {
-      return res.status(400).json({ message: 'Ingresa tu número de repartidor y contraseña.' });
+      return res.status(400).json({ message: 'Ingresa tu correo electrónico y contraseña.' });
     }
 
     if (password.length < 4 || password.length > 20) {
       return res.status(400).json({ message: 'La contraseña debe tener entre 4 y 20 caracteres.' });
     }
 
-    const repartidor = await Repartidor.findOne({ legajo: username });
+    // En la app mobile se busca por el email creado por el admin (o por legajo si es del seed)
+    const repartidor = await Repartidor.findOne({
+      $or: [
+        { email: new RegExp(`^${username}$`, 'i') },
+        { legajo: username }
+      ]
+    });
 
     if (!repartidor) {
       return res.status(404).json({
@@ -78,8 +93,16 @@ const mobileLogin = async (req, res) => {
       });
     }
 
-    const passwordMatches = await bcrypt.compare(password, repartidor.password)
-      || password === repartidor.password;
+    let passwordMatches = false;
+    try {
+      passwordMatches = await bcrypt.compare(password, repartidor.password);
+    } catch {
+      passwordMatches = false;
+    }
+    if (!passwordMatches) {
+      passwordMatches = (password === repartidor.password);
+    }
+
     if (!passwordMatches) {
       return res.status(401).json({ message: 'Credenciales Invalidas. Por favor, verifique sus credenciales.' });
     }
@@ -93,10 +116,9 @@ const mobileLogin = async (req, res) => {
     return res.json({
       token,
       user: {
-        // ✅ CORREGIDO: Devolvemos siempre el _id de Mongo en id
         _id: repartidor._id.toString(),
         id: repartidor._id.toString(),
-        legajo: repartidor.legajo,
+        email: repartidor.email,
         name: repartidor.nombre,
         surname: repartidor.apellido,
         role: 'repartidor',
@@ -111,14 +133,14 @@ const mobileLogin = async (req, res) => {
 const getMobileDemoCourier = async (_req, res) => {
   try {
     const repartidor = await Repartidor.findOne({
-      legajo: { $exists: true, $ne: '' },
+      email: { $exists: true, $ne: '' }
     })
       .sort({ _id: 1 })
-      .select({ _id: 0, legajo: 1 })
+      .select({ _id: 0, email: 1 })
       .lean();
 
     return res.json({
-      user: repartidor ? { id: repartidor.legajo } : null,
+      user: repartidor ? { id: repartidor.email } : null,
     });
   } catch (error) {
     console.error('Error al buscar el usuario de demostración móvil:', error);

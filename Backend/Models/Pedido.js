@@ -4,28 +4,18 @@ const { v4: uuidv4 } = require('uuid');
 const pedidoSchema = new mongoose.Schema({
     ID: {
         type: String,
-        default: uuidv4, // Se rellena solo con un código único automáticamente
-        unique: true     // Garantiza que no se repita en la base de datos
+        default: uuidv4,
+        unique: true
     },
-    origen: {
-        type: String,
-        required: true // Corregido aquí
+    comercioOrigen: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Comercio',
+        required: true
     },
-    destino: {
-        type: String,
-        required: true // Corregido aquí
-    },
-    destinatario: {
-        type: String,
-        required: true // Corregido aquí
-    },
-    contacto: {
-        type: String,
-        required: true // Corregido aquí
-    },
-    email: {
-        type: String,
-        required: false // Corregido aquí
+    comercioDestino: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Comercio',
+        required: true
     },
     repartidor: {
         type: String,

@@ -1,4 +1,3 @@
-
 export type OrderStatus =
   | 'PENDIENTE'
   | 'ASIGNADO'
@@ -34,16 +33,19 @@ export async function getOrders(): Promise<DeliveryOrder[]> {
       id: pedido._id || pedido.ID,
       codigo: pedido.codigo || `PED-${String(pedido._id || '').slice(-4)}`,
       repartidorId: pedido.repartidor?._id ? String(pedido.repartidor._id) : String(pedido.repartidor || ''),
-      // Si no viene comercioOrigen explícito, usamos la ubicación de origen como nombre del comercio
-      comercioOrigen: pedido.comercioOrigen || pedido.origen || 'Comercio no especificado',
-      origen: pedido.origen || 'Dirección no especificada',
-      destino: pedido.destino || 'Sin destino',
-      destinatario: pedido.destinatario || 'Consumidor Final',
-      contacto: pedido.contacto || 'Sin especificar',
+      // Nombre del comercio de origen
+      comercioOrigen: pedido.comercioOrigen || pedido.comercio?.nombre || 'Comercio no especificado',
+      // Dirección física real de origen
+      origen: pedido.direccionOrigen || pedido.comercio?.direccion || pedido.origen || 'Dirección no especificada',
+      // Dirección física real de entrega
+      destino: pedido.direccionDestino || pedido.comercioDestino?.direccion || pedido.destino || 'Sin destino',
+      // Nombre del comercio de destino (destinatario)
+      destinatario: pedido.nombreDestino || pedido.comercioDestino?.nombre || (pedido.destinatario && pedido.destinatario !== 'Consumidor Final' ? pedido.destinatario : (pedido.comercioDestino?.nombre || pedido.destinatario || 'Consumidor Final')),
+      contacto: pedido.contacto || pedido.comercioDestino?.telefono || 'Sin especificar',
       estado: (pedido.estado || 'PENDIENTE').toUpperCase() as OrderStatus,
       distancia: pedido.distancia ?? 3.0,
       fechaEstado: pedido.updatedAt || pedido.createdAt || new Date().toISOString(),
-  }));
+    }));
   } catch (error) {
     console.error('Error al conectar con el backend:', error);
     return [];

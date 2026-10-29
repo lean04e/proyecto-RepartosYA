@@ -3,7 +3,6 @@ const Comercio = require('../Models/Comercio');
 // Obtener todos los comercios activos para mostrarlos en la tabla
 const obtenerComercios = async (req, res) => {
     try {
-        // Buscamos los que no estén borrados y los ordenamos del que más pedidos tiene al que menos
         const comercios = await Comercio.find({ borrado: false })
             .sort({ cantPedidos: -1 });
 
@@ -11,6 +10,23 @@ const obtenerComercios = async (req, res) => {
     } catch (error) {
         res.status(500).json({ 
             mensaje: 'Error al obtener los comercios', 
+            error: error.message 
+        });
+    }
+};
+
+// Obtener un comercio por su ID
+const obtenerComercioPorId = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const comercio = await Comercio.findById(id);
+        if (!comercio) {
+            return res.status(404).json({ mensaje: 'Comercio no encontrado' });
+        }
+        res.status(200).json(comercio);
+    } catch (error) {
+        res.status(500).json({ 
+            mensaje: 'Error al obtener el comercio', 
             error: error.message 
         });
     }
@@ -35,7 +51,6 @@ const eliminarComercio = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // Actualizamos el campo borrado a true en lugar de eliminarlo físicamente
         const comercioBorrado = await Comercio.findByIdAndUpdate(
             id, 
             { borrado: true }, 
@@ -60,7 +75,6 @@ const actualizarComercio = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // Buscamos y actualizamos el comercio, devolviendo el documento actualizado
         const comercioActualizado = await Comercio.findByIdAndUpdate(
             id, 
             req.body, 
@@ -82,6 +96,7 @@ const actualizarComercio = async (req, res) => {
 
 module.exports = {
     obtenerComercios,
+    obtenerComercioPorId,
     crearComercio,
     eliminarComercio,
     actualizarComercio
