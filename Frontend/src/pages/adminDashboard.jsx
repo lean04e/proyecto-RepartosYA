@@ -102,22 +102,15 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [drivers, setDrivers] = useState(initialDriversData);
     const [routeAssignments, setRouteAssignments] = useState({});
 
-    const hasActiveDrivers = Array.isArray(drivers) && drivers.length > 0 && drivers.some((driver) => {
-        const status = String(driver.status || '').trim().toLowerCase();
-        return !status.includes('inactiv') && !status.includes('finalizado');
-    });
-
     const sections = [
-        { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos', badge: '0' },
-        { icon: '📊', label: 'Reportes', href: '#dashboard', badge: '0' },
+        { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos' },
+        { icon: '📊', label: 'Reportes', href: '#dashboard' },
         { id: 'commerces', icon: '🏪', label: 'Comercio', href: '#comercios' },
         {
             id: 'drivers',
             icon: '🚚',
             label: 'Repartidores',
             href: '#repartidores',
-            status: hasActiveDrivers ? 'Activos' : 'Inactivos',
-            statusClass: hasActiveDrivers ? 'badge-status-active' : 'badge-status-inactive',
         },
         { id: 'routes', icon: '🗺️', label: 'Hoja de Ruta', href: '#hoja-de-ruta' },
         { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
@@ -300,8 +293,6 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                                 >
                                     <span className="sidebar-item-icon" aria-hidden="true">{section.icon}</span>
                                     <span className="sidebar-item-label">{section.label}</span>
-                                    {section.badge && <span className="badge-counter">{section.badge}</span>}
-                                    {section.status && <span className={section.statusClass || 'badge-status-active'}>{section.status}</span>}
                                 </a>
                             ))}
                         </nav>
