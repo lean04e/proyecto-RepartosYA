@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
-import { generateDefaultOrders } from '../data/mockCommerces'
-import './CommercesSection.css'
+import { useEffect, useState } from 'react';
+import { create, remove, update } from '../services/api';
+import './CommercesSection.css';
 
 const INITIAL_VISIBLE_COUNT = 6
 
-function CommercesSection({ commerces }) {
-  const [commerceList, setCommerceList] = useState(commerces)
+function CommercesSection({ commerces, onCommercesChange, openAddOnMount = false }) {
+  const commerceList = commerces
+  const setCommerceList = onCommercesChange
   const [sort, setSort] = useState({ key: 'orders', direction: 'desc' })
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
   const [detailCommerce, setDetailCommerce] = useState(null)
@@ -14,8 +15,10 @@ function CommercesSection({ commerces }) {
   const [formErrors, setFormErrors] = useState({})
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [deletingCommerce, setDeletingCommerce] = useState(null)
-  const [addingCommerce, setAddingCommerce] = useState(false)
-  const [newCommerceData, setNewCommerceData] = useState(null)
+  const [addingCommerce, setAddingCommerce] = useState(openAddOnMount)
+  const [newCommerceData, setNewCommerceData] = useState(
+    openAddOnMount ? { name: '', orders: '', phone: '', address: '' } : null,
+  )
   const [newCommerceErrors, setNewCommerceErrors] = useState({})
   const [successToastMessage, setSuccessToastMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -31,6 +34,7 @@ function CommercesSection({ commerces }) {
     const matchesSearch =
       !normalizedSearchTerm ||
       commerce.name.toLocaleLowerCase('es').includes(normalizedSearchTerm) ||
+      (commerce.rubro || '').toLocaleLowerCase('es').includes(normalizedSearchTerm) ||
       commerce.address.toLocaleLowerCase('es').includes(normalizedSearchTerm)
     const matchesMinimumOrders =
       minimumOrders === '' || commerce.orders >= Number(minimumOrders)
@@ -72,6 +76,7 @@ function CommercesSection({ commerces }) {
     setEditingCommerce(commerce)
     setFormData({
       name: commerce.name,
+      rubro: commerce.rubro || '', // <-- Aseguramos cargar el rubro actual
       orders: String(commerce.orders),
       phone: commerce.phone,
       address: commerce.address,
@@ -116,24 +121,45 @@ function CommercesSection({ commerces }) {
     setConfirmationOpen(true)
   }
 
-  const handleConfirmEdit = () => {
-    const updatedOrders = Number(formData.orders)
-    setCommerceList((currentCommerces) =>
-      currentCommerces.map((commerce) =>
-        commerce.id === editingCommerce.id
-          ? { ...commerce, ...formData, orders: updatedOrders }
-          : commerce,
-      ),
-    )
-    if (detailCommerce && detailCommerce.id === editingCommerce.id) {
-      setDetailCommerce((prev) => ({
-        ...prev,
-        ...formData,
-        orders: updatedOrders,
-      }))
+  const handleConfirmEdit = async () => {
+    try {
+      // 1. Preparamos el objeto con la estructura que espera el backend
+      const comercioParaBackend = {
+        nombre: formData.name,
+        rubro: formData.rubro,
+        telefono: formData.phone,
+        direccion: formData.address,
+        cantPedidos: Number(formData.orders) || 0,
+      }
+
+      // 2. Actualizamos de verdad en MongoDB Atlas mediante PUT
+      await update('comercios', editingCommerce.id, comercioParaBackend)
+
+      const updatedOrders = Number(formData.orders)
+      
+      // 3. Actualizamos el estado local de React
+      setCommerceList((currentCommerces) =>
+        currentCommerces.map((commerce) =>
+          commerce.id === editingCommerce.id
+            ? { ...commerce, ...formData, orders: updatedOrders }
+            : commerce,
+        ),
+      )
+      
+      if (detailCommerce && detailCommerce.id === editingCommerce.id) {
+        setDetailCommerce((prev) => ({
+          ...prev,
+          ...formData,
+          orders: updatedOrders,
+        }))
+      }
+      
+      handleCloseEdit()
+      showSuccessToast('El comercio ha sido modificado exitosamente en la base de datos')
+    } catch (error) {
+      console.error('Error al actualizar el comercio:', error)
+      alert('Hubo un error al intentar modificar el comercio en la base de datos.')
     }
-    handleCloseEdit()
-    showSuccessToast('El comercio ha sido modificado exitosamente')
   }
 
   const handleOpenDelete = (commerce) => {
@@ -144,19 +170,30 @@ function CommercesSection({ commerces }) {
     setDeletingCommerce(null)
   }
 
-  const handleConfirmDelete = () => {
-    setCommerceList((currentCommerces) =>
-      currentCommerces.filter((commerce) => commerce.id !== deletingCommerce.id),
-    )
-    if (detailCommerce && detailCommerce.id === deletingCommerce.id) {
-      setDetailCommerce(null)
+const handleConfirmDelete = async () => {
+    try {
+      // 1. Borramos de verdad en MongoDB usando el _id del comercio
+      await remove('comercios', deletingCommerce.id)
+
+      // 2. Quitamos el elemento de la lista local de React
+      setCommerceList((currentCommerces) =>
+        currentCommerces.filter((commerce) => commerce.id !== deletingCommerce.id),
+      )
+
+      if (detailCommerce && detailCommerce.id === deletingCommerce.id) {
+        setDetailCommerce(null)
+      }
+
+      handleCloseDelete()
+      showSuccessToast('El comercio ha sido borrado exitosamente')
+    } catch (error) {
+      console.error('Error al borrar el comercio:', error)
+      alert('Hubo un error al intentar eliminar el comercio en la base de datos.')
     }
-    handleCloseDelete()
-    showSuccessToast('El comercio ha sido borrado exitosamente')
   }
 
   const handleOpenAdd = () => {
-    setNewCommerceData({ name: '', orders: '', phone: '', address: '' })
+    setNewCommerceData({ name: '', rubro: '', orders: '', phone: '', address: '' })
     setNewCommerceErrors({})
     setAddingCommerce(true)
   }
@@ -173,7 +210,7 @@ function CommercesSection({ commerces }) {
     setNewCommerceErrors((currentErrors) => ({ ...currentErrors, [name]: false }))
   }
 
-  const handleAddCommerce = (event) => {
+  const handleAddCommerce = async (event) => {
     event.preventDefault()
 
     const nextErrors = Object.fromEntries(
@@ -185,19 +222,39 @@ function CommercesSection({ commerces }) {
       return
     }
 
-    const nextId = Math.max(0, ...commerceList.map((commerce) => commerce.id)) + 1
-    const initialOrders = Number(newCommerceData.orders)
-    const commerceToAdd = {
-      id: nextId,
-      ...newCommerceData,
-      orders: initialOrders,
-      historicalOrders: initialOrders,
-      recentOrders: generateDefaultOrders(nextId),
-    }
+    try {
+      // 1. Preparamos el objeto con las propiedades que espera tu backend (en español)
+      const comercioParaBackend = {
+        nombre: newCommerceData.name,
+        rubro: newCommerceData.rubro,
+        telefono: newCommerceData.phone,
+        direccion: newCommerceData.address,
+        cantPedidos: Number(newCommerceData.orders) || 0,
+      }
 
-    setCommerceList((currentCommerces) => [...currentCommerces, commerceToAdd])
-    handleCloseAdd()
-    showSuccessToast('El comercio ha sido añadido exitosamente')
+      // 2. Guardamos de verdad en MongoDB a través de la ruta POST /comercios
+      const comercioCreado = await create('comercios', comercioParaBackend)
+
+      // 3. Traducimos la respuesta del servidor al formato que usa visualmente la tabla
+      const comercioAdaptado = {
+        id: comercioCreado._id,
+        name: comercioCreado.nombre,
+        rubro: comercioCreado.rubro,
+        orders: comercioCreado.cantPedidos,
+        phone: comercioCreado.telefono,
+        address: comercioCreado.direccion,
+        historicalOrders: (comercioCreado.cantPedidos || 0) * 5,
+        recentOrders: [],
+      }
+
+      // 4. Actualizamos el estado de la lista y cerramos el modal con éxito
+      setCommerceList((currentCommerces) => [...currentCommerces, comercioAdaptado])
+      handleCloseAdd()
+      showSuccessToast('¡Comercio guardado en la base de datos exitosamente!')
+    } catch (error) {
+      console.error('Error al guardar el comercio:', error)
+      alert('Hubo un error al intentar guardar el comercio en la base de datos.')
+    }
   }
 
   const handleSearchChange = (event) => {
@@ -225,7 +282,7 @@ function CommercesSection({ commerces }) {
 
       <div className="commerce-filters" aria-label="Filtros de comercios">
         <label className="search-filter" htmlFor="commerce-search">
-          <span className="sr-only">Buscar comercio por nombre o dirección</span>
+          <span className="sr-only">Buscar comercio por nombre, rubro o dirección</span>
           <div className="filter-input-wrapper">
             <SearchIcon />
             <input
@@ -233,7 +290,7 @@ function CommercesSection({ commerces }) {
               type="search"
               value={searchTerm}
               onChange={handleSearchChange}
-              placeholder="Buscar por nombre o dirección"
+              placeholder="Buscar por nombre, rubro o dirección"
             />
           </div>
         </label>
@@ -264,8 +321,14 @@ function CommercesSection({ commerces }) {
                   onSort={handleSort}
                 />
                 <SortableHeader
+                  column="rubro"
+                  label="Rubro"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+                <SortableHeader
                   column="orders"
-                  label="Número de pedidos en el último mes"
+                  label="Número de pedidos"
                   sort={sort}
                   onSort={handleSort}
                   className="orders-column"
@@ -302,7 +365,8 @@ function CommercesSection({ commerces }) {
                   <th scope="row" data-label="Nombre del comercio">
                     <span className="commerce-name">{commerce.name}</span>
                   </th>
-                  <td data-label="Pedidos último mes" className="orders-cell">
+                  <td data-label="Rubro">{commerce.rubro}</td>
+                  <td data-label="Número de pedidos" className="orders-cell">
                     {commerce.orders.toLocaleString('es-AR')}
                   </td>
                   <td data-label="Teléfono">{commerce.phone}</td>
@@ -339,12 +403,12 @@ function CommercesSection({ commerces }) {
               ))}
               {visibleCommerces.length === 0 && (
                 <tr className="empty-results-row">
-                  <td colSpan="5">No se encontraron comercios con esos filtros.</td>
+                  <td colSpan="6">No se encontraron comercios con esos filtros.</td>
                 </tr>
               )}
               {canShowMore && (
                 <tr className="show-more-row">
-                  <td colSpan="5">
+                  <td colSpan="6">
                     <button
                       className="show-more-button"
                       type="button"
@@ -365,6 +429,7 @@ function CommercesSection({ commerces }) {
           commerce={detailCommerce}
           onClose={handleCloseDetail}
           onEdit={handleOpenEdit}
+          onDelete={handleOpenDelete}
         />
       )}
       {editingCommerce &&
@@ -411,9 +476,10 @@ function CommercesSection({ commerces }) {
 function EditCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   const fields = [
     { name: 'name', label: 'Nombre del comercio', type: 'text' },
+    { name: 'rubro', label: 'Rubro', type: 'text' }, // <-- Agregado para cumplir con el backend
     {
       name: 'orders',
-      label: 'Número de pedidos en el último mes',
+      label: 'Número de pedidos',
       type: 'number',
     },
     { name: 'phone', label: 'Teléfono', type: 'tel' },
@@ -483,9 +549,10 @@ function EditCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }
 function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }) {
   const fields = [
     { name: 'name', label: 'Nombre del comercio', type: 'text' },
+    { name: 'rubro', label: 'Rubro', type: 'text' }, // <-- CAMPO OBLIGATORIO AGREGADO
     {
       name: 'orders',
-      label: 'Número de pedidos en el último mes',
+      label: 'Número de pedidos',
       type: 'number',
     },
     { name: 'phone', label: 'Teléfono', type: 'tel' },
@@ -524,7 +591,7 @@ function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit })
                   id={`new-commerce-${field.name}`}
                   name={field.name}
                   type={field.type}
-                  value={formData[field.name]}
+                  value={formData[field.name] || ''}
                   onChange={onChange}
                   className={formErrors[field.name] ? 'has-error' : ''}
                   aria-invalid={formErrors[field.name] || undefined}
@@ -693,7 +760,7 @@ function StoreIcon() {
   )
 }
 
-function CommerceDetailModal({ commerce, onClose }) {
+function CommerceDetailModal({ commerce, onClose, onEdit, onDelete }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -704,20 +771,13 @@ function CommerceDetailModal({ commerce, onClose }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  // Compatibilidad con Backend / Base de Datos:
-  // Se leen pedidos históricos y pedidos recientes con fallback seguro
-  const historicalOrders =
-    commerce.historicalOrders !== undefined
-      ? commerce.historicalOrders
-      : Math.round(Number(commerce.orders || 0) * 3)
-
   const recentOrders =
     Array.isArray(commerce.recentOrders) && commerce.recentOrders.length > 0
       ? commerce.recentOrders.slice(0, 10)
       : []
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop detail-backdrop" role="presentation" onClick={onClose}>
       <div
         className="detail-modal"
         role="dialog"
@@ -744,6 +804,14 @@ function CommerceDetailModal({ commerce, onClose }) {
           <div className="detail-summary-grid">
             <div className="detail-card">
               <span className="detail-card-label">
+                <StoreIcon />
+                <span>Rubro</span>
+              </span>
+              <span className="detail-card-value">{commerce.rubro || 'No especificado'}</span>
+            </div>
+
+            <div className="detail-card">
+              <span className="detail-card-label">
                 <PhoneIcon />
                 <span>Teléfono</span>
               </span>
@@ -761,22 +829,13 @@ function CommerceDetailModal({ commerce, onClose }) {
             <div className="detail-card detail-card-highlight">
               <span className="detail-card-label">
                 <CalendarMonthIcon />
-                <span>Pedidos en el último mes</span>
+                <span>Número de pedidos</span>
               </span>
               <span className="detail-card-value detail-metric-number">
                 {Number(commerce.orders || 0).toLocaleString('es-AR')}
               </span>
             </div>
 
-            <div className="detail-card detail-card-highlight">
-              <span className="detail-card-label">
-                <HistoryIcon />
-                <span>Número de pedidos histórica</span>
-              </span>
-              <span className="detail-card-value detail-metric-number">
-                {historicalOrders.toLocaleString('es-AR')}
-              </span>
-            </div>
           </div>
 
           {/* Historial de pedidos */}
@@ -820,8 +879,11 @@ function CommerceDetailModal({ commerce, onClose }) {
         </div>
 
         <div className="detail-modal-footer">
-          <button className="modal-apply" type="button" onClick={onClose}>
-            Cerrar
+          <button className="modal-apply" type="button" onClick={() => onEdit(commerce)}>
+            Modificar comercio
+          </button>
+          <button className="modal-delete" type="button" onClick={() => onDelete(commerce)}>
+            Borrar comercio
           </button>
         </div>
       </div>
@@ -883,14 +945,5 @@ function CalendarMonthIcon() {
   )
 }
 
-function HistoryIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l3 3" />
-    </svg>
-  )
-}
 
 export default CommercesSection

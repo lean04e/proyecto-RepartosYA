@@ -53,6 +53,11 @@ export function resetPassword(username, newPassword) {
     });
 }
 
+// El backend expone los pedidos en /api/pedidos (a diferencia de comercios y repartidores).
+export function getPedidos() {
+    return request('/api/pedidos');
+}
+
 export function getAll(resource) {
     return request(getResourcePath(resource));
 }

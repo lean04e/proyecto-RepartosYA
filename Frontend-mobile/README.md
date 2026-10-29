@@ -1,0 +1,81 @@
+# Welcome to your Expo app 👋
+
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+
+## Get started
+
+1. Install dependencies
+
+   ```bash
+   npm install
+   ```
+
+2. Start the app
+
+   ```bash
+   npx expo start
+   ```
+
+## Mobile backend login
+
+The mobile login uses the courier-only `POST /auth/mobile/login` endpoint in
+`Backend`. Start that server with `node server.js` from the `Backend` directory.
+The courier record in MongoDB must have its `legajo` and password populated.
+
+Create `Frontend-mobile/.env.local` with the backend URL:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.20:3001
+```
+
+Replace the example IP with the computer's IPv4 address. A physical phone and
+the computer running the backend must be on the same network, and the computer's
+firewall must allow incoming connections on the backend port. `localhost` on a
+phone points to the phone itself, not the computer.
+
+Restart Expo after changing `.env.local`. This public URL is bundled into the
+app, so do not put credentials or other secrets in `EXPO_PUBLIC_` variables.
+
+The demo panel requests the first courier with a configured `legajo` from the
+backend. Passwords are stored as hashes and cannot be displayed; use the known
+demo password configured for that account separately. If no courier has a
+legajo, the panel indicates that no mobile login is configured.
+
+In the output, you'll find options to open the app in a
+
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+
+You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+## Get a fresh project
+
+When you're ready, run:
+
+```bash
+npm run reset-project
+```
+
+This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+
+### Other setup steps
+
+- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
+- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
+- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+
+## Learn more
+
+To learn more about developing your project with Expo, look at the following resources:
+
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+
+## Join the community
+
+Join our community of developers creating universal apps.
+
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.

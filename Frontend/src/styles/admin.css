@@ -297,18 +297,26 @@
 }
 
 .badge-counter,
-.badge-status-active {
+.badge-status-active,
+.badge-status-inactive {
     padding: 4px 8px;
     border-radius: 999px;
     background: #d91e18;
     color: #fff;
     font-size: 11px;
     line-height: 1.2;
+    font-weight: 700;
 }
 
 .badge-status-active {
     background: #d1fae5;
     color: #047857;
+}
+
+.badge-status-inactive {
+    background: #e2e8f0;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
 }
 
 .sidebar-user-card {
@@ -400,6 +408,12 @@
     margin-left: 260px;
 }
 
+.admin-content-area:not(.sidebar-is-open) > .commerces-section,
+.admin-content-area:not(.sidebar-is-open) > .repartidores-section,
+.admin-content-area:not(.sidebar-is-open) > .route-sheet-section {
+    margin-inline: auto;
+}
+
 .admin-header-title-row {
     display: flex;
     align-items: flex-end;
@@ -444,19 +458,31 @@
     justify-content: space-between;
     gap: 12px;
     background-color: #1d72f3;
-    padding: 10px 16px;
+    align-self: flex-start;
+    margin: 24px clamp(0px, 6vw, 96px) 0 0;
+    padding: 18px 34px;
     border: none;
-    border-radius: 10px;
+    border-radius: 14px;
     background: #155dfc;
-    box-shadow: 0 3px 7px #155dfc25;
+    box-shadow: 0 4px 10px #155dfc30;
     color: white;
-    font-size: 14px;
+    font-size: 18px;
     font-weight: 600;
     cursor: pointer;
 }
 
+.new-order-button svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .new-order-button .btn-icon {
-    font-size: 16px;
+    font-size: 18px;
 }
 
 .new-order-button .btn-text {
@@ -850,7 +876,8 @@
 }
 
 [data-theme='dark'] .ops-status-pill,
-[data-theme='dark'] .fleet-turn-pill{
+[data-theme='dark'] .fleet-turn-pill,
+[data-theme='dark'] .badge-status-inactive {
     background: #273449;
     border-color: #3b475b;
     color: #d1d5db;
@@ -999,6 +1026,10 @@
         gap: 16px;
     }
 
+    .new-order-button {
+        margin: 0;
+    }
+
     .metrics-grid {
         grid-template-columns: 1fr;
         gap: 12px;
@@ -1016,4 +1047,13 @@
     .kanban-column {
         min-height: 200px;
     }
+}
+
+.order-item-clickable {
+    cursor: pointer;
+}
+
+.order-item-clickable:hover,
+.order-item-clickable:focus-visible {
+    border-color: #2563eb !important;
 }
