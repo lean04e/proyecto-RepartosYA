@@ -101,6 +101,13 @@ const obtenerPedidos = async (req, res) => {
             .lean();
 
         // Enriquecemos cada pedido con los datos traídos desde el propio comercio mediante obtenerComercio
+        // Resolvemos los nombres de los repartidores asignados (el pedido guarda solo el _id)
+        const idsRepartidores = [...new Set(pedidos.map(p => p.repartidor).filter(r => /^[0-9a-fA-F]{24}$/.test(String(r || ''))))];
+        const repartidores = await Repartidor.find({ _id: { $in: idsRepartidores } }).select('nombre apellido').lean();
+        const nombresRepartidores = new Map(
+            repartidores.map(r => [String(r._id), `${r.nombre || ''} ${r.apellido || ''}`.trim()])
+        );
+
         const pedidosFormateados = await Promise.all(pedidos.map(async (p) => {
             const origenDoc = p.comercioOrigen && p.comercioOrigen.nombre
                 ? p.comercioOrigen
@@ -112,6 +119,7 @@ const obtenerPedidos = async (req, res) => {
 
             return {
                 ...p,
+                repartidorNombre: nombresRepartidores.get(String(p.repartidor)) || null,
                 // Datos del origen obtenidos directamente de Comercio
                 comercioOrigen: origenDoc ? origenDoc.nombre : 'Comercio no especificado',
                 origen: origenDoc ? origenDoc.direccion : 'Dirección no especificada',
