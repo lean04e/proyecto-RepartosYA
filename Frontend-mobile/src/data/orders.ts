@@ -31,7 +31,7 @@ export async function getOrders(): Promise<DeliveryOrder[]> {
 
     return data.map((pedido: any): DeliveryOrder => ({
       id: pedido._id || pedido.ID,
-      codigo: pedido.codigo || `PED-${String(pedido._id || '').slice(-4)}`,
+      codigo: pedido.codigo || String(pedido._id || '').slice(0, 8),
       repartidorId: pedido.repartidor?._id ? String(pedido.repartidor._id) : String(pedido.repartidor || ''),
       // Nombre del comercio de origen
       comercioOrigen: pedido.comercioOrigen || pedido.comercio?.nombre || 'Comercio no especificado',
