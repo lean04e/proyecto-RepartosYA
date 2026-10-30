@@ -57,7 +57,7 @@ useEffect(() => {
 
             const misPedidos = dataPedidos.filter(p => {
               const nombreRep = String(p.repartidor || '').trim().toLowerCase();
-              return nombreRep === displayName.toLowerCase() || nombreRep === String(driver.nombre).trim().toLowerCase();
+              return nombreRep === String(driver._id || driver.id || '').toLowerCase() || nombreRep === displayName.toLowerCase() || nombreRep === String(driver.nombre).trim().toLowerCase();
             });
 
             const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
@@ -153,7 +153,7 @@ useEffect(() => {
         // Filtramos los que le pertenecen a este repartidor (ignorando mayúsculas)
         const misPedidos = todosLosPedidos.filter(p => {
           const nombreRep = String(p.repartidor || '').trim().toLowerCase();
-          return nombreRep === displayName.toLowerCase() || nombreRep === String(driver.nombre).trim().toLowerCase();
+          return nombreRep === String(driver._id || driver.id || '').toLowerCase() || nombreRep === displayName.toLowerCase() || nombreRep === String(driver.nombre).trim().toLowerCase();
         });
 
         // Separamos los que están en viaje (pendientes) y los ya finalizados

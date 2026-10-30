@@ -106,7 +106,7 @@ useEffect(() => {
             id: p.ID,
             origin: p.nombreOrigen || p.comercioOrigen || p.origen,
             destination: p.nombreDestino || (p.destinatario && p.destinatario !== 'Consumidor Final' ? p.destinatario : null) || p.destino,
-            driver: p.repartidor || null, 
+            driver: p.repartidorNombre || p.repartidor || null,
             status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
             createdAt: fechaCreacion(p),
             
