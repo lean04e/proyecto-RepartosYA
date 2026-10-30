@@ -5,8 +5,6 @@ import CommercesSection from '../components/CommercesSection';
 import OrdersSection, { PackageIcon } from '../components/OrdersSection';
 import RepartidoresSection from '../components/RepartidoresSection';
 import RouteSheetSection from '../components/RouteSheetSection';
-import { initialDriversData } from '../data/mockDrivers';
-import { initialOrdersData } from '../data/mockOrders';
 import { getAll, getPedidos } from '../services/api';
 import '../styles/admin.css';
 
@@ -99,7 +97,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [ordersVersion, setOrdersVersion] = useState(0);
     const [commerces, setCommerces] = useState([]);
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
-    const [drivers, setDrivers] = useState(initialDriversData);
+    const [drivers, setDrivers] = useState([]);
     const [routeAssignments, setRouteAssignments] = useState({});
 
     const sections = [
@@ -404,7 +402,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         </section>
 
                         <OrdersSection
-                            orders={initialOrdersData}
+                            orders={[]}
                             openOrderId={requestedOrderId}
                             addOrderRequest={addOrderRequest}
                             onOrdersChanged={refreshOrders}

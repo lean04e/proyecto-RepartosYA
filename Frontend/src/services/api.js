@@ -13,7 +13,7 @@ async function request(path, options = {}) {
             },
         });
     } catch {
-        throw new Error('No se pudo conectar con el servidor de prueba. Ejecuta npm run mock-api en la carpeta Frontend.');
+        throw new Error('No se pudo conectar con el servidor. Verifica que el backend esté iniciado.');
     }
 
     const data = await response.json();
