@@ -75,6 +75,11 @@ export function getPedidos() {
     return request('/api/pedidos');
 }
 
+// Historial completo de pedidos que tienen al comercio como destino (incluye borrados).
+export function getPedidosDeComercio(comercioId) {
+    return request(`/comercios/${encodeURIComponent(comercioId)}/pedidos`);
+}
+
 export function getAll(resource) {
     return request(getResourcePath(resource));
 }

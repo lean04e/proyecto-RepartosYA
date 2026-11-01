@@ -9,6 +9,7 @@ import { getAll, getPedidos } from '../services/api';
 import '../styles/admin.css';
 
 const ORDER_REFRESH_INTERVAL = 60_000;
+const COMMERCE_REFRESH_INTERVAL = 60_000;
 
 function formatToday() {
     return new Intl.DateTimeFormat('es-AR', {
@@ -143,25 +144,40 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
 
     // EFFECT PARA COMERCIOS (Con traducción de datos backend -> frontend)
+    // Carga al montar, al volver a la seccion de comercios y cada COMMERCE_REFRESH_INTERVAL
     useEffect(() => {
-        getAll('comercios')
-            .then((data) => {
-                if (Array.isArray(data)) {
-                    const comerciosAdaptados = data.map((comercio) => ({
-                        id: comercio._id,
-                        name: comercio.nombre,
-                        rubro: comercio.rubro || '',
-                        orders: comercio.cantPedidos,
-                        phone: comercio.telefono,
-                        address: comercio.direccion,
-                        historicalOrders: (comercio.cantPedidos || 0) * 5,
-                        recentOrders: []
-                    }));
-                    setCommerces(comerciosAdaptados);
-                }
-            })
-            .catch((err) => console.error('Error al cargar los comercios:', err));
-    }, []);
+        let isMounted = true;
+
+        const loadCommerces = () => {
+            getAll('comercios')
+                .then((data) => {
+                    if (isMounted && Array.isArray(data)) {
+                        const comerciosAdaptados = data.map((comercio) => ({
+                            id: comercio._id,
+                            name: comercio.nombre,
+                            rubro: comercio.rubro || '',
+                            orders: comercio.cantPedidos,
+                            phone: comercio.telefono,
+                            address: comercio.direccion,
+                            historicalOrders: (comercio.cantPedidos || 0) * 5,
+                            recentOrders: []
+                        }));
+                        setCommerces(comerciosAdaptados);
+                    }
+                })
+                .catch((err) => console.error('Error al cargar los comercios:', err));
+        };
+
+        loadCommerces();
+        const commercesRefreshInterval = activeSection === 'commerces'
+            ? window.setInterval(loadCommerces, COMMERCE_REFRESH_INTERVAL)
+            : null;
+
+        return () => {
+            isMounted = false;
+            window.clearInterval(commercesRefreshInterval);
+        };
+    }, [activeSection]);
 
     useEffect(() => {
         const dateRefreshInterval = window.setInterval(() => {

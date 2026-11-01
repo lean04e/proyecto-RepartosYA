@@ -82,9 +82,6 @@ const crearPedido = async (req, res) => {
         
         await nuevoPedido.save();
 
-        // Incrementamos la cantidad de pedidos del comercio origen
-        await Comercio.findByIdAndUpdate(comercioOrigenDoc._id, { $inc: { cantPedidos: 1 } });
-
         res.status(201).json({ mensaje: 'Pedido creado exitosamente', pedido: nuevoPedido });
     } catch (error) {
         res.status(400).json({ error: 'Error al crear el pedido', detalle: error.message });
@@ -93,8 +90,14 @@ const crearPedido = async (req, res) => {
 
 const obtenerPedidos = async (req, res) => {
     try {
+        // Con ?incluirEntregadosBorrados=true también se devuelven los pedidos entregados que se borraron
+        // de la lista (los usa el historial de los repartidores); el resto de los borrados siguen ocultos.
+        const filtro = req.query.incluirEntregadosBorrados === 'true'
+            ? { $or: [{ borrado: { $ne: true } }, { estado: 'ENTREGADO' }] }
+            : { borrado: { $ne: true } };
+
         // Traemos los pedidos de la base de datos
-        const pedidos = await Pedido.find({ borrado: { $ne: true } })
+        const pedidos = await Pedido.find(filtro)
             .populate('comercioOrigen')
             .populate('comercioDestino')
             .sort({ _id: -1 })
@@ -251,6 +254,12 @@ const asignarRepartidor = async (req, res) => {
         });
 
         await pedido.save();
+
+        // Cuenta un pedido entregado para el comercio destino (solo en la transición a ENTREGADO)
+        if (pedido.estado === 'ENTREGADO' && estadoAnterior !== 'ENTREGADO') {
+            await Comercio.findByIdAndUpdate(pedido.comercioDestino, { $inc: { cantPedidos: 1 } });
+        }
+
         res.status(200).json({ mensaje: 'Pedido actualizado exitosamente', pedido });
     } catch (error) {
         res.status(400).json({ error: 'Error al asignar el repartidor o actualizar estado', detalle: error.message });

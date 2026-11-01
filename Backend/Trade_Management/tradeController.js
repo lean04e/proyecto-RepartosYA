@@ -1,4 +1,5 @@
 const Comercio = require('../Models/Comercio');
+const Pedido = require('../Models/Pedido');
 
 // Obtener todos los comercios activos para mostrarlos en la tabla
 const obtenerComercios = async (req, res) => {
@@ -28,6 +29,30 @@ const obtenerComercioPorId = async (req, res) => {
         res.status(500).json({ 
             mensaje: 'Error al obtener el comercio', 
             error: error.message 
+        });
+    }
+};
+
+// Historial completo de pedidos que tienen al comercio como destino.
+// Incluye todos los estados y también los pedidos borrados de la lista de pedidos.
+const obtenerPedidosDeComercio = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pedidos = await Pedido.find({ comercioDestino: id })
+            .sort({ _id: -1 })
+            .lean();
+
+        res.status(200).json(pedidos.map((p) => ({
+            ID: p.ID,
+            estado: p.estado,
+            borrado: p.borrado === true,
+            // Los pedidos viejos no tienen createdAt: la fecha está en los primeros 4 bytes del _id
+            fecha: p.createdAt || p._id.getTimestamp()
+        })));
+    } catch (error) {
+        res.status(500).json({
+            mensaje: 'Error al obtener los pedidos del comercio',
+            error: error.message
         });
     }
 };
@@ -97,6 +122,7 @@ const actualizarComercio = async (req, res) => {
 module.exports = {
     obtenerComercios,
     obtenerComercioPorId,
+    obtenerPedidosDeComercio,
     crearComercio,
     eliminarComercio,
     actualizarComercio

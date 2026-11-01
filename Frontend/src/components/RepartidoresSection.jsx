@@ -44,7 +44,7 @@ useEffect(() => {
         // Hacemos las dos peticiones al mismo tiempo
         const [resRepartidores, resPedidos] = await Promise.all([
           fetch('http://localhost:3001/api/repartidores'),
-          fetch('http://localhost:3001/api/pedidos')
+          fetch('http://localhost:3001/api/pedidos?incluirEntregadosBorrados=true')
         ]);
 
         if (resRepartidores.ok && resPedidos.ok) {
@@ -145,7 +145,7 @@ useEffect(() => {
 
     try {
       // Traemos todos los pedidos del sistema para contar pendientes y entregados
-      const response = await fetch(`http://localhost:3001/api/pedidos`);
+      const response = await fetch(`http://localhost:3001/api/pedidos?incluirEntregadosBorrados=true`);
       
       if (response.ok) {
         const todosLosPedidos = await response.json();

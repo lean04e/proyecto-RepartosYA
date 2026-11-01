@@ -9,7 +9,7 @@ import { useAppTheme } from '../../hooks/app-theme';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
 type ActiveModal = 'orderDetails' | 'completion' | null;
-const DEMO_ETA_SECONDS = 4 * 60;
+const DEMO_ETA_SECONDS = 30;
 const MAX_VISIBLE_ORDERS = 4;
 
 function formatEta(seconds: number) {
@@ -69,8 +69,17 @@ export default function RepartidorDashboard() {
     .sort((first, second) => (
       Date.parse(second.fechaEstado ?? '') - Date.parse(first.fechaEstado ?? '')
     ));
-  const elapsedSeconds = activeOrder?.fechaEstado
-    ? Math.max(0, Math.floor((clock - Date.parse(activeOrder.fechaEstado)) / 1000))
+  // El timer arranca cuando se asignó el pedido o cuando se entregó el anterior, lo que ocurra último
+  const lastDeliveredAt = courierOrders.reduce((latest, order) => (
+    order.estado === 'ENTREGADO' && order.fechaEstado
+      ? Math.max(latest, Date.parse(order.fechaEstado))
+      : latest
+  ), 0);
+  const timerStartedAt = activeOrder?.fechaEstado
+    ? Math.max(Date.parse(activeOrder.fechaEstado), lastDeliveredAt)
+    : 0;
+  const elapsedSeconds = activeOrder
+    ? Math.max(0, Math.floor((clock - timerStartedAt) / 1000))
     : 0;
   const etaSeconds = activeOrder ? Math.max(0, DEMO_ETA_SECONDS - elapsedSeconds) : 0;
   const activeOrderId = activeOrder?.id;

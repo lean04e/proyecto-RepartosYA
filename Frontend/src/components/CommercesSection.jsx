@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
-import { create, remove, update } from '../services/api';
+import { create, getPedidosDeComercio, remove, update } from '../services/api';
 import './CommercesSection.css';
 
 const INITIAL_VISIBLE_COUNT = 6
+
+const orderDateFormatter = new Intl.DateTimeFormat('es-AR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
 
 function CommercesSection({ commerces, onCommercesChange, openAddOnMount = false }) {
   const commerceList = commerces
@@ -772,10 +781,33 @@ function CommerceDetailModal({ commerce, onClose, onEdit, onDelete }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  const recentOrders =
-    Array.isArray(commerce.recentOrders) && commerce.recentOrders.length > 0
-      ? commerce.recentOrders.slice(0, 10)
-      : []
+  const [orderHistory, setOrderHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyError, setHistoryError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    getPedidosDeComercio(commerce.id)
+      .then((pedidos) => {
+        if (cancelled) return
+        setOrderHistory(
+          pedidos.map((pedido) => ({
+            id: pedido.ID,
+            date: orderDateFormatter.format(new Date(pedido.fecha)),
+            status: (pedido.estado || '').toLowerCase().replace('_', '-'),
+          })),
+        )
+      })
+      .catch((error) => {
+        if (!cancelled) setHistoryError(error.message)
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [commerce.id])
 
   return (
     <div className="modal-backdrop detail-backdrop" role="presentation" onClick={onClose}>
@@ -845,7 +877,7 @@ function CommerceDetailModal({ commerce, onClose, onEdit, onDelete }) {
 
             <div className="detail-orders-frame">
               <table className="detail-orders-table">
-                <caption className="sr-only">Últimos pedidos del comercio</caption>
+                <caption className="sr-only">Historial de pedidos del comercio</caption>
                 <thead>
                   <tr>
                     <th scope="col">Fecha</th>
@@ -854,8 +886,14 @@ function CommerceDetailModal({ commerce, onClose, onEdit, onDelete }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentOrders.length > 0 ? (
-                    recentOrders.map((order) => (
+                  {historyLoading || historyError ? (
+                    <tr>
+                      <td colSpan="3" className="detail-orders-empty">
+                        {historyLoading ? 'Cargando historial...' : historyError}
+                      </td>
+                    </tr>
+                  ) : orderHistory.length > 0 ? (
+                    orderHistory.map((order) => (
                       <tr key={order.id}>
                         <td className="order-date-cell">{order.date}</td>
                         <td className="order-id-cell">
@@ -869,7 +907,7 @@ function CommerceDetailModal({ commerce, onClose, onEdit, onDelete }) {
                   ) : (
                     <tr>
                       <td colSpan="3" className="detail-orders-empty">
-                        No hay pedidos recientes registrados para este comercio.
+                        No hay pedidos registrados para este comercio.
                       </td>
                     </tr>
                   )}
@@ -892,22 +930,19 @@ function CommerceDetailModal({ commerce, onClose, onEdit, onDelete }) {
   )
 }
 
+const ORDER_STATUS_LABELS = {
+  registrado: 'Registrado',
+  asignado: 'Asignado',
+  'en-camino': 'En Camino',
+  entregado: 'Entregado',
+  rechazado: 'Rechazado',
+  cancelado: 'Cancelado',
+}
+
 function OrderStatusBadge({ status }) {
   const normalized = (status || '').toLowerCase()
-
-  let label = 'Desconocido'
-  let badgeClass = 'status-default'
-
-  if (normalized === 'entregado') {
-    label = 'Entregado'
-    badgeClass = 'status-entregado'
-  } else if (normalized === 'pendiente') {
-    label = 'Pendiente'
-    badgeClass = 'status-pendiente'
-  } else if (normalized === 'cancelado') {
-    label = 'Cancelado'
-    badgeClass = 'status-cancelado'
-  }
+  const label = ORDER_STATUS_LABELS[normalized] || 'Desconocido'
+  const badgeClass = ORDER_STATUS_LABELS[normalized] ? `status-${normalized}` : 'status-default'
 
   return (
     <span className={`status-badge ${badgeClass}`}>

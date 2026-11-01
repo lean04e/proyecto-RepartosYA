@@ -24,7 +24,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
 
 export async function getOrders(): Promise<DeliveryOrder[]> {
   try {
-    const response = await fetch(`${API_URL}/api/pedidos`);
+    const response = await fetch(`${API_URL}/api/pedidos?incluirEntregadosBorrados=true`);
     if (!response.ok) throw new Error('Error al obtener pedidos del servidor');
 
     const data = await response.json();
