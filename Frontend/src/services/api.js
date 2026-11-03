@@ -75,6 +75,11 @@ export function getPedidos() {
     return request('/api/pedidos');
 }
 
+// Pedidos activos mas los ENTREGADOS que se borraron de la lista (base de los reportes).
+export function getPedidosEntregados() {
+    return request('/api/pedidos?incluirEntregadosBorrados=true');
+}
+
 // Historial completo de pedidos que tienen al comercio como destino (incluye borrados).
 export function getPedidosDeComercio(comercioId) {
     return request(`/comercios/${encodeURIComponent(comercioId)}/pedidos`);

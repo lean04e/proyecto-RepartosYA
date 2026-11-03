@@ -408,6 +408,7 @@
     margin-left: 260px;
 }
 
+.admin-content-area:not(.sidebar-is-open) > .reports-section,
 .admin-content-area:not(.sidebar-is-open) > .commerces-section,
 .admin-content-area:not(.sidebar-is-open) > .repartidores-section,
 .admin-content-area:not(.sidebar-is-open) > .route-sheet-section {
