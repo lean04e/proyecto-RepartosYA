@@ -1,15 +1,51 @@
+import { useEffect, useState } from 'react';
 import repartosYaLogo from '../../assets/repartosYA-logo.png';
 import repartosYALogoOsc from '../../assets/repartosYA-version-Osc.png';
+
+const CLOCK_REFRESH_INTERVAL = 15_000;
+
+// Ejemplo: "Lunes 25/7 15:30"
+function formatHeaderDate(date) {
+    const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('es-AR', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        }).formatToParts(date).map((part) => [part.type, part.value]),
+    );
+    const weekday = parts.weekday.charAt(0).toUpperCase() + parts.weekday.slice(1);
+    return `${weekday} ${parts.day}/${parts.month} ${parts.hour}:${parts.minute}`;
+}
+
+function HeaderRotator({ isDarkMode }) {
+    const [now, setNow] = useState(() => formatHeaderDate(new Date()));
+
+    useEffect(() => {
+        const interval = window.setInterval(() => setNow(formatHeaderDate(new Date())), CLOCK_REFRESH_INTERVAL);
+        return () => window.clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="top-rotator">
+            <span className="rotator-sr-only">RepartosYA, {now}</span>
+            <img
+                src={isDarkMode ? repartosYALogoOsc : repartosYaLogo}
+                alt=""
+                aria-hidden="true"
+                className="rotator-item navbar-company-logo"
+            />
+            <span className="rotator-item rotator-date" aria-hidden="true">{now}</span>
+        </div>
+    );
+}
 
 function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme }) {
     return (
         <header className="admin-top-navbar">
             <div className="top-navbar-left">
-                <div className="brand-logo-container">
-                    <img src={isDarkMode ? repartosYALogoOsc : repartosYaLogo} 
-                    alt="RepartosYA" 
-                    className="navbar-company-logo" />
-                </div>
                 <button
                     type="button"
                     onClick={onToggleSidebar}
@@ -21,11 +57,7 @@ function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme }) {
                 </button>
             </div>
 
-            <div className="top-search-box">
-                <span className="search-icon" aria-hidden="true">⌕</span>
-                <input type="search" placeholder="Buscar pedidos, repartidores, comercios..." />
-                <span className="search-shortcut">CTRL + K</span>
-            </div>
+            <HeaderRotator isDarkMode={isDarkMode} />
 
             <div className="top-nav-right">
                 <button
