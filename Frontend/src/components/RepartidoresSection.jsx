@@ -384,35 +384,45 @@ useEffect(() => {
 
 const handleConfirmDelete = async () => {
     const idRepartidor = deletingDriver._id || deletingDriver.id;
+    const isInactive = deletingDriver.status === 'Inactivo';
+    const newStatus = isInactive ? 'Activo' : 'Inactivo'; // Alternamos el estado
 
     try {
-      // Escenario 1: Petición DELETE al backend
       const response = await fetch(`http://localhost:3001/api/repartidores/${idRepartidor}`, {
-        method: 'DELETE'
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: deletingDriver.nombre || deletingDriver.firstName || '',
+          apellido: deletingDriver.apellido || deletingDriver.lastName || '',
+          email: deletingDriver.email || '',
+          telefono: deletingDriver.telefono || deletingDriver.phone || '',
+          status: newStatus
+        })
       });
 
       if (response.ok) {
-        // Filtramos el repartidor eliminado de la lista actual sin necesidad de recargar todo
-        const updatedList = driverList.filter((d) => (d._id || d.id) !== idRepartidor);
+        const refreshResponse = await fetch('http://localhost:3001/api/repartidores');
+        const dataActualizada = await refreshResponse.json();
         
-        setDriverList(updatedList);
+        setDriverList(dataActualizada);
         if (onDriversChange) {
-          onDriversChange(updatedList);
+          onDriversChange(dataActualizada);
         }
         
         if (detailDriver && (detailDriver._id || detailDriver.id) === idRepartidor) {
-          setDetailDriver(null);
+          const updatedDriver = dataActualizada.find(d => (d._id || d.id) === idRepartidor);
+          setDetailDriver(updatedDriver);
         }
         
         handleCloseDelete();
-        showSuccessToast('Repartidor eliminado del sistema correctamente');
+        showSuccessToast(`Repartidor dado de ${isInactive ? 'alta' : 'baja'} correctamente`);
       } else {
         const errorData = await response.json();
-        alert("Error al eliminar: " + (errorData.error || "No se pudo borrar"));
+        alert(`Error al dar de ${isInactive ? 'alta' : 'baja'}: ` + (errorData.error || "No se pudo actualizar"));
       }
     } catch (error) {
       console.error("Error de conexión:", error);
-      alert("Error de conexión al intentar borrar el repartidor.");
+      alert(`Error de conexión al intentar dar de ${isInactive ? 'alta' : 'baja'} el repartidor.`);
     }
   };
 
@@ -630,16 +640,16 @@ const handleConfirmDelete = async () => {
                             <EditIcon />
                           </button>
                           <button
-                            className="action-button action-button-danger"
+                            className={`action-button ${driver.status === 'Inactivo' ? 'action-button-success' : 'action-button-danger'}`}
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleOpenDelete(driver);
+                              handleOpenDelete(driver); // Usamos la misma función para abrir el modal
                             }}
-                            aria-label={`Borrar ${displayName}`}
-                            title="Borrar Repartidor"
+                            aria-label={driver.status === 'Inactivo' ? `Dar de alta a ${displayName}` : `Dar de baja a ${displayName}`}
+                            title={driver.status === 'Inactivo' ? "Dar de alta" : "Dar de baja"}
                           >
-                            <TrashIcon />
+                            {driver.status === 'Inactivo' ? <RestoreIcon /> : <TrashIcon />}
                           </button>
                         </div>
                       </td>
@@ -720,6 +730,7 @@ const handleConfirmDelete = async () => {
             deletingDriver.name ||
             `${deletingDriver.nombre || deletingDriver.firstName || ''} ${deletingDriver.apellido || deletingDriver.lastName || ''}`.trim()
           }
+          isInactive={deletingDriver.status === 'Inactivo'}
           onCancel={handleCloseDelete}
           onConfirm={handleConfirmDelete}
         />
@@ -1258,25 +1269,37 @@ function ConfirmEditModal({ driverName, onCancel, onConfirm }) {
 }
 
 // HU #6: Advertencia pidiendo confirmación explícita
-function DeleteDriverModal({ driverName, onCancel, onConfirm }) {
+function DeleteDriverModal({ driverName, isInactive, onCancel, onConfirm }) {
   return (
     <div className="modal-backdrop" role="presentation">
       <div
-        className="confirmation-modal delete-confirmation-modal"
+        // 1. Alternamos la clase del contenedor para que no se pinte de rojo si es "Dar de alta"
+        className={`confirmation-modal ${isInactive ? 'restore-confirmation-modal' : 'delete-confirmation-modal'}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-driver-title"
       >
-        <h2 id="delete-driver-title">¿Confirmas borrar el repartidor?</h2>
+        <h2 id="delete-driver-title">
+          {isInactive ? '¿Confirmas dar de alta al repartidor?' : '¿Confirmas dar de baja al repartidor?'}
+        </h2>
         <p className="confirmation-copy">
-          Se eliminará a <strong>{driverName}</strong> de las listas y menús del sistema.
+          {isInactive 
+            ? <span>El estado de <strong>{driverName}</strong> pasará a ser "Activo" y podrá volver a recibir pedidos.</span>
+            : <span>El estado de <strong>{driverName}</strong> pasará a ser "Inactivo". Su historial de entregas se conservará en el sistema.</span>
+          }
         </p>
         <div className="confirmation-actions">
           <button className="modal-cancel" type="button" onClick={onCancel}>
             Cancelar
           </button>
-          <button className="modal-delete" type="button" onClick={onConfirm}>
-            Borrar repartidor
+          <button 
+            // 2. Usamos modal-apply pero le forzamos el fondo verde oscuro clásico de éxito
+            className={isInactive ? "modal-apply" : "modal-delete"} 
+            style={isInactive ? { backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff' } : {}}
+            type="button" 
+            onClick={onConfirm}
+          >
+            {isInactive ? 'Dar de alta' : 'Dar de baja'}
           </button>
         </div>
       </div>
@@ -1349,6 +1372,15 @@ function TrashIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4 7h16M10 11v5M14 11v5M6.5 7l.7 13h9.6l.7-13M9 7V4h6v3" />
+    </svg>
+  );
+}
+
+function RestoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
     </svg>
   );
 }
