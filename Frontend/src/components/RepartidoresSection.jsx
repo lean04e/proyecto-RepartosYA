@@ -111,7 +111,10 @@ useEffect(() => {
     let firstValue = firstDriver[sort.key] ?? '';
     let secondValue = secondDriver[sort.key] ?? '';
 
-    if (sort.key === 'orders' || sort.key === 'deliveredOrders') {
+    if (sort.key === 'name') {
+      firstValue = firstDriver.name || `${firstDriver.nombre || ''} ${firstDriver.apellido || ''}`.trim();
+      secondValue = secondDriver.name || `${secondDriver.nombre || ''} ${secondDriver.apellido || ''}`.trim();
+    } else if (sort.key === 'orders' || sort.key === 'deliveredOrders') {
       firstValue = Number(firstDriver.deliveredOrders ?? firstDriver.orders ?? 0);
       secondValue = Number(secondDriver.deliveredOrders ?? secondDriver.orders ?? 0);
     } else if (sort.key === 'pendingOrders') {
