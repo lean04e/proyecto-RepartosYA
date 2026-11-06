@@ -114,7 +114,6 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
             href: '#repartidores',
         },
         { id: 'routes', icon: '🗺️', label: 'Hoja de Ruta', href: '#hoja-de-ruta' },
-        { icon: '⚙️', label: 'Configuración', href: '#configuracion' },
     ];
 
     // EFFECT PARA REPARTIDORES
