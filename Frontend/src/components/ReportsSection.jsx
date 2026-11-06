@@ -7,14 +7,6 @@ import './ReportsSection.css';
 
 const REFRESH_INTERVAL = 60_000;
 
-// Rangos del reporte. Hoy solo esta disponible el historico; diario y mensual se habilitan
-// cuando exista el filtrado por fecha (cada rango define el tamaño de los grupos del grafico).
-const PERIODS = [
-    { id: 'daily', label: 'Diario', available: false },
-    { id: 'monthly', label: 'Mensual', available: false },
-    { id: 'historic', label: 'Histórico', available: true },
-];
-
 // Datos de prueba: los pedidos todavia no guardan un monto. Cuando se audite el comprobante
 // de pago de cada entrega, el revenue saldra de `order.monto` y esta tarifa deja de usarse.
 const TEST_FEE_PER_DELIVERY = 2500;
@@ -44,6 +36,11 @@ const dateTimeFormat = new Intl.DateTimeFormat('es-AR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+});
+const timeFormat = new Intl.DateTimeFormat('es-AR', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -98,7 +95,7 @@ function buildDeliveryRows(orders) {
 
 // El ancho de cada columna sale del texto mas largo de su encabezado o sus celdas
 function getColumnWidth(column, rows) {
-    const longest = Math.max(column.label.length, ...rows.map((row) => String(row[column.key]).length));
+    const longest = rows.reduce((max, row) => Math.max(max, String(row[column.key]).length), column.label.length);
     return Math.min(longest + 3, MAX_COLUMN_WIDTH);
 }
 
@@ -179,10 +176,14 @@ function niceMax(value) {
     return step * magnitude;
 }
 
-function Chart({ title, total, note, timeline, valueKey, formatValue, formatAxis, tone, children }) {
+const MAX_LABELED_MONTHS = 12;
+
+function Chart({ title, total, note, badge, timeline, valueKey, formatValue, formatAxis, tone, children }) {
     const max = niceMax(Math.max(...timeline.map((item) => item[valueKey]), 0));
     const ticks = [1, 0.75, 0.5, 0.25, 0].map((ratio) => max * ratio);
-    const showValues = timeline.length <= 12;
+    const showValues = timeline.length <= MAX_LABELED_MONTHS;
+    // Con muchos meses solo se rotula uno de cada N para que las etiquetas no se pisen
+    const labelStep = Math.ceil(timeline.length / MAX_LABELED_MONTHS);
 
     return (
         <article className={`report-card report-chart report-chart-${tone}`}>
@@ -191,7 +192,10 @@ function Chart({ title, total, note, timeline, valueKey, formatValue, formatAxis
                     <h2 className="report-card-title">{title}</h2>
                     {note && <p className="report-card-note">{note}</p>}
                 </div>
-                <p className="report-card-total">{total}</p>
+                <div className="report-card-figure">
+                    <p className="report-card-total">{total}</p>
+                    {badge && <span className="report-badge">{badge}</span>}
+                </div>
             </header>
 
             <div className="report-plot">
@@ -209,16 +213,18 @@ function Chart({ title, total, note, timeline, valueKey, formatValue, formatAxis
             <ol className="report-months" style={{ '--columns': timeline.length }}>
                 {timeline.map((item, index) => {
                     const isYearStart = index === 0 || item.year !== timeline[index - 1].year;
+                    const showLabel = index % labelStep === 0 || isYearStart;
                     return (
                         <li key={item.key}>
-                            <span>{item.label}</span>
-                            {isYearStart && <small>{item.year}</small>}
+                            {showLabel && <span>{item.label}</span>}
+                            {showLabel && isYearStart && <small>{item.year}</small>}
                         </li>
                     );
                 })}
             </ol>
 
-            <span className="report-sr-only">
+            <span className="sr-only">
+                {note ? `${note}. ` : ''}
                 {timeline.map((item) => `${item.label} ${item.year}: ${formatValue(item[valueKey])}`).join('. ')}
             </span>
         </article>
@@ -272,7 +278,21 @@ function DownloadIcon() {
 
 function DeliveriesList({ rows }) {
     const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportFailed, setExportFailed] = useState(false);
     const visibleRows = rows.slice(0, visibleCount);
+
+    const handleExport = async () => {
+        setIsExporting(true);
+        setExportFailed(false);
+        try {
+            await downloadDeliveriesExcel(rows);
+        } catch {
+            setExportFailed(true);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     return (
         <section className="report-deliveries" aria-labelledby="deliveries-title">
@@ -281,13 +301,20 @@ function DeliveriesList({ rows }) {
                 <button
                     type="button"
                     className="report-export-button"
-                    disabled={rows.length === 0}
-                    onClick={() => downloadDeliveriesExcel(rows)}
+                    disabled={rows.length === 0 || isExporting}
+                    aria-busy={isExporting}
+                    onClick={handleExport}
                 >
                     <DownloadIcon />
-                    Descargar Excel
+                    {isExporting ? 'Generando archivo...' : 'Descargar Excel'}
                 </button>
             </div>
+
+            {exportFailed && (
+                <p className="report-export-error" role="alert">
+                    No se pudo generar el archivo de Excel. Intentá de nuevo.
+                </p>
+            )}
 
             <div className="table-frame">
                 <div className="table-scroll">
@@ -301,8 +328,8 @@ function DeliveriesList({ rows }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {visibleRows.map((row) => (
-                                <tr key={row.id}>
+                            {visibleRows.map((row, index) => (
+                                <tr key={`${row.id}-${index}`}>
                                     <th scope="row" data-label="ID">
                                         <span className="commerce-name">{row.id}</span>
                                     </th>
@@ -343,7 +370,10 @@ function DeliveriesList({ rows }) {
 function ReportsSection() {
     const [orders, setOrders] = useState(null);
     const [error, setError] = useState('');
-    const [period, setPeriod] = useState('historic');
+    const [updatedAt, setUpdatedAt] = useState(null);
+    // Reintentar vuelve a montar la carga y el refresco periodico
+    const [reloadCount, setReloadCount] = useState(0);
+    const retry = () => setReloadCount((count) => count + 1);
 
     useEffect(() => {
         let isMounted = true;
@@ -356,11 +386,12 @@ function ReportsSection() {
                 }
                 if (isMounted) {
                     setOrders(data.filter((order) => order.estado === 'ENTREGADO'));
+                    setUpdatedAt(new Date());
                     setError('');
                 }
             } catch (loadError) {
                 if (isMounted) {
-                    setError(loadError.message);
+                    setError(loadError.message || 'No se pudo cargar');
                 }
             }
         };
@@ -371,7 +402,7 @@ function ReportsSection() {
             isMounted = false;
             window.clearInterval(interval);
         };
-    }, []);
+    }, [reloadCount]);
 
     const report = useMemo(() => {
         if (!orders) {
@@ -390,34 +421,34 @@ function ReportsSection() {
         <section className="reports-section" aria-labelledby="reports-title">
             <div className="admin-header-title-row">
                 <div>
-                    <p className="eyebrow"><span className="green-dot" /> ANÁLISIS DE OPERACIONES · ENTREGAS</p>
                     <h1 className="main-title" id="reports-title">Reportes</h1>
                     <p className="subtitle-date">
-                        Solo pedidos entregados, incluidos los borrados de la lista
+                        Incluye pedidos ya eliminados del listado
+                        {updatedAt && ` · Actualizado a las ${timeFormat.format(updatedAt)}`}
                     </p>
                 </div>
 
-                <div className="report-period" role="group" aria-label="Rango de tiempo">
-                    {PERIODS.map((option) => (
-                        <button
-                            key={option.id}
-                            type="button"
-                            className={`report-period-option${option.id === period ? ' active' : ''}`}
-                            aria-pressed={option.id === period}
-                            disabled={!option.available}
-                            title={option.available ? undefined : 'Disponible próximamente'}
-                            onClick={() => setPeriod(option.id)}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
+                {/* Cuando exista el filtrado por fecha, este rango pasa a ser un selector (diario, mensual, histórico) */}
+                <p className="report-scope">Histórico</p>
             </div>
 
+            {error && orders && (
+                <p className="report-stale" role="status">
+                    No se pudo actualizar. Estás viendo los datos de las {timeFormat.format(updatedAt)}.
+                    <button type="button" className="report-retry-button" onClick={retry}>Reintentar</button>
+                </p>
+            )}
+
             {error && !orders ? (
-                <p className="report-state report-state-error" role="alert">{error}</p>
+                <div className="report-state report-state-error" role="alert">
+                    <p>No se pudieron cargar los reportes. Revisá la conexión e intentá de nuevo.</p>
+                    <button type="button" className="report-retry-button" onClick={retry}>Reintentar</button>
+                </div>
             ) : !report ? (
-                <p className="report-state" role="status">Cargando reportes...</p>
+                <div className="report-main-grid" role="status" aria-label="Cargando reportes">
+                    <div className="report-card report-skeleton" />
+                    <div className="report-card report-skeleton" />
+                </div>
             ) : orders.length === 0 ? (
                 <p className="report-state" role="status">
                     Todavía no hay pedidos entregados. Los gráficos aparecen con la primera entrega.
@@ -438,7 +469,13 @@ function ReportsSection() {
                             {({ max, showValues }) => (
                                 <ul className="report-bars" style={{ '--columns': report.timeline.length }}>
                                     {report.timeline.map((item) => (
-                                        <li key={item.key} title={`${item.label} ${item.year}: ${numberFormat.format(item.count)}`}>
+                                        <li
+                                            key={item.key}
+                                            className="report-point"
+                                            tabIndex={0}
+                                            aria-label={`${item.label} ${item.year}: ${numberFormat.format(item.count)}`}
+                                            data-tip={`${item.label} ${item.year}: ${numberFormat.format(item.count)}`}
+                                        >
                                             <span className="report-bar" style={{ height: `${(item.count / max) * 100}%` }}>
                                                 {showValues && item.count > 0 && <span className="report-bar-value">{numberFormat.format(item.count)}</span>}
                                             </span>
@@ -449,8 +486,9 @@ function ReportsSection() {
                         </Chart>
 
                         <Chart
-                            title="Revenue"
-                            note="Datos de prueba: tarifa fija por entrega hasta auditar los comprobantes de pago"
+                            title="Ingresos estimados"
+                            note={`Tarifa fija de ${currencyFormat.format(TEST_FEE_PER_DELIVERY)} por entrega hasta auditar los comprobantes de pago`}
+                            badge="Datos de prueba"
                             total={currencyFormat.format(report.totalRevenue)}
                             timeline={report.timeline}
                             valueKey="revenue"
@@ -478,8 +516,11 @@ function ReportsSection() {
                                             {points.map(({ x, y, item }) => (
                                                 <li
                                                     key={item.key}
+                                                    className="report-point"
                                                     style={{ left: `${x}%`, top: `${y}%` }}
-                                                    title={`${item.label} ${item.year}: ${currencyFormat.format(item.revenue)}`}
+                                                    tabIndex={0}
+                                                    aria-label={`${item.label} ${item.year}: ${currencyFormat.format(item.revenue)} estimados`}
+                                                    data-tip={`${item.label} ${item.year}: ${currencyFormat.format(item.revenue)}`}
                                                 >
                                                     {showValues && item.revenue > 0 && (
                                                         <span className="report-dot-value">$ {compactCurrencyFormat.format(item.revenue)}</span>
