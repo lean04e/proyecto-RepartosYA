@@ -3,6 +3,7 @@ import avatar from '../assets/jefeP.jpeg';
 import TopNavbar from '../components/admin/TopNavBar';
 import CommercesSection from '../components/CommercesSection';
 import OrdersSection, { PackageIcon } from '../components/OrdersSection';
+import ReportsSection from '../components/ReportsSection';
 import RepartidoresSection from '../components/RepartidoresSection';
 import RouteSheetSection from '../components/RouteSheetSection';
 import { getAll, getPedidos } from '../services/api';
@@ -104,7 +105,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
     const sections = [
         { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos' },
-        { icon: '📊', label: 'Reportes', href: '#dashboard' },
+        { id: 'reports', icon: '📊', label: 'Reportes', href: '#dashboard' },
         { id: 'commerces', icon: '🏪', label: 'Comercios', href: '#comercios' },
         {
             id: 'drivers',
@@ -332,6 +333,8 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
                     <CommercesSection commerces={commerces} onCommercesChange={setCommerces} openAddOnMount={openAddCommerce} />
+                ) : activeSection === 'reports' ? (
+                    <ReportsSection />
                 ) : activeSection === 'drivers' ? (
                     <RepartidoresSection drivers={drivers} onDriversChange={setDrivers} />
                 ) : activeSection === 'routes' ? (
