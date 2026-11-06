@@ -25,7 +25,7 @@ const login = async (req, res) => {
       usuarioEncontrado = await Repartidor.findOne({
         email: new RegExp(`^${username.trim()}$`, 'i')
       });
-      rol = 'repartidor'; s
+      rol = 'repartidor'; 
     }
 
     if (!usuarioEncontrado) {

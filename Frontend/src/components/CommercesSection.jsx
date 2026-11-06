@@ -533,6 +533,14 @@ function EditCommerceModal({ formData, formErrors, onChange, onClose, onSubmit }
                   className={formErrors[field.name] ? 'has-error' : ''}
                   aria-invalid={formErrors[field.name] || undefined}
                   aria-describedby={formErrors[field.name] ? `${field.name}-error` : undefined}
+                  {...(field.type === 'number' && {
+                    min: '0',
+                    onKeyDown: (e) => {
+                      if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                        e.preventDefault()
+                      }
+                    }
+                  })}
                 />
                 {formErrors[field.name] && (
                   <small id={`${field.name}-error`} className="field-error" role="alert">
@@ -597,7 +605,7 @@ function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit })
             {fields.map((field) => (
               <label className="form-field" htmlFor={`new-commerce-${field.name}`} key={field.name}>
                 <span>{field.label}</span>
-                <input
+               <input
                   id={`new-commerce-${field.name}`}
                   name={field.name}
                   type={field.type}
@@ -606,6 +614,14 @@ function AddCommerceModal({ formData, formErrors, onChange, onClose, onSubmit })
                   className={formErrors[field.name] ? 'has-error' : ''}
                   aria-invalid={formErrors[field.name] || undefined}
                   aria-describedby={formErrors[field.name] ? `new-${field.name}-error` : undefined}
+                  {...(field.type === 'number' && {
+                    min: '0',
+                    onKeyDown: (e) => {
+                      if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                        e.preventDefault()
+                      }
+                    }
+                  })}
                 />
                 {formErrors[field.name] && (
                   <small id={`new-${field.name}-error`} className="field-error" role="alert">
