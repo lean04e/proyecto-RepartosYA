@@ -12,7 +12,7 @@ Dueño/gerente de un negocio de repartos que usa el panel admin (`Frontend/`) en
 
 ## Product Purpose
 
-RepartosYA gestiona repartos de comercios locales. Los comercios cargan pedidos, el admin los asigna a repartidores (que usan la app móvil en `Frontend-mobile/`) y controla entregas y rutas. El éxito es que el dueño vea el estado de la operación de un vistazo y pueda actuar sobre ella.
+RepartosYA gestiona repartos de comercios locales. El admin carga pedidos que le mandan los comercios por WhatsApp o Instagram, y los asigna a repartidores (que usan la app móvil en `Frontend-mobile/`) y controla entregas y rutas. El éxito es que el dueño vea el estado de la operación de un vistazo y pueda actuar sobre ella.
 
 ## Operating Context
 
