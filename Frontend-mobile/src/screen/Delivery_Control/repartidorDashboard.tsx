@@ -1,14 +1,15 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
 import { useAppTheme } from '../../hooks/app-theme';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
-type ActiveModal = 'orderDetails' | 'completion' | null;
+type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | null;
 const DEMO_ETA_SECONDS = 30;
 const MAX_VISIBLE_ORDERS = 4;
 
@@ -41,6 +42,10 @@ export default function RepartidorDashboard() {
   const [completedOrder, setCompletedOrder] = useState<DeliveryOrder | null>(null);
   const [isStartingOrder, setIsStartingOrder] = useState(false);
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  const [receiptUri, setReceiptUri] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [price, setPrice] = useState('');
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const palette = APP_THEMES[isDarkMode ? 'dark' : 'light'];
   const courierOrders = orders.filter((order) => order.repartidorId === id);
   const activeOrder = courierOrders.find((order) => order.estado === 'EN_CAMINO');
@@ -91,6 +96,9 @@ export default function RepartidorDashboard() {
   );
   const isSelectedActiveOrder = Boolean(activeOrder && selectedOrder?.id === activeOrder.id);
   const canCompleteSelected = isSelectedActiveOrder && etaSeconds === 0 && !isCompletingOrder;
+  const canConfirmReceipt = Boolean(
+    receiptUri && paymentMethod.trim() && price.trim() && !isCompletingOrder,
+  );
   const visibleHistory = showAllHistory
     ? historicalOrders
     : historicalOrders.slice(0, MAX_VISIBLE_ORDERS);
@@ -166,6 +174,9 @@ export default function RepartidorDashboard() {
       const updatedOrders = await updateOrderStatus(activeOrder.id, 'ENTREGADO');
       setOrders(updatedOrders);
       setOrdersError(null);
+      setReceiptUri(null);
+      setPaymentMethod('');
+      setPrice('');
       setActiveModal('completion');
     } catch (error) {
       setCompletedOrder(null);
@@ -173,6 +184,34 @@ export default function RepartidorDashboard() {
     } finally {
       setIsCompletingOrder(false);
     }
+  };
+
+  const pickReceipt = async (source: 'library' | 'camera') => {
+    try {
+      setReceiptError(null);
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setReceiptError('Necesitas dar permiso para cargar el comprobante.');
+        return;
+      }
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+      if (!result.canceled) {
+        setReceiptUri(result.assets[0].uri);
+      }
+    } catch {
+      setReceiptError('No se pudo cargar la imagen.');
+    }
+  };
+
+  const openReceipt = () => {
+    setReceiptError(null);
+    setOrdersError(null);
+    setActiveModal('receipt');
   };
 
   const openOrderDetails = (order: DeliveryOrder) => {
@@ -507,12 +546,12 @@ export default function RepartidorDashboard() {
                     !canCompleteSelected && { opacity: 0.7 },
                     pressed && canCompleteSelected && styles.buttonPressed,
                   ]}
-                  onPress={handleCompleteOrder}
+                  onPress={openReceipt}
                   disabled={!canCompleteSelected}
                   accessibilityRole="button"
                   accessibilityState={{ disabled: !canCompleteSelected }}>
                   <Text style={[styles.startButtonText, { color: canCompleteSelected ? palette.text : palette.secondary }]}>
-                    {isCompletingOrder ? 'Guardando...' : etaSeconds > 0 ? 'Entrega en curso' : '✓  Pedido completado'}
+                    {etaSeconds > 0 ? 'Entrega en curso' : '✓  Entregar pedido'}
                   </Text>
                 </Pressable>
               ) : (
@@ -543,6 +582,130 @@ export default function RepartidorDashboard() {
         </Modal>
 
         <Modal
+          visible={activeModal === 'receipt'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal('orderDetails')}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: palette.text }]}>Entregar pedido</Text>
+                  <Text style={[styles.startSubtitle, { color: palette.secondary }]}>
+                    Carga el comprobante de la compra
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setActiveModal('orderDetails')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
+              <ScrollView
+                style={styles.orderDetailScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                {activeOrder && (
+                  <View style={[
+                    styles.startOrderSummary,
+                    { backgroundColor: palette.background, borderColor: palette.border },
+                  ]}>
+                    <Text style={[styles.queueOrderCode, { color: palette.text }]}>Pedido #{activeOrder.codigo}</Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMERCIO DE ORIGEN</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                      {activeOrder.comercioOrigen ?? 'Comercio de origen'}
+                    </Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>{activeOrder.destinatario}</Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ENTREGA</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>{activeOrder.destino}</Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>CONTACTO</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>{activeOrder.contacto}</Text>
+                  </View>
+                )}
+
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMPROBANTE / FACTURA</Text>
+                <View style={[styles.receiptBox, { backgroundColor: palette.background, borderColor: palette.border }]}>
+                  {receiptUri ? (
+                    <Image
+                      source={{ uri: receiptUri }}
+                      style={styles.receiptImage}
+                      resizeMode="contain"
+                      accessibilityLabel="Comprobante cargado"
+                    />
+                  ) : (
+                    <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
+                      Aún no se cargó ninguna imagen
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.receiptActions}>
+                  <Pressable
+                    style={[styles.receiptActionButton, { borderColor: palette.border }]}
+                    onPress={() => pickReceipt('library')}
+                    accessibilityRole="button">
+                    <Text style={[styles.sectionAction, { color: palette.primary }]}>
+                      {receiptUri ? 'Cambiar imagen' : 'Elegir imagen'}
+                    </Text>
+                  </Pressable>
+                  {Platform.OS !== 'web' && (
+                    <Pressable
+                      style={[styles.receiptActionButton, { borderColor: palette.border }]}
+                      onPress={() => pickReceipt('camera')}
+                      accessibilityRole="button">
+                      <Text style={[styles.sectionAction, { color: palette.primary }]}>Tomar foto</Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>MÉTODO DE PAGO</Text>
+                <TextInput
+                  style={[styles.receiptInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.background }]}
+                  value={paymentMethod}
+                  onChangeText={setPaymentMethod}
+                  placeholder="Ej: Efectivo, Transferencia"
+                  placeholderTextColor={palette.secondary}
+                />
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>PRECIO</Text>
+                <TextInput
+                  style={[styles.receiptInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.background }]}
+                  value={price}
+                  onChangeText={setPrice}
+                  placeholder="Total según la factura"
+                  placeholderTextColor={palette.secondary}
+                  keyboardType="decimal-pad"
+                />
+              </ScrollView>
+              {(receiptError || ordersError) && (
+                <Text style={styles.orderError} accessibilityRole="alert">{receiptError ?? ordersError}</Text>
+              )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.startButton,
+                  { backgroundColor: canConfirmReceipt ? '#00ffd1' : palette.border },
+                  !canConfirmReceipt && { opacity: 0.7 },
+                  pressed && canConfirmReceipt && styles.buttonPressed,
+                ]}
+                onPress={handleCompleteOrder}
+                disabled={!canConfirmReceipt}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canConfirmReceipt }}>
+                <Text style={[styles.startButtonText, { color: canConfirmReceipt ? palette.text : palette.secondary }]}>
+                  {isCompletingOrder ? 'Guardando...' : '✓  Confirmar entrega'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.cancelStartButton}
+                onPress={() => setActiveModal('orderDetails')}
+                accessibilityRole="button">
+                <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Volver</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
           visible={activeModal === 'completion'}
           transparent
           animationType="fade"
@@ -557,7 +720,7 @@ export default function RepartidorDashboard() {
               </View>
               <Text style={[styles.modalEmpty, { color: palette.secondary }]}>
                 {completedOrder
-                  ? `El pedido #${completedOrder.codigo} fue marcado como entregado. La ventana a mostrarse debería ser la de los pasos a seguir para la entrega final, junto con un comprobante fotografico. Aún no esta disponible.`
+                  ? `El pedido #${completedOrder.codigo} fue marcado como entregado.`
                   : 'El pedido fue marcado como entregado.'}
               </Text>
             </View>
