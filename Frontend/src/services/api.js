@@ -76,6 +76,11 @@ export function getPedidos() {
 }
 
 // Pedidos activos mas los ENTREGADOS que se borraron de la lista (base de los reportes).
+// URL publica de un archivo subido al backend (por ejemplo la imagen de un comprobante)
+export function getUploadUrl(path) {
+    return `${API_BASE_URL}${path}`;
+}
+
 export function getPedidosEntregados() {
     return request('/api/pedidos?incluirEntregadosBorrados=true');
 }

@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import writeExcelFile from 'write-excel-file/browser';
-import { getPedidosEntregados } from '../services/api';
+import { getPedidosEntregados, getUploadUrl } from '../services/api';
 import './CommercesSection.css';
 import './OrdersSection.css';
 import './ReportsSection.css';
 
 const REFRESH_INTERVAL = 60_000;
-
-// Datos de prueba: los pedidos todavia no guardan un monto. Cuando se audite el comprobante
-// de pago de cada entrega, el revenue saldra de `order.monto` y esta tarifa deja de usarse.
-const TEST_FEE_PER_DELIVERY = 2500;
 
 const TOP_LIMIT = 5;
 const INITIAL_VISIBLE_COUNT = 20;
@@ -69,12 +65,12 @@ function getDeliveredDate(order) {
     return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
+// El precio y el metodo de pago los carga el repartidor al entregar, desde la factura
 function getRevenue(order) {
-    return typeof order.monto === 'number' ? order.monto : TEST_FEE_PER_DELIVERY;
+    return typeof order.comprobante?.precio === 'number' ? order.comprobante.precio : 0;
 }
 
-// Una fila por entrega, la mas reciente primero. Metodo de pago y precio quedan vacios
-// hasta que se audite el comprobante de pago de cada entrega.
+// Una fila por entrega, la mas reciente primero
 function buildDeliveryRows(orders) {
     return orders
         .map((order) => {
@@ -86,8 +82,9 @@ function buildDeliveryRows(orders) {
                 origin: order.comercioOrigen ?? '',
                 destination: order.comercioDestino ?? '',
                 driver: order.repartidorNombre ?? '',
-                paymentMethod: order.metodoPago ?? '',
-                price: typeof order.monto === 'number' ? currencyFormat.format(order.monto) : '',
+                paymentMethod: order.comprobante?.metodoPago ?? '',
+                price: typeof order.comprobante?.precio === 'number' ? currencyFormat.format(order.comprobante.precio) : '',
+                receiptUrl: order.comprobante?.imagen ? getUploadUrl(order.comprobante.imagen) : '',
             };
         })
         .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
@@ -276,8 +273,68 @@ function DownloadIcon() {
     );
 }
 
+function CloseIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12" />
+            <path d="M18 6 6 18" />
+        </svg>
+    );
+}
+
+function ReceiptModal({ row, onClose }) {
+    const [imageFailed, setImageFailed] = useState(false);
+
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
+    return (
+        <div className="modal-backdrop" role="presentation" onClick={onClose}>
+            <div
+                className="edit-modal receipt-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="receipt-title"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="modal-heading">
+                    <div>
+                        <h2 id="receipt-title">Pedido {row.id.split('-')[0]}</h2>
+                        <p className="receipt-meta">
+                            {[row.dateTime, row.paymentMethod, row.price].filter(Boolean).join(' · ')}
+                        </p>
+                    </div>
+                    <button className="modal-close" type="button" onClick={onClose} aria-label="Cerrar comprobante">
+                        <CloseIcon />
+                    </button>
+                </div>
+                <div className="receipt-body">
+                    {imageFailed ? (
+                        <p className="receipt-empty" role="alert">No se pudo cargar la imagen del comprobante.</p>
+                    ) : (
+                        <img
+                            className="receipt-image"
+                            src={row.receiptUrl}
+                            alt={`Comprobante del pedido ${row.id}`}
+                            onError={() => setImageFailed(true)}
+                        />
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function DeliveriesList({ rows }) {
     const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+    const [receiptRow, setReceiptRow] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
     const [exportFailed, setExportFailed] = useState(false);
     const visibleRows = rows.slice(0, visibleCount);
@@ -325,6 +382,7 @@ function DeliveriesList({ rows }) {
                                 {DELIVERY_COLUMNS.map((column) => (
                                     <th key={column.key} scope="col">{column.label}</th>
                                 ))}
+                                <th scope="col">Comprobante</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -339,16 +397,30 @@ function DeliveriesList({ rows }) {
                                     <td data-label="Repartidor">{row.driver}</td>
                                     <td data-label="Método de pago">{row.paymentMethod}</td>
                                     <td data-label="Precio" className="order-date-cell">{row.price}</td>
+                                    <td data-label="Comprobante">
+                                        {row.receiptUrl ? (
+                                            <button
+                                                type="button"
+                                                className="report-receipt-button"
+                                                onClick={() => setReceiptRow(row)}
+                                                aria-label={`Ver comprobante del pedido ${row.id}`}
+                                            >
+                                                Ver comprobante
+                                            </button>
+                                        ) : (
+                                            <span className="report-receipt-none">Sin comprobante</span>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                             {rows.length === 0 && (
                                 <tr className="empty-results-row">
-                                    <td colSpan={DELIVERY_COLUMNS.length}>No hay pedidos entregados</td>
+                                    <td colSpan={DELIVERY_COLUMNS.length + 1}>No hay pedidos entregados</td>
                                 </tr>
                             )}
                             {rows.length > visibleCount && (
                                 <tr className="show-more-row">
-                                    <td colSpan={DELIVERY_COLUMNS.length}>
+                                    <td colSpan={DELIVERY_COLUMNS.length + 1}>
                                         <button
                                             className="show-more-button"
                                             type="button"
@@ -363,6 +435,8 @@ function DeliveriesList({ rows }) {
                     </table>
                 </div>
             </div>
+
+            {receiptRow && <ReceiptModal row={receiptRow} onClose={() => setReceiptRow(null)} />}
         </section>
     );
 }
@@ -486,9 +560,8 @@ function ReportsSection() {
                         </Chart>
 
                         <Chart
-                            title="Ingresos estimados"
-                            note={`Tarifa fija de ${currencyFormat.format(TEST_FEE_PER_DELIVERY)} por entrega hasta auditar los comprobantes de pago`}
-                            badge="Datos de prueba"
+                            title="Ingresos"
+                            note="Suma de los precios cargados en los comprobantes de entrega"
                             total={currencyFormat.format(report.totalRevenue)}
                             timeline={report.timeline}
                             valueKey="revenue"
