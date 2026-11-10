@@ -26,24 +26,31 @@ export const APP_THEMES = {
     border: '#E2E8F0',
     header: '#155dfc',
     successSurface: '#ecfdf5',
+    successText: '#047857',
+    dangerSurface: '#FEE2E2',
+    dangerText: '#B91C1C',
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
   },
   dark: {
-    primary: '#ffffff',
+    // Alineado con los tokens oscuros del admin (Frontend/src/index.css)
+    primary: '#7793f8',          // accent: legible sobre fondo oscuro (códigos, links)
     background: '#000000',
-    surface: '#4a37c3',
-    text: '#f3f4f7',
-    secondary: '#9bb0ca',
-    heading: '#7DD3FC',
-    countBadge: '#7793f8',
+    surface: '#0b0d12',
+    text: '#e9effc',
+    secondary: '#aab6ce',        // text-muted
+    heading: '#7793f8',
+    countBadge: '#2059d5',
     countBadgeText: '#ffffff',
-    textSecondary: '#040000',
-    border: '#1c63c7',
-    header: '#1D4ED8',
-    successSurface: '#0e342c',
-    backgroundElement: '#2059d5',
-    backgroundSelected: '#051933',
+    textSecondary: '#aab6ce',
+    border: '#252b38',
+    header: '#2059d5',
+    successSurface: 'rgba(16, 185, 129, 0.15)',
+    successText: '#6ee7b7',
+    dangerSurface: 'rgba(180, 35, 24, 0.2)',
+    dangerText: '#ff8a83',
+    backgroundElement: '#141820', // surface-raised
+    backgroundSelected: '#0d1b3a',
   },
 };
 

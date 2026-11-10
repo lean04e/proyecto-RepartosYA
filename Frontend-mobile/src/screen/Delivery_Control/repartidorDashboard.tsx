@@ -206,7 +206,7 @@ export default function RepartidorDashboard() {
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: palette.heading }]}>PEDIDO PENDIENTE</Text>
                 {activeOrder && (
-                  <Text style={[styles.sectionBadge, { backgroundColor: palette.successSurface, color: '#047857' }]}>
+                  <Text style={[styles.sectionBadge, { backgroundColor: palette.successSurface, color: palette.successText }]}>
                     En curso
                   </Text>
                 )}
@@ -339,8 +339,8 @@ export default function RepartidorDashboard() {
                     </View>
                     <Text style={[
                       styles.historyStatus,
-                      { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : '#FEE2E2',
-                        color: order.estado === 'ENTREGADO' ? '#047857' : '#B91C1C' },
+                      { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : palette.dangerSurface,
+                        color: order.estado === 'ENTREGADO' ? palette.successText : palette.dangerText },
                     ]}>
                       {order.estado === 'ENTREGADO' ? 'Entregado' : 'Cancelado'}
                     </Text>
