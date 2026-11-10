@@ -1,6 +1,11 @@
 const Pedido = require('../Models/Pedido'); 
 const Repartidor = require('../Models/Repartidor');
 const Comercio = require('../Models/Comercio');
+const fs = require('fs');
+const path = require('path');
+
+const EXTENSIONES_COMPROBANTE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const MAX_COMPROBANTE_BYTES = 6 * 1024 * 1024;
 
 // Función auxiliar para resolver el _id de Mongo de Repartidor
 async function resolverIdRepartidor(repartidorInput) {
@@ -266,6 +271,69 @@ const asignarRepartidor = async (req, res) => {
     }
 };
 
+// Marca el pedido como ENTREGADO guardando el comprobante (imagen), metodo de pago y precio
+const entregarPedido = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { imagenBase64, mimeType, metodoPago, precio } = req.body;
+
+        const extension = EXTENSIONES_COMPROBANTE[mimeType];
+        const precioNumero = Number(precio);
+        if (!extension) {
+            return res.status(400).json({ error: 'El comprobante debe ser una imagen JPG, PNG o WEBP' });
+        }
+        if (typeof imagenBase64 !== 'string' || !imagenBase64) {
+            return res.status(400).json({ error: 'Falta la imagen del comprobante' });
+        }
+        if (typeof metodoPago !== 'string' || !metodoPago.trim()) {
+            return res.status(400).json({ error: 'Falta el metodo de pago' });
+        }
+        if (!Number.isFinite(precioNumero) || precioNumero <= 0) {
+            return res.status(400).json({ error: 'El precio debe ser un numero mayor a 0' });
+        }
+
+        const imagen = Buffer.from(imagenBase64, 'base64');
+        if (imagen.length === 0 || imagen.length > MAX_COMPROBANTE_BYTES) {
+            return res.status(400).json({ error: 'La imagen esta vacia o supera los 6 MB' });
+        }
+
+        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { ID: id };
+        const pedido = await Pedido.findOne(query);
+        if (!pedido) {
+            return res.status(404).json({ error: 'Pedido no encontrado' });
+        }
+        if (pedido.estado === 'ENTREGADO') {
+            return res.status(409).json({ error: 'El pedido ya fue entregado' });
+        }
+
+        // El nombre del archivo sale del _id del pedido, nunca de datos del cliente
+        const carpeta = path.join(__dirname, '..', 'uploads', 'comprobantes');
+        await fs.promises.mkdir(carpeta, { recursive: true });
+        const nombreArchivo = `${pedido._id}.${extension}`;
+        await fs.promises.writeFile(path.join(carpeta, nombreArchivo), imagen);
+
+        const estadoAnterior = pedido.estado;
+        pedido.estado = 'ENTREGADO';
+        pedido.comprobante = {
+            imagen: `/uploads/comprobantes/${nombreArchivo}`,
+            metodoPago: metodoPago.trim(),
+            precio: precioNumero
+        };
+        pedido.historialEstados.push({
+            fecha: new Date().toISOString(),
+            estadoAnterior,
+            estadoNuevo: 'ENTREGADO'
+        });
+        await pedido.save();
+
+        await Comercio.findByIdAndUpdate(pedido.comercioDestino, { $inc: { cantPedidos: 1 } });
+
+        res.status(200).json({ mensaje: 'Pedido entregado exitosamente', pedido });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al registrar la entrega', detalle: error.message });
+    }
+};
+
 const desasignarRepartidor = async (req, res) => {
     try {
         const { id } = req.params;
@@ -323,6 +391,7 @@ module.exports = {
     cancelarPedido, 
     eliminarPedido, 
     asignarRepartidor, 
+    entregarPedido,
     desasignarRepartidor, 
     obtenerPedidosEntregadosPorRepartidor 
 };

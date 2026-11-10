@@ -31,6 +31,11 @@ const pedidoSchema = new mongoose.Schema({
         enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'RECHAZADO', 'CANCELADO'],
         default: 'REGISTRADO'
     },
+    comprobante: {
+        imagen: { type: String, default: null },
+        metodoPago: { type: String, default: null },
+        precio: { type: Number, default: null }
+    },
     borrado: {
         type: Boolean,
         default: false

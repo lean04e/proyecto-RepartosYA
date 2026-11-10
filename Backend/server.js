@@ -1,13 +1,15 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors'); 
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 
 // 1. MIDDLEWARES GLOBALES (Siempre van primero)
 app.use(cors()); // Habilita la conexión con el frontend (Vite)
-app.use(express.json()); // Permite que Express entienda JSON
+app.use(express.json({ limit: '10mb' })); // Permite que Express entienda JSON (10mb por las imagenes de comprobantes)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Comprobantes de entrega
 
 
 // 2. RUTAS

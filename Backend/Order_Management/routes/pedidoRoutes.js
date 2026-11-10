@@ -8,6 +8,7 @@ const {
     eliminarPedido, 
     obtenerPedidosEntregadosPorRepartidor,
     asignarRepartidor,
+    entregarPedido,
     desasignarRepartidor
 } = require('../pedidoController');
 
@@ -16,6 +17,7 @@ router.get('/', obtenerPedidos);
 router.put('/modificar/:id', modificarPedido); 
 router.put('/cancelar/:id', cancelarPedido);
 router.put('/asignar/:id', asignarRepartidor);
+router.put('/entregar/:id', entregarPedido);
 router.delete('/:id', eliminarPedido);
 router.get('/repartidor/:nombreRepartidor/entregados', obtenerPedidosEntregadosPorRepartidor);
 router.put('/desasignar/:id', desasignarRepartidor);
