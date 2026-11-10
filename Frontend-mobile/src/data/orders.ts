@@ -16,7 +16,6 @@ export type DeliveryOrder = {
   destinatario: string;
   contacto: string;
   estado: OrderStatus;
-  distancia?: number;
   fechaEstado?: string;
 };
 
@@ -43,7 +42,6 @@ export async function fetchOrders(): Promise<DeliveryOrder[]> {
     destinatario: pedido.nombreDestino || pedido.comercioDestino?.nombre || (pedido.destinatario && pedido.destinatario !== 'Consumidor Final' ? pedido.destinatario : (pedido.comercioDestino?.nombre || pedido.destinatario || 'Consumidor Final')),
     contacto: pedido.contacto || pedido.comercioDestino?.telefono || 'Sin especificar',
     estado: (pedido.estado || 'PENDIENTE').toUpperCase() as OrderStatus,
-    distancia: pedido.distancia ?? 3.0,
     fechaEstado: pedido.updatedAt || pedido.createdAt || new Date().toISOString(),
   }));
 }

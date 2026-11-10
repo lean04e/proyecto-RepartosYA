@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import {
   AppState, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View,
@@ -22,10 +22,60 @@ function formatEta(seconds: number) {
   return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
-function formatDistance(distance?: number) {
-  return typeof distance === 'number' && Number.isFinite(distance)
-    ? `${distance.toFixed(1)} km`
-    : 'Distancia sin estimar';
+type Palette = (typeof APP_THEMES)['light'];
+type Leg = 'origen' | 'destino';
+
+const LEG_STEPS: { key: Leg; label: string }[] = [
+  { key: 'origen', label: '1 · Retirar en origen' },
+  { key: 'destino', label: '2 · Entregar en destino' },
+];
+
+// Dos pasos: retirar en el comercio de origen y entregar en el destino
+function LegTracker({ leg, palette }: { leg: Leg; palette: Palette }) {
+  return (
+    <View style={styles.legTracker} accessibilityLabel={leg === 'origen' ? 'Paso 1 de 2: retirar en origen' : 'Paso 2 de 2: entregar en destino'}>
+      {LEG_STEPS.map((step) => {
+        const isCurrent = step.key === leg;
+        const isDone = step.key === 'origen' && leg === 'destino';
+        return (
+          <View key={step.key} style={styles.legStep}>
+            <View
+              style={[
+                styles.legBar,
+                { backgroundColor: isCurrent || isDone ? palette.primary : palette.border },
+                isDone && { opacity: 0.45 },
+              ]}
+            />
+            <Text style={[
+              styles.legLabel,
+              { color: isCurrent ? palette.text : palette.secondary, fontWeight: isCurrent ? '800' : '600' },
+            ]}>
+              {step.label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function LegGroup({ active, palette, children }: { active: boolean; palette: Palette; children: ReactNode }) {
+  return (
+    <View
+      style={[
+        styles.legGroup,
+        active
+          ? { backgroundColor: palette.focusSurface, borderColor: palette.primary }
+          : { borderColor: palette.border },
+      ]}>
+      {active && (
+        <Text style={[styles.legTag, { backgroundColor: palette.primary, color: palette.onPrimary }]}>
+          Rumbo actual
+        </Text>
+      )}
+      {children}
+    </View>
+  );
 }
 
 export default function RepartidorDashboard() {
@@ -66,10 +116,7 @@ export default function RepartidorDashboard() {
         || order.estado === 'EN_CAMINO' 
       )
     )
-    .sort((first, second) => (
-      (first.distancia ?? Number.POSITIVE_INFINITY) - (second.distancia ?? Number.POSITIVE_INFINITY)
-      || first.codigo.localeCompare(second.codigo)
-    ));
+    .sort((first, second) => first.codigo.localeCompare(second.codigo));
   const today = new Date().toDateString();
   const historicalOrders = courierOrders
     .filter((order) => (
@@ -94,6 +141,8 @@ export default function RepartidorDashboard() {
     : 0;
   const etaSeconds = activeOrder ? Math.max(0, DEMO_ETA_SECONDS - elapsedSeconds) : 0;
   const activeOrderId = activeOrder?.id;
+  // Primera mitad del tiempo: rumbo al comercio de origen; segunda mitad: rumbo al destino
+  const currentLeg: Leg = etaSeconds > DEMO_ETA_SECONDS / 2 ? 'origen' : 'destino';
   const canStartSelected = Boolean(
     selectedOrder
     && !activeOrder
@@ -322,14 +371,6 @@ export default function RepartidorDashboard() {
               />
             }>
             <View style={[styles.sectionCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: palette.heading }]}>PEDIDO PENDIENTE</Text>
-                {activeOrder && (
-                  <Text style={[styles.sectionBadge, { backgroundColor: palette.successSurface, color: palette.successText }]}>
-                    En curso
-                  </Text>
-                )}
-              </View>
               {isLoadingOrders ? (
                 <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>Cargando pedidos...</Text>
               ) : activeOrder ? (
@@ -343,14 +384,20 @@ export default function RepartidorDashboard() {
                     <Text style={[styles.queueOrderCode, { color: palette.text }]}>#{activeOrder.codigo}</Text>
                     <Text style={styles.etaValue}>Tiempo Restante: {formatEta(etaSeconds)}</Text>
                   </View>
-                  <Text style={[styles.queueRecipient, { color: palette.text }]}>{activeOrder.destinatario}</Text>
-                  <Text style={[styles.orderFieldValue, { color: palette.secondary }]} numberOfLines={2}>
-                    {activeOrder.destino}
+                  <LegTracker leg={currentLeg} palette={palette} />
+                  <Text style={[styles.legHeadline, { color: palette.text }]}>
+                    {etaSeconds === 0 ? 'Llegaste a ' : 'Dirigite a '}
+                    {currentLeg === 'origen' ? activeOrder.comercioOrigen : activeOrder.destinatario}
                   </Text>
-                  <View style={styles.orderCardFooter}>
-                    <Text style={[styles.queueAddress, { color: palette.secondary }]}>
-                      {formatDistance(activeOrder.distancia)}
+                  <Text style={[styles.legAddress, { color: palette.secondary }]} numberOfLines={2}>
+                    {currentLeg === 'origen' ? activeOrder.origen : activeOrder.destino}
+                  </Text>
+                  {currentLeg === 'origen' && (
+                    <Text style={[styles.legNext, { color: palette.secondary }]} numberOfLines={2}>
+                      Después: {activeOrder.destinatario} · {activeOrder.destino}
                     </Text>
+                  )}
+                  <View style={[styles.orderCardFooter, { justifyContent: 'flex-end' }]}>
                     <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
                   </View>
                 </View>
@@ -397,9 +444,6 @@ export default function RepartidorDashboard() {
                         </Text>
                       </View>
                       <View style={styles.queueCardTrailing}>
-                        <Text style={[styles.distanceBadge, { color: palette.primary, borderColor: palette.border }]}>
-                          {formatDistance(order.distancia)}
-                        </Text>
                       <Text style={[styles.queueChevron, { color: index === 0 ? palette.primary : palette.secondary }]}>
                         ›
                       </Text>
@@ -523,12 +567,10 @@ export default function RepartidorDashboard() {
             <View style={[styles.startDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={[styles.modalTitle, { color: palette.text }]}>
-                    {isSelectedActiveOrder ? 'Pedido pendiente' : 'Detalle del pedido'}
-                  </Text>
-                  <Text style={[styles.startSubtitle, { color: palette.secondary }]}>
-                    {isSelectedActiveOrder ? 'Entrega en curso' : 'Cola de reparto'}
-                  </Text>
+                  <Text style={[styles.modalTitle, { color: palette.text }]}>Detalle del pedido</Text>
+                  {!isSelectedActiveOrder && (
+                    <Text style={[styles.startSubtitle, { color: palette.secondary }]}>Cola de reparto</Text>
+                  )}
                 </View>
                 <Pressable
                   onPress={() => setActiveModal(null)}
@@ -550,53 +592,27 @@ export default function RepartidorDashboard() {
                         <Text style={[styles.queueOrderCode, { color: palette.text }]}>
                           Pedido #{selectedOrder.codigo}
                         </Text>
-                        <Text style={[styles.distanceBadge, { color: palette.primary, borderColor: palette.border }]}>
-                          {formatDistance(selectedOrder.distancia)}
+                        {isSelectedActiveOrder && (
+                          <Text style={styles.etaValue}>Tiempo Restante: {formatEta(etaSeconds)}</Text>
+                        )}
+                      </View>
+                      {isSelectedActiveOrder && <LegTracker leg={currentLeg} palette={palette} />}
+                      <LegGroup active={isSelectedActiveOrder && currentLeg === 'origen'} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                          {selectedOrder.comercioOrigen ?? 'Comercio de origen'}
                         </Text>
-                      </View>
-                      {isSelectedActiveOrder && (
-                        <Text style={[styles.etaValue, styles.detailEta]}>Tiempo Restante: {formatEta(etaSeconds)}</Text>
-                      )}
-                      <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMERCIO DE ORIGEN</Text>
-                      <Text style={[styles.orderFieldValue, { color: palette.text }]}>
-                        {selectedOrder.comercioOrigen ?? 'Comercio de origen'}
-                      </Text>
-                      <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ORIGEN</Text>
-                      <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.origen}</Text>
-                      <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
-                      <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.destinatario}</Text>
-                      <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ENTREGA</Text>
-                      <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.destino}</Text>
-                      <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>CONTACTO</Text>
-                      <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.contacto}</Text>
-                    </View>
-
-                    <Text style={[styles.orderFieldLabel, styles.mapSectionLabel, { color: palette.secondary }]}>
-                      RUTA SUGERIDA (ESQUEMÁTICA)
-                    </Text>
-                    <View
-                      style={[styles.mapPreview, { backgroundColor: isDarkMode ? '#435347' : '#DCE8D5' }]}
-                      accessibilityLabel={`Ruta sugerida de ${selectedOrder.origen} a ${selectedOrder.destino}`}>
-                      <View style={styles.mapRoadHorizontal} />
-                      <View style={styles.mapRoadVertical} />
-                      <View style={styles.mapRoadDiagonal} />
-                      <View style={styles.mapRouteFirst} />
-                      <View style={styles.mapRouteSecond} />
-                      <View style={styles.mapRouteThird} />
-                      <View style={styles.mapOriginMarker}>
-                        <Text style={styles.mapMarkerDot}>●</Text>
-                        <Text style={styles.mapMarkerLabel}>ORIGEN</Text>
-                      </View>
-                      <View style={styles.mapDestinationMarker}>
-                        <Text style={[styles.mapMarkerDot, styles.mapDestinationDot]}>●</Text>
-                        <Text style={styles.mapMarkerLabel}>DESTINO</Text>
-                      </View>
-                      <View style={styles.mapAddressBadge}>
-                        <Text style={styles.mapAddressLabel}>DISTANCIA ESTIMADA</Text>
-                        <Text style={styles.mapAddress}>
-                          {formatDistance(selectedOrder.distancia)} · Ruta ilustrativa
-                        </Text>
-                      </View>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.origen}</Text>
+                      </LegGroup>
+                      <LegGroup active={isSelectedActiveOrder && currentLeg === 'destino'} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.destinatario}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ENTREGA</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.destino}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>CONTACTO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.contacto}</Text>
+                      </LegGroup>
                     </View>
                   </>
                 )}
@@ -612,7 +628,7 @@ export default function RepartidorDashboard() {
                 <View style={styles.startWarning}>
                   <Text style={styles.startWarningText}>
                     {queuedOrders[0]
-                      ? `Primero debes completar el pedido #${queuedOrders[0].codigo} (${formatDistance(queuedOrders[0].distancia)}).`
+                      ? `Primero debes completar el pedido #${queuedOrders[0].codigo}.`
                       : 'Este pedido ya no está en la cola.'}
                   </Text>
                 </View>
