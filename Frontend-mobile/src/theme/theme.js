@@ -503,6 +503,45 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
   },
+  deliveredDialog: {
+    maxHeight: '94%',
+  },
+  deliveredScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  deliveredHeader: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  deliveredBanner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  deliveredStatus: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  deliveredDate: {
+    fontSize: 14,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  deliveredPrice: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  historyTrailing: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   historyStatus: {
     overflow: 'hidden',
     paddingHorizontal: 9,

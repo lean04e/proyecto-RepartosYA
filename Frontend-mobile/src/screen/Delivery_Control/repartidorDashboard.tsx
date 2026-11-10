@@ -11,7 +11,7 @@ import { deliverOrder, fetchOrders, getOrders, updateOrderStatus, type DeliveryO
 import { useAppTheme } from '../../hooks/app-theme';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
-type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | null;
+type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | 'deliveredDetail' | null;
 const DEMO_ETA_SECONDS = 30;
 const MAX_VISIBLE_ORDERS = 4;
 const POLL_INTERVAL_MS = 10000;
@@ -96,6 +96,8 @@ export default function RepartidorDashboard() {
   const [isStartingOrder, setIsStartingOrder] = useState(false);
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deliveredOrder, setDeliveredOrder] = useState<DeliveryOrder | null>(null);
+  const [receiptImageFailed, setReceiptImageFailed] = useState(false);
   const isBusyRef = useRef(false);
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
   const [receiptData, setReceiptData] = useState<{ base64: string; mimeType: string } | null>(null);
@@ -335,6 +337,12 @@ export default function RepartidorDashboard() {
     setActiveModal('receipt');
   };
 
+  const openDeliveredDetail = (order: DeliveryOrder) => {
+    setDeliveredOrder(order);
+    setReceiptImageFailed(false);
+    setActiveModal('deliveredDetail');
+  };
+
   const openOrderDetails = (order: DeliveryOrder) => {
     setSelectedOrder(order);
     setOrdersError(null);
@@ -488,9 +496,19 @@ export default function RepartidorDashboard() {
                 <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>Cargando pedidos...</Text>
               ) : visibleHistory.length > 0 ? (
                 visibleHistory.map((order) => (
-                  <View
+                  <Pressable
                     key={order.id}
-                    style={[styles.historyRow, { borderBottomColor: palette.border }]}>
+                    style={({ pressed }) => [
+                      styles.historyRow,
+                      { borderBottomColor: palette.border },
+                      pressed && styles.buttonPressed,
+                    ]}
+                    disabled={order.estado !== 'ENTREGADO'}
+                    onPress={() => openDeliveredDetail(order)}
+                    accessibilityRole={order.estado === 'ENTREGADO' ? 'button' : undefined}
+                    accessibilityLabel={
+                      order.estado === 'ENTREGADO' ? `Ver detalle del pedido ${order.codigo}` : undefined
+                    }>
                     <View style={styles.queueCardText}>
                       <Text style={[styles.queueOrderCode, { color: palette.text }]}>#{order.codigo}</Text>
                       <Text style={[styles.queueRecipient, { color: palette.text }]} numberOfLines={1}>
@@ -500,14 +518,19 @@ export default function RepartidorDashboard() {
                         {order.destino}
                       </Text>
                     </View>
-                    <Text style={[
-                      styles.historyStatus,
-                      { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : palette.dangerSurface,
-                        color: order.estado === 'ENTREGADO' ? palette.successText : palette.dangerText },
-                    ]}>
-                      {order.estado === 'ENTREGADO' ? 'Entregado' : 'Cancelado'}
-                    </Text>
-                  </View>
+                    <View style={styles.historyTrailing}>
+                      <Text style={[
+                        styles.historyStatus,
+                        { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : palette.dangerSurface,
+                          color: order.estado === 'ENTREGADO' ? palette.successText : palette.dangerText },
+                      ]}>
+                        {order.estado === 'ENTREGADO' ? 'Entregado' : 'Cancelado'}
+                      </Text>
+                      {order.estado === 'ENTREGADO' && (
+                        <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
+                      )}
+                    </View>
+                  </Pressable>
                 ))
               ) : (
                 <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
@@ -797,6 +820,102 @@ export default function RepartidorDashboard() {
                 accessibilityRole="button">
                 <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Volver</Text>
               </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={activeModal === 'deliveredDetail'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal(null)}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, styles.deliveredDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={[styles.modalHeader, styles.deliveredHeader]}>
+                <View style={[styles.deliveredBanner, { backgroundColor: palette.successSurface }]}>
+                  <Text style={[styles.deliveredStatus, { color: palette.successText }]}>✓  Entregado</Text>
+                  {deliveredOrder?.fechaEstado && (
+                    <Text style={[styles.deliveredDate, { color: palette.successText }]}>
+                      {new Date(deliveredOrder.fechaEstado).toLocaleDateString('es-AR')}
+                      {' · '}
+                      {new Date(deliveredOrder.fechaEstado).toLocaleTimeString('es-AR', {
+                        hour: '2-digit', minute: '2-digit',
+                      })} hs
+                    </Text>
+                  )}
+                </View>
+                <Pressable
+                  onPress={() => setActiveModal(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
+              <ScrollView style={styles.deliveredScroll} showsVerticalScrollIndicator={false}>
+                {deliveredOrder && (
+                  <>
+                    <View style={[
+                      styles.startOrderSummary,
+                      { backgroundColor: palette.background, borderColor: palette.border },
+                    ]}>
+                      <Text style={[styles.queueOrderCode, { color: palette.text }]}>
+                        Pedido #{deliveredOrder.codigo}
+                      </Text>
+                      <LegGroup active={false} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                          {deliveredOrder.comercioOrigen ?? 'Comercio de origen'}
+                        </Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.origen}</Text>
+                      </LegGroup>
+                      <LegGroup active={false} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.destinatario}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ENTREGA</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.destino}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>CONTACTO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.contacto}</Text>
+                      </LegGroup>
+                      <LegGroup active={false} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>MÉTODO DE PAGO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                          {deliveredOrder.metodoPago ?? 'Sin registrar'}
+                        </Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>PRECIO</Text>
+                        <Text style={[
+                          styles.orderFieldValue,
+                          styles.deliveredPrice,
+                          { color: typeof deliveredOrder.precio === 'number' ? palette.successText : palette.text },
+                        ]}>
+                          {typeof deliveredOrder.precio === 'number'
+                            ? `$ ${deliveredOrder.precio.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : 'Sin registrar'}
+                        </Text>
+                      </LegGroup>
+                    </View>
+
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMPROBANTE / FACTURA</Text>
+                    <View style={[styles.receiptBox, { backgroundColor: palette.background, borderColor: palette.border }]}>
+                      {deliveredOrder.comprobanteUrl && !receiptImageFailed ? (
+                        <Image
+                          source={{ uri: deliveredOrder.comprobanteUrl }}
+                          style={styles.receiptImage}
+                          resizeMode="contain"
+                          onError={() => setReceiptImageFailed(true)}
+                          accessibilityLabel="Comprobante de la entrega"
+                        />
+                      ) : (
+                        <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
+                          {deliveredOrder.comprobanteUrl
+                            ? 'No se pudo cargar la imagen del comprobante.'
+                            : 'Este pedido no tiene comprobante cargado.'}
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                )}
+              </ScrollView>
             </View>
           </View>
         </Modal>

@@ -17,6 +17,9 @@ export type DeliveryOrder = {
   contacto: string;
   estado: OrderStatus;
   fechaEstado?: string;
+  metodoPago?: string;
+  precio?: number;
+  comprobanteUrl?: string;
 };
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
@@ -43,6 +46,9 @@ export async function fetchOrders(): Promise<DeliveryOrder[]> {
     contacto: pedido.contacto || pedido.comercioDestino?.telefono || 'Sin especificar',
     estado: (pedido.estado || 'PENDIENTE').toUpperCase() as OrderStatus,
     fechaEstado: pedido.updatedAt || pedido.createdAt || new Date().toISOString(),
+    metodoPago: pedido.comprobante?.metodoPago ?? undefined,
+    precio: pedido.comprobante?.precio ?? undefined,
+    comprobanteUrl: pedido.comprobante?.imagen ? `${API_URL}${pedido.comprobante.imagen}` : undefined,
   }));
 }
 
