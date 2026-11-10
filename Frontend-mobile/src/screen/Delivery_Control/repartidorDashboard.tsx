@@ -1,17 +1,20 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  AppState, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { deliverOrder, getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
+import { deliverOrder, fetchOrders, getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
 import { useAppTheme } from '../../hooks/app-theme';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
 type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | null;
 const DEMO_ETA_SECONDS = 30;
 const MAX_VISIBLE_ORDERS = 4;
+const POLL_INTERVAL_MS = 10000;
 
 function formatEta(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -42,6 +45,8 @@ export default function RepartidorDashboard() {
   const [completedOrder, setCompletedOrder] = useState<DeliveryOrder | null>(null);
   const [isStartingOrder, setIsStartingOrder] = useState(false);
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isBusyRef = useRef(false);
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
   const [receiptData, setReceiptData] = useState<{ base64: string; mimeType: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -140,6 +145,59 @@ export default function RepartidorDashboard() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    isBusyRef.current = isStartingOrder || isCompletingOrder;
+  }, [isStartingOrder, isCompletingOrder]);
+
+  // Refresco automatico: cada 10 s mientras la app esta en primer plano y al volver a ella.
+  // Se omite mientras se inicia/completa un pedido para no pisar ese cambio con datos viejos.
+  useEffect(() => {
+    let isMounted = true;
+
+    const refresh = async () => {
+      if (isBusyRef.current) {
+        return;
+      }
+      try {
+        const freshOrders = await fetchOrders();
+        if (isMounted && !isBusyRef.current) {
+          setOrders(freshOrders);
+        }
+      } catch {
+        // Falla silenciosa: se conserva la lista actual y se reintenta en el proximo ciclo
+      }
+    };
+
+    const intervalId = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        refresh();
+      }
+    }, POLL_INTERVAL_MS);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        refresh();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      subscription.remove();
+    };
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      setOrders(await fetchOrders());
+      setOrdersError(null);
+    } catch (error) {
+      setOrdersError(error instanceof Error ? error.message : 'No se pudieron actualizar los pedidos.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleStartOrder = async () => {
     if (
@@ -254,7 +312,15 @@ export default function RepartidorDashboard() {
         <View style={styles.content}>
           <ScrollView
             contentContainerStyle={styles.dashboardContent}
-            showsVerticalScrollIndicator={false}>
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={palette.primary}
+                colors={[palette.primary]}
+              />
+            }>
             <View style={[styles.sectionCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: palette.heading }]}>PEDIDO PENDIENTE</Text>
