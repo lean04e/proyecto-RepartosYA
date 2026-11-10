@@ -73,3 +73,28 @@ export async function updateOrderStatus(
     throw error;
   }
 }
+
+export type DeliveryReceipt = {
+  imagenBase64: string;
+  mimeType: string;
+  metodoPago: string;
+  precio: number;
+};
+
+export async function deliverOrder(
+  orderId: string,
+  receipt: DeliveryReceipt,
+): Promise<DeliveryOrder[]> {
+  const response = await fetch(`${API_URL}/api/pedidos/entregar/${orderId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(receipt),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? 'No se pudo registrar la entrega.');
+  }
+
+  return await getOrders();
+}

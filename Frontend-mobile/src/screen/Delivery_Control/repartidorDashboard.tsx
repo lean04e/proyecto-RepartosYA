@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
+import { deliverOrder, getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
 import { useAppTheme } from '../../hooks/app-theme';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
@@ -43,6 +43,7 @@ export default function RepartidorDashboard() {
   const [isStartingOrder, setIsStartingOrder] = useState(false);
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
+  const [receiptData, setReceiptData] = useState<{ base64: string; mimeType: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [price, setPrice] = useState('');
   const [receiptError, setReceiptError] = useState<string | null>(null);
@@ -96,8 +97,9 @@ export default function RepartidorDashboard() {
   );
   const isSelectedActiveOrder = Boolean(activeOrder && selectedOrder?.id === activeOrder.id);
   const canCompleteSelected = isSelectedActiveOrder && etaSeconds === 0 && !isCompletingOrder;
+  const parsedPrice = Number(price.replace(',', '.'));
   const canConfirmReceipt = Boolean(
-    receiptUri && paymentMethod.trim() && price.trim() && !isCompletingOrder,
+    receiptData && paymentMethod.trim() && parsedPrice > 0 && !isCompletingOrder,
   );
   const visibleHistory = showAllHistory
     ? historicalOrders
@@ -164,17 +166,23 @@ export default function RepartidorDashboard() {
   };
 
   const handleCompleteOrder = async () => {
-    if (!activeOrder || etaSeconds > 0 || isCompletingOrder) {
+    if (!activeOrder || etaSeconds > 0 || isCompletingOrder || !receiptData || !(parsedPrice > 0)) {
       return;
     }
 
     try {
       setIsCompletingOrder(true);
       setCompletedOrder(activeOrder);
-      const updatedOrders = await updateOrderStatus(activeOrder.id, 'ENTREGADO');
+      const updatedOrders = await deliverOrder(activeOrder.id, {
+        imagenBase64: receiptData.base64,
+        mimeType: receiptData.mimeType,
+        metodoPago: paymentMethod.trim(),
+        precio: parsedPrice,
+      });
       setOrders(updatedOrders);
       setOrdersError(null);
       setReceiptUri(null);
+      setReceiptData(null);
       setPaymentMethod('');
       setPrice('');
       setActiveModal('completion');
@@ -196,12 +204,18 @@ export default function RepartidorDashboard() {
         setReceiptError('Necesitas dar permiso para cargar el comprobante.');
         return;
       }
-      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7, base64: true };
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled) {
-        setReceiptUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        if (!asset.base64) {
+          setReceiptError('No se pudo leer la imagen.');
+          return;
+        }
+        setReceiptUri(asset.uri);
+        setReceiptData({ base64: asset.base64, mimeType: asset.mimeType ?? 'image/jpeg' });
       }
     } catch {
       setReceiptError('No se pudo cargar la imagen.');
