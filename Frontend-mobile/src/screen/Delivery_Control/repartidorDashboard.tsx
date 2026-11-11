@@ -30,7 +30,7 @@ const LEG_STEPS: { key: Leg; label: string }[] = [
   { key: 'destino', label: '2 · Entregar en destino' },
 ];
 
-// Dos pasos: retirar en el comercio de origen y entregar en el destino
+// Dos pasos: retirar en el depósito de origen y entregar en el destino
 function LegTracker({ leg, palette }: { leg: Leg; palette: Palette }) {
   return (
     <View style={styles.legTracker} accessibilityLabel={leg === 'origen' ? 'Paso 1 de 2: retirar en origen' : 'Paso 2 de 2: entregar en destino'}>
@@ -143,7 +143,7 @@ export default function RepartidorDashboard() {
     : 0;
   const etaSeconds = activeOrder ? Math.max(0, DEMO_ETA_SECONDS - elapsedSeconds) : 0;
   const activeOrderId = activeOrder?.id;
-  // Primera mitad del tiempo: rumbo al comercio de origen; segunda mitad: rumbo al destino
+  // Primera mitad del tiempo: rumbo al depósito de origen; segunda mitad: rumbo al destino
   const currentLeg: Leg = etaSeconds > DEMO_ETA_SECONDS / 2 ? 'origen' : 'destino';
   const canStartSelected = Boolean(
     selectedOrder
@@ -621,9 +621,9 @@ export default function RepartidorDashboard() {
                       </View>
                       {isSelectedActiveOrder && <LegTracker leg={currentLeg} palette={palette} />}
                       <LegGroup active={isSelectedActiveOrder && currentLeg === 'origen'} palette={palette}>
-                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>DEPÓSITO DE ORIGEN</Text>
                         <Text style={[styles.orderFieldValue, { color: palette.text }]}>
-                          {selectedOrder.comercioOrigen ?? 'Comercio de origen'}
+                          {selectedOrder.comercioOrigen ?? 'Depósito de origen'}
                         </Text>
                         <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ORIGEN</Text>
                         <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.origen}</Text>
@@ -731,9 +731,9 @@ export default function RepartidorDashboard() {
                     { backgroundColor: palette.background, borderColor: palette.border },
                   ]}>
                     <Text style={[styles.queueOrderCode, { color: palette.text }]}>Pedido #{activeOrder.codigo}</Text>
-                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMERCIO DE ORIGEN</Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DEPÓSITO DE ORIGEN</Text>
                     <Text style={[styles.orderFieldValue, { color: palette.text }]}>
-                      {activeOrder.comercioOrigen ?? 'Comercio de origen'}
+                      {activeOrder.comercioOrigen ?? 'Depósito de origen'}
                     </Text>
                     <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
                     <Text style={[styles.orderFieldValue, { color: palette.text }]}>{activeOrder.destinatario}</Text>
@@ -862,9 +862,9 @@ export default function RepartidorDashboard() {
                         Pedido #{deliveredOrder.codigo}
                       </Text>
                       <LegGroup active={false} palette={palette}>
-                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>DEPÓSITO DE ORIGEN</Text>
                         <Text style={[styles.orderFieldValue, { color: palette.text }]}>
-                          {deliveredOrder.comercioOrigen ?? 'Comercio de origen'}
+                          {deliveredOrder.comercioOrigen ?? 'Depósito de origen'}
                         </Text>
                         <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ORIGEN</Text>
                         <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.origen}</Text>

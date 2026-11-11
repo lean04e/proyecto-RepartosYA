@@ -35,8 +35,8 @@ export async function fetchOrders(): Promise<DeliveryOrder[]> {
     id: pedido._id || pedido.ID,
     codigo: pedido.codigo || String(pedido._id || '').slice(0, 8),
     repartidorId: pedido.repartidor?._id ? String(pedido.repartidor._id) : String(pedido.repartidor || ''),
-    // Nombre del comercio de origen
-    comercioOrigen: pedido.comercioOrigen || pedido.comercio?.nombre || 'Comercio no especificado',
+    // Nombre del depósito de origen
+    comercioOrigen: pedido.comercioOrigen || pedido.comercio?.nombre || 'Depósito no especificado',
     // Dirección física real de origen
     origen: pedido.direccionOrigen || pedido.comercio?.direccion || pedido.origen || 'Dirección no especificada',
     // Dirección física real de entrega

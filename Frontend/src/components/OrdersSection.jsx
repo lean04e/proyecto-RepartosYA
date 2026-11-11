@@ -86,6 +86,7 @@ function OrdersSection({ orders, onGoToCommerces, openOrderId, onOrderOpened, ad
 
   // --- NUEVO: Estados para la Base de Datos ---
   const [dbComercios, setDbComercios] = useState([]);
+  const [dbDepositos, setDbDepositos] = useState([]);
   const [editErrors, setEditErrors] = useState({})
 
 useEffect(() => {
@@ -93,6 +94,8 @@ useEffect(() => {
       try {
         const resCom = await fetch('http://localhost:3001/comercios');
         if (resCom.ok) setDbComercios(await resCom.json());
+        const resDep = await fetch('http://localhost:3001/api/depositos');
+        if (resDep.ok) setDbDepositos(await resDep.json());
 
         // Traer Pedidos desde el backend
         const resPed = await fetch('http://localhost:3001/api/pedidos');
@@ -190,6 +193,7 @@ try {
   }
 
   const commerceOptions = dbComercios.map((comercio) => comercio.nombre);
+  const depositOptions = dbDepositos.map((deposito) => deposito.nombre);
   const detailOrder = orderList.find((order) => order.id === detailOrderId)
 
   // Abre el detalle de un pedido pedido desde afuera (tarjetas del dashboard)
@@ -203,6 +207,7 @@ try {
   }, [openOrderId, onOrderOpened])
   const findCommerce = (name) => {
     const commerce = dbComercios.find((comercio) => comercio.nombre === name)
+      || dbDepositos.find((deposito) => deposito.nombre === name)
     return commerce && { address: commerce.direccion, phone: commerce.telefono }
   }
 
@@ -262,13 +267,13 @@ try {
 
     const handleConfirmEdit = async () => {
     try {
-      const selectedCommerceOrigin = dbComercios.find(c => c.nombre === formData.origin);
+      const selectedDepositOrigin = dbDepositos.find(d => d.nombre === formData.origin);
       const selectedCommerceDest = dbComercios.find(c => c.nombre === formData.destination);
       const response = await fetch(`http://localhost:3001/api/pedidos/modificar/${editingOrder.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          comercioOrigen: selectedCommerceOrigin?._id || formData.origin,
+          depositoOrigen: selectedDepositOrigin?._id || formData.origin,
           comercioDestino: selectedCommerceDest?._id || formData.destination
         })
       });
@@ -336,13 +341,13 @@ const handleAddOrder = async (event) => {
 
     // Escenario 1: Creación de pedido exitoso
     try {
-      const selectedCommerceOrigin = dbComercios.find(c => c.nombre === newOrderData.origin);
+      const selectedDepositOrigin = dbDepositos.find(d => d.nombre === newOrderData.origin);
       const selectedCommerceDest = dbComercios.find(c => c.nombre === newOrderData.destination);
       const response = await fetch('http://localhost:3001/api/pedidos/cargar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          comercioOrigen: selectedCommerceOrigin?._id || newOrderData.origin,
+          depositoOrigen: selectedDepositOrigin?._id || newOrderData.origin,
           comercioDestino: selectedCommerceDest?._id || newOrderData.destination
         })
       });
@@ -603,6 +608,7 @@ const handleAddOrder = async (event) => {
             formData={formData}
             formErrors={editErrors}
             commerceOptions={commerceOptions}
+            depositOptions={depositOptions}
             onChange={handleFieldChange}
             onClose={handleCloseEdit}
             onSubmit={handleApplyEdit}
@@ -614,6 +620,7 @@ const handleAddOrder = async (event) => {
           formData={newOrderData}
           formErrors={newOrderErrors}
           commerceOptions={commerceOptions}
+          depositOptions={depositOptions}
           onChange={handleNewOrderFieldChange}
           onClose={handleCloseAdd}
           onSubmit={handleAddOrder}
@@ -787,6 +794,7 @@ function EditOrderModal({
   formData,
   formErrors= {},
   commerceOptions,
+  depositOptions,
   onChange,
   onClose,
   onSubmit,
@@ -832,21 +840,12 @@ function EditOrderModal({
                   className={formErrors.origin ? 'has-error' : ''}
                 >
                   <option value="" disabled hidden />
-                  {withCurrent(commerceOptions, formData.origin).map((name) => (
+                  {withCurrent(depositOptions, formData.origin).map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
                   ))}
                 </select>
-                <button
-                  className="field-link-button"
-                  type="button"
-                  onClick={onGoToCommerces}
-                  aria-label="Ir a comercios y cargar un comercio"
-                  title="Ir a comercios y cargar un comercio"
-                >
-                  <ExternalLinkIcon />
-                </button>
               </div>
               {/* ACÁ AGREGAMOS EL MENSAJE DE ERROR */}
               {formErrors.origin && (
@@ -910,6 +909,7 @@ function AddOrderModal({
   formData,
   formErrors,
   commerceOptions,
+  depositOptions,
   onChange,
   onClose,
   onSubmit,
@@ -957,21 +957,12 @@ function AddOrderModal({
                   aria-invalid={formErrors.origin || undefined}
                 >
                   <option value="" disabled hidden />
-                  {commerceOptions.map((name) => (
+                  {depositOptions.map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
                   ))}
                 </select>
-                <button
-                  className="field-link-button"
-                  type="button"
-                  onClick={onGoToCommerces}
-                  aria-label="Ir a comercios y cargar un comercio"
-                  title="Ir a comercios y cargar un comercio"
-                >
-                  <ExternalLinkIcon />
-                </button>
               </div>
                 {formErrors.origin && (
                 <small className="field-error" style={{ color: '#d32f2f', display: 'block', marginTop: '4px' }} role="alert">
