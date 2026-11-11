@@ -10,7 +10,12 @@ const pedidoSchema = new mongoose.Schema({
     comercioOrigen: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Comercio',
-        required: true
+        required: false // pedidos viejos: el origen era un comercio
+    },
+    depositoOrigen: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Deposito',
+        required: false
     },
     comercioDestino: {
         type: mongoose.Schema.Types.ObjectId,

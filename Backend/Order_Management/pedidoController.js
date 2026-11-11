@@ -1,6 +1,7 @@
 const Pedido = require('../Models/Pedido'); 
 const Repartidor = require('../Models/Repartidor');
 const Comercio = require('../Models/Comercio');
+const Deposito = require('../Models/Deposito');
 const fs = require('fs');
 const path = require('path');
 
@@ -59,23 +60,33 @@ async function obtenerComercio(id) {
     }).lean();
 }
 
+// Busca un deposito por _id o por nombre
+async function obtenerDeposito(id) {
+    if (!id) return null;
+    const input = String(id).trim();
+    if (input.match(/^[0-9a-fA-F]{24}$/)) {
+        return await Deposito.findById(input).lean();
+    }
+    return await Deposito.findOne({ nombre: new RegExp(`^${input}$`, 'i') }).lean();
+}
+
 const crearPedido = async (req, res) => {
     try {
-        const { origen, destino, comercioOrigen, comercioDestino, repartidor } = req.body;
+        const { origen, destino, depositoOrigen, comercioDestino, repartidor } = req.body;
 
         const repartidorId = await resolverIdRepartidor(repartidor);
 
         // Obtenemos los datos de ambos comercios usando la función obtenerComercio
-        const comercioOrigenDoc = await obtenerComercio(comercioOrigen || origen);
+        const depositoOrigenDoc = await obtenerDeposito(depositoOrigen || origen);
         const comercioDestinoDoc = await obtenerComercio(comercioDestino || destino);
 
-        if (!comercioOrigenDoc || !comercioDestinoDoc) {
-            return res.status(400).json({ error: 'Comercio de origen o destino inválido' });
+        if (!depositoOrigenDoc || !comercioDestinoDoc) {
+            return res.status(400).json({ error: 'Depósito de origen o comercio de destino inválido' });
         }
 
         // Guardamos ÚNICAMENTE las 2 IDs de los comercios en el pedido (cero datos duplicados)
         const nuevoPedido = new Pedido({
-            comercioOrigen: comercioOrigenDoc._id,
+            depositoOrigen: depositoOrigenDoc._id,
             comercioDestino: comercioDestinoDoc._id,
             repartidor: repartidorId,
             historialEstados: [{
@@ -104,6 +115,7 @@ const obtenerPedidos = async (req, res) => {
         // Traemos los pedidos de la base de datos
         const pedidos = await Pedido.find(filtro)
             .populate('comercioOrigen')
+            .populate('depositoOrigen')
             .populate('comercioDestino')
             .sort({ _id: -1 })
             .lean();
@@ -117,9 +129,12 @@ const obtenerPedidos = async (req, res) => {
         );
 
         const pedidosFormateados = await Promise.all(pedidos.map(async (p) => {
-            const origenDoc = p.comercioOrigen && p.comercioOrigen.nombre
-                ? p.comercioOrigen
-                : await obtenerComercio(p.comercioOrigen || p.origen);
+            // El origen es un deposito; los pedidos viejos conservan su comercio de origen
+            const origenDoc = p.depositoOrigen && p.depositoOrigen.nombre
+                ? p.depositoOrigen
+                : (p.comercioOrigen && p.comercioOrigen.nombre
+                    ? p.comercioOrigen
+                    : await obtenerComercio(p.comercioOrigen || p.origen));
 
             const destinoDoc = p.comercioDestino && p.comercioDestino.nombre
                 ? p.comercioDestino
@@ -129,7 +144,8 @@ const obtenerPedidos = async (req, res) => {
                 ...p,
                 repartidorNombre: nombresRepartidores.get(String(p.repartidor)) || null,
                 // Datos del origen obtenidos directamente de Comercio
-                comercioOrigen: origenDoc ? origenDoc.nombre : 'Comercio no especificado',
+                comercioOrigen: origenDoc ? origenDoc.nombre : 'Origen no especificado',
+                depositoOrigen: undefined,
                 origen: origenDoc ? origenDoc.direccion : 'Dirección no especificada',
 
                 // Datos del destino obtenidos directamente de Comercio
@@ -150,14 +166,17 @@ const obtenerPedidos = async (req, res) => {
 const modificarPedido = async (req, res) => {
     try {
         const { id } = req.params;
-        const { origen, destino, comercioOrigen, comercioDestino } = req.body;
+        const { origen, destino, depositoOrigen, comercioDestino } = req.body;
 
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { ID: id };
         const updateData = {};
 
-        if (comercioOrigen || origen) {
-            const origenDoc = await obtenerComercio(comercioOrigen || origen);
-            if (origenDoc) updateData.comercioOrigen = origenDoc._id;
+        if (depositoOrigen || origen) {
+            const origenDoc = await obtenerDeposito(depositoOrigen || origen);
+            if (origenDoc) {
+                updateData.depositoOrigen = origenDoc._id;
+                updateData.comercioOrigen = null;
+            }
         }
 
         if (comercioDestino || destino) {

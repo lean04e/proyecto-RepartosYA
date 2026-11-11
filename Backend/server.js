@@ -24,6 +24,9 @@ app.use('/auth', authRoutes);
 const tradeRoutes = require('./Trade_Management/tradeRoutes');
 app.use('/comercios', tradeRoutes);
 
+// Rutas de Depositos (origenes de los pedidos)
+app.use('/api/depositos', require('./Deposit_Management/depositRoutes'));
+
 // Rutas de Pedidos 
 const pedidoRoutes = require('./Order_Management/routes/pedidoRoutes');
 app.use('/api/pedidos', pedidoRoutes);
@@ -35,7 +38,10 @@ app.get('/', (req, res) => {
 // 3. CONEXIÓN A BASE DE DATOS
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('📦 Conectado exitosamente a MongoDB Atlas en la nube ☁️'))
+  .then(async () => {
+    console.log('📦 Conectado exitosamente a MongoDB Atlas en la nube ☁️');
+    await require('./Models/Deposito').sembrarBase();
+  })
   .catch((err) => console.error('❌ Error al conectar a MongoDB:', err));
 
 // 4. INICIO DEL SERVIDOR
