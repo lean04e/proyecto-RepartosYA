@@ -209,17 +209,26 @@ const cancelarPedido = async (req, res) => {
             return res.status(404).json({ error: 'Pedido no encontrado en la base de datos' });
         }
 
+        if (pedido.estado === 'CANCELADO' || pedido.estado === 'FALLIDO') {
+            return res.status(409).json({ error: 'El pedido ya fue cancelado' });
+        }
+
+        // Cancelado: se corta antes de salir. Fallido: ya estaba en camino o entregado.
         const estadoAnterior = pedido.estado;
-        pedido.estado = 'CANCELADO';
-        
+        const estadoNuevo = ['EN_CAMINO', 'ENTREGADO'].includes(estadoAnterior) ? 'FALLIDO' : 'CANCELADO';
+        pedido.estado = estadoNuevo;
+
         pedido.historialEstados.push({
             fecha: new Date().toISOString(),
             estadoAnterior: estadoAnterior,
-            estadoNuevo: 'CANCELADO'
+            estadoNuevo
         });
 
         await pedido.save();
-        res.status(200).json({ mensaje: 'Pedido cancelado exitosamente', pedido });
+        res.status(200).json({
+            mensaje: estadoNuevo === 'FALLIDO' ? 'Pedido marcado como fallido' : 'Pedido cancelado exitosamente',
+            pedido
+        });
     } catch (error) {
         res.status(400).json({ error: 'Error al cancelar el pedido', detalle: error.message });
     }

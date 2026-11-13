@@ -122,7 +122,7 @@ export default function RepartidorDashboard() {
   const today = new Date().toDateString();
   const historicalOrders = courierOrders
     .filter((order) => (
-      (order.estado === 'CANCELADO' || order.estado === 'ENTREGADO')
+      (order.estado === 'CANCELADO' || order.estado === 'FALLIDO' || order.estado === 'ENTREGADO')
       && order.fechaEstado
       && new Date(order.fechaEstado).toDateString() === today
     ))
@@ -478,7 +478,7 @@ export default function RepartidorDashboard() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeadingGroup}>
                   <Text style={[styles.sectionTitle, { color: palette.heading }]}>
-                    ENTREGADOS / CANCELADOS
+                    ENTREGADOS / CANCELADOS / FALLIDOS
                   </Text>
                   <Text
                     style={[
@@ -524,7 +524,7 @@ export default function RepartidorDashboard() {
                         { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : palette.dangerSurface,
                           color: order.estado === 'ENTREGADO' ? palette.successText : palette.dangerText },
                       ]}>
-                        {order.estado === 'ENTREGADO' ? 'Entregado' : 'Cancelado'}
+                        {order.estado === 'ENTREGADO' ? 'Entregado' : order.estado === 'FALLIDO' ? 'Fallido' : 'Cancelado'}
                       </Text>
                       {order.estado === 'ENTREGADO' && (
                         <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
@@ -534,7 +534,7 @@ export default function RepartidorDashboard() {
                 ))
               ) : (
                 <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
-                  No hay pedidos entregados o cancelados hoy.
+                  No hay pedidos entregados, cancelados o fallidos hoy.
                 </Text>
               )}
               {historicalOrders.length > MAX_VISIBLE_ORDERS && (

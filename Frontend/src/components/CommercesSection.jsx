@@ -953,6 +953,7 @@ const ORDER_STATUS_LABELS = {
   entregado: 'Entregado',
   rechazado: 'Rechazado',
   cancelado: 'Cancelado',
+  fallido: 'Fallido',
 }
 
 function OrderStatusBadge({ status }) {
