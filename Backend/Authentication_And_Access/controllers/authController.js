@@ -1,55 +1,332 @@
-// Importamos el modelo que acabamos de simplificar
-const Admin = require('../../../models/Admin');
-const bcrypt = require('bcryptjs');
+const Admin = require('../../Models/Admin');
+const Repartidor = require('../../Models/Repartidor');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { sendRecoveryEmail } = require('../services/emailService');
 
-// Esta es la función que procesa el intento de inicio de sesión
-const loginAdmin = async (req, res) => {
+const JWT_SECRET = process.env.JWT_SECRET || 'CLAVE_SECRETA_SUPER_SEGURA';
+
+/**
+ * Autenticación de usuarios (Admin y Repartidores)
+ */
+const login = async (req, res) => {
   try {
-    // 1. Extraemos el email y la password que envió la página web
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
-    // 2. Validamos que no hayan enviado campos vacíos
-    if (!email || !password) {
-      return res.status(400).json({ mensaje: 'Debes completar el email y la contraseña' });
+    // 1. Buscamos si es un Administrador
+    let usuarioEncontrado = await Admin.findOne({
+      $or: [{ email: username }, { nombre: username }]
+    });
+    let rol = 'admin';
+
+    // 2. Si no es admin, buscamos en los Repartidores por email o legajo
+    if (!usuarioEncontrado) {
+      usuarioEncontrado = await Repartidor.findOne({
+        $or: [
+          { email: new RegExp(`^${(username || '').trim()}$`, 'i') },
+          { legajo: username }
+        ]
+      });
+      rol = 'repartidor';
     }
 
-    // 3. Buscamos en MongoDB si existe el Administrador con ese email
-    const adminEncontrado = await Admin.findOne({ email });
-
-    // Si no existe ningún admin con ese correo:
-    if (!adminEncontrado) {
-      return res.status(401).json({ mensaje: 'Credenciales incorrectas' });
+    if (!usuarioEncontrado) {
+      return res.status(401).json({ message: 'Usuario o credenciales incorrectas.' });
     }
 
-    // 4. Comparamos la contraseña tipeada con la encriptada en la BD
-    const esPasswordCorrecta = await bcrypt.compare(password, adminEncontrado.password);
-
-    // Si la contraseña no coincide:
-    if (!esPasswordCorrecta) {
-      return res.status(401).json({ mensaje: 'Credenciales incorrectas' });
+    // 3. Validar la contraseña (soporta contraseñas con hash bcrypt o texto plano)
+    let passwordValid = false;
+    try {
+      passwordValid = await bcrypt.compare(password, usuarioEncontrado.password);
+    } catch {
+      passwordValid = false;
+    }
+    if (!passwordValid) {
+      passwordValid = (password === usuarioEncontrado.password);
     }
 
-    // 5. Si todo está bien, generamos una credencial digital (Token JWT) para la sesión
+    if (!passwordValid) {
+      return res.status(401).json({ message: 'Contraseña incorrecta.' });
+    }
+
+    // 4. Generar el Token JWT
     const token = jwt.sign(
-      { id: adminEncontrado._id, email: adminEncontrado.email },
-      'CLAVE_SECRETA_DEL_SERVIDOR',
-      { expiresIn: '8h' } // Expira en 8 horas (la jornada de trabajo)
+      { id: usuarioEncontrado._id, role: rol },
+      JWT_SECRET,
+      { expiresIn: '8h' }
     );
 
-    // 6. Respondemos al Frontend confirmando el éxito y devolviendo el token
-    return res.status(200).json({
-      mensaje: '¡Bienvenido Martín!',
+    // 5. Responder al frontend
+    res.json({
       token,
-      preferenciaModoOscuro: adminEncontrado.preferenciaModoOscuro
+      user: {
+        name: usuarioEncontrado.nombre,
+        role: rol
+      }
     });
 
   } catch (error) {
-    console.error('Error en el servidor:', error);
-    return res.status(500).json({ mensaje: 'Error interno del servidor' });
+    console.error('Error en el login:', error);
+    res.status(500).json({ message: 'Error interno del servidor.' });
+  }
+};
+
+/**
+ * HISTORIA DE USUARIO: Recuperación de clave de acceso (EXCLUSIVO PARA EL MODELO ADMIN)
+ * Criterios de Aplicación:
+ * - Escenario 1: Se ingresa email -> si coincide con un Admin en la base de datos,
+ *   se genera y envía correo/enlace de recuperación con validez temporal.
+ * - Escenario 2: Se ingresa email -> si NO coincide con la base de datos de Admin,
+ *   NO se envía ningún mail pero NO se le hace saber al admin/usuario (retorna 200 genérico).
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const inputIdentifier = req.body.email || req.body.identifier;
+
+    if (!inputIdentifier || !inputIdentifier.trim()) {
+      return res.status(400).json({ message: 'Debes ingresar un correo electrónico.' });
+    }
+
+    const cleanIdentifier = inputIdentifier.trim().toLowerCase();
+
+    // 1. Buscar ÚNICAMENTE en el modelo Admin
+    const adminEncontrado = await Admin.findOne({
+      $or: [
+        { email: new RegExp(`^${cleanIdentifier}$`, 'i') },
+        { nombre: new RegExp(`^${cleanIdentifier}$`, 'i') }
+      ]
+    });
+
+    // =========================================================================
+    // ESCENARIO 2: El correo NO coincide con ningún Admin registrado
+    // =========================================================================
+    if (!adminEncontrado) {
+      console.log(`ℹ️ [Recuperación Admin] El correo "${cleanIdentifier}" no pertenece a un Administrador. No se envía correo.`);
+      return res.status(200).json({
+        message: 'Si el correo electrónico coincide con una cuenta registrada, se enviará un enlace de recuperación.'
+      });
+    }
+
+    // =========================================================================
+    // ESCENARIO 1: El correo coincide con un Admin en la base de datos
+    // =========================================================================
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpires = new Date(Date.now() + 3600000); // 1 hora de validez
+
+    adminEncontrado.resetPasswordToken = resetToken;
+    adminEncontrado.resetPasswordExpires = resetTokenExpires;
+    await adminEncontrado.save();
+
+    const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendBaseUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(adminEncontrado.email)}`;
+
+    await sendRecoveryEmail({
+      to: adminEncontrado.email,
+      name: adminEncontrado.nombre,
+      resetLink,
+      resetToken
+    });
+
+    return res.status(200).json({
+      message: 'Si el correo electrónico coincide con una cuenta registrada, se enviará un enlace de recuperación.',
+      token: resetToken,
+      resetLink
+    });
+
+  } catch (error) {
+    console.error('Error en forgotPassword (Admin):', error);
+    return res.status(500).json({ message: 'Error interno del servidor.' });
+  }
+};
+
+/**
+ * HISTORIA DE USUARIO: Restablecer contraseña y acceder con las nuevas credenciales
+ * (EXCLUSIVO PARA EL MODELO ADMIN)
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!newPassword || newPassword.trim().length === 0) {
+      return res.status(400).json({ message: 'Debes ingresar una nueva contraseña.' });
+    }
+
+    if (newPassword.length < 4 || newPassword.length > 20) {
+      return res.status(400).json({ message: 'La contraseña debe tener entre 4 y 20 caracteres.' });
+    }
+
+    if (!token) {
+      return res.status(400).json({ message: 'El token de recuperación es requerido.' });
+    }
+
+    // 1. Buscar en Admin EXCLUSIVAMENTE por token vigente
+    const adminEncontrado = await Admin.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!adminEncontrado) {
+      return res.status(400).json({ message: 'El enlace de recuperación es inválido o ha expirado.' });
+    }
+
+    // 2. Encriptar la nueva contraseña con bcrypt y limpiar el token
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    adminEncontrado.password = hashedPassword;
+    adminEncontrado.resetPasswordToken = undefined;
+    adminEncontrado.resetPasswordExpires = undefined;
+    await adminEncontrado.save();
+
+    // 3. Generar credencial de sesión para acceder inmediatamente al sistema (Escenario 1)
+    const sessionToken = jwt.sign(
+      { id: adminEncontrado._id, role: 'admin' },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    return res.status(200).json({
+      message: 'Contraseña actualizada correctamente.',
+      token: sessionToken,
+      user: {
+        id: adminEncontrado._id,
+        name: adminEncontrado.nombre,
+        role: 'admin'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en resetPassword (Admin):', error);
+    return res.status(500).json({ message: 'Error interno del servidor.' });
+  }
+};
+
+/**
+ * Validador de token para la vista del Administrador
+ */
+const verifyResetToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({ valid: false, message: 'Token no proporcionado.' });
+    }
+
+    const admin = await Admin.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!admin) {
+      return res.status(400).json({ valid: false, message: 'El enlace de recuperación es inválido o ha expirado.' });
+    }
+
+    return res.status(200).json({
+      valid: true,
+      email: admin.email
+    });
+
+
+  } catch (error) {
+    console.error('Error al verificar token (Admin):', error);
+    return res.status(500).json({ valid: false, message: 'Error interno del servidor.' });
+  }
+};
+
+/**
+ * Login para la aplicación móvil de Repartidores
+ */
+const mobileLogin = async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const username = typeof body.username === 'string' ? body.username.trim() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Ingresa tu correo electrónico y contraseña.' });
+    }
+
+    if (password.length < 4 || password.length > 20) {
+      return res.status(400).json({ message: 'La contraseña debe tener entre 4 y 20 caracteres.' });
+    }
+
+    const repartidor = await Repartidor.findOne({
+      $or: [
+        { email: new RegExp(`^${username}$`, 'i') },
+        { legajo: username }
+      ]
+    });
+
+    if (!repartidor) {
+      return res.status(404).json({
+        message: `El usuario ${username} no está en el sistema.`,
+      });
+    }
+
+    let passwordMatches = false;
+    try {
+      passwordMatches = await bcrypt.compare(password, repartidor.password);
+    } catch {
+      passwordMatches = false;
+    }
+    if (!passwordMatches) {
+      passwordMatches = (password === repartidor.password);
+    }
+
+    if (!passwordMatches) {
+      return res.status(401).json({ message: 'Credenciales Invalidas. Por favor, verifique sus credenciales.' });
+    }
+
+    const token = jwt.sign(
+      { id: repartidor._id, role: 'repartidor' },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    return res.json({
+      token,
+      user: {
+        _id: repartidor._id.toString(),
+        id: repartidor._id.toString(),
+        email: repartidor.email,
+        name: repartidor.nombre,
+        surname: repartidor.apellido,
+        role: 'repartidor',
+      },
+    });
+  } catch (error) {
+    console.error('Error en el login móvil:', error);
+    return res.status(500).json({ message: 'Error interno del servidor.' });
+  }
+};
+
+/**
+ * Usuario demo para la app móvil
+ */
+const getMobileDemoCourier = async (_req, res) => {
+  try {
+    const repartidor = await Repartidor.findOne({
+      email: { $exists: true, $ne: '' }
+    })
+      .sort({ _id: 1 })
+      .select({ _id: 0, email: 1 })
+      .lean();
+
+    return res.json({
+      user: repartidor ? { id: repartidor.email } : null,
+    });
+  } catch (error) {
+    console.error('Error al buscar el usuario de demostración móvil:', error);
+    return res.status(500).json({ message: 'No se pudo consultar el usuario de demostración.' });
   }
 };
 
 module.exports = {
-  loginAdmin
+  login,
+  mobileLogin,
+  getMobileDemoCourier,
+  forgotPassword,
+  resetPassword,
+  verifyResetToken
 };

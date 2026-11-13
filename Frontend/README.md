@@ -1,16 +1,42 @@
-# React + Vite
+# RepartosYA Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Ejecutar la aplicación con la API de prueba
 
-Currently, two official plugins are available:
+Instala las dependencias una vez desde la carpeta `Frontend`:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+```
 
-## React Compiler
+Abre dos terminales, ambas en `Frontend`. En la primera inicia la API simulada:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm run mock-api
+```
 
-## Expanding the ESLint configuration
+En la segunda inicia la aplicación:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run dev
+```
+
+JSON Server queda disponible en `http://localhost:3001` y Vite muestra la URL de la aplicación (normalmente `http://localhost:5173`).
+
+## Credenciales de demostración
+
+- Administrador: `AdminMartin` / `SoyElAdmin`
+- Repartidor de prueba: `0001` / `RepartidorNro1`
+
+El inicio de sesión se valida mediante `POST /auth/login`. La sesión del administrador se conserva en `sessionStorage`, lo que permite actualizar la página mientras la pestaña del navegador siga abierta; al cerrar la pestaña, la sesión temporal desaparece.
+
+## Datos y endpoints simulados
+
+Los datos se guardan en `mock-api/db.json`. JSON Server persiste allí las operaciones CRUD de estas colecciones:
+
+- `/pedidos`
+- `/comercios`
+- `/repartidores`
+
+El módulo `src/services/api.js` centraliza las llamadas HTTP (`getAll`, `create`, `update`, `remove` y `login`). Al conectar el backend real, se podrá cambiar la URL con `VITE_API_URL` y adaptar el contrato en ese módulo.
+
+Esta API es exclusivamente local y de demostración: almacena las contraseñas de prueba en texto plano, no publica la colección `/users` por la API y el token de sesión es ficticio. No usar con credenciales ni datos reales.

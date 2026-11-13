@@ -1,0 +1,51 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors'); 
+const path = require('path');
+require('dotenv').config();
+
+const app = express();
+
+// 1. MIDDLEWARES GLOBALES (Siempre van primero)
+app.use(cors()); // Habilita la conexión con el frontend (Vite)
+app.use(express.json({ limit: '10mb' })); // Permite que Express entienda JSON (10mb por las imagenes de comprobantes)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Comprobantes de entrega
+
+
+// 2. RUTAS
+// Rutas de Repartidores
+app.use('/api/repartidores', require('./Authentication_And_Access/routes/repartidorRoutes'));
+
+// Rutas de Autenticación
+const authRoutes = require('./Authentication_And_Access/routes/authRoutes');
+app.use('/auth', authRoutes);
+
+// Rutas de Comercios
+const tradeRoutes = require('./Trade_Management/tradeRoutes');
+app.use('/comercios', tradeRoutes);
+
+// Rutas de Depositos (origenes de los pedidos)
+app.use('/api/depositos', require('./Deposit_Management/depositRoutes'));
+
+// Rutas de Pedidos 
+const pedidoRoutes = require('./Order_Management/routes/pedidoRoutes');
+app.use('/api/pedidos', pedidoRoutes);
+
+app.get('/', (req, res) => {
+  res.send('¡El servidor de RepartosYA está funcionando al 100%!');
+});
+
+// 3. CONEXIÓN A BASE DE DATOS
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mateodibastiano_db_user:Jqol4bEYIuDIMYvY@cluster0.2a4xehf.mongodb.net/repartosya?retryWrites=true&w=majority';
+mongoose.connect(MONGO_URI)
+  .then(async () => {
+    console.log('📦 Conectado exitosamente a MongoDB Atlas en la nube ☁️');
+    await require('./Models/Deposito').sembrarBase();
+  })
+  .catch((err) => console.error('❌ Error al conectar a MongoDB:', err));
+
+// 4. INICIO DEL SERVIDOR
+const PORT = process.env.PORT || 3001; 
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+});

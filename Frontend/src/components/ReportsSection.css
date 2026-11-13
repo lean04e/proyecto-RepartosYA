@@ -1,0 +1,584 @@
+.reports-section {
+  width: 100%;
+  max-width: 1200px;
+  padding: 0;
+  --axis-width: 52px;
+  --chart-height: 220px;
+}
+
+.report-scope {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 16px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.report-main-grid,
+.report-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.report-main-grid {
+  margin-bottom: 20px;
+}
+
+.report-card {
+  min-width: 0;
+  padding: 22px 24px 20px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.report-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.report-card-title {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.report-card-note {
+  max-width: 34ch;
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.report-card-total {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-chart-count {
+  --chart-color: var(--primary);
+}
+
+.report-card-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.report-badge {
+  padding: 2px 8px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.report-chart-revenue {
+  --chart-color: #007a58;
+}
+
+:root[data-theme='dark'] .report-chart-revenue {
+  --chart-color: #34d3a6;
+}
+
+.report-chart-revenue .report-line-stroke {
+  stroke-dasharray: 6 5;
+}
+
+.report-plot {
+  display: flex;
+  gap: 8px;
+  height: var(--chart-height);
+}
+
+.report-axis {
+  display: flex;
+  flex: 0 0 calc(var(--axis-width) - 8px);
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-axis span {
+  display: flex;
+  height: 0;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: visible;
+}
+
+.report-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.report-gridlines {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.report-gridlines span {
+  height: 1px;
+  background: var(--border);
+}
+
+.report-gridlines span:last-child {
+  background: var(--border-strong);
+}
+
+.report-bars {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-bars li {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+}
+
+.report-bar {
+  position: relative;
+  width: min(100%, 44px);
+  min-height: 2px;
+  border-radius: 6px 6px 0 0;
+  background: var(--chart-color);
+  transition: filter 150ms ease;
+}
+
+.report-bars li:hover .report-bar {
+  filter: brightness(1.15);
+}
+
+.report-bar-value,
+.report-dot-value {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.report-line-area {
+  fill: var(--chart-color);
+  fill-opacity: 0.12;
+}
+
+.report-line-stroke {
+  fill: none;
+  stroke: var(--chart-color);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.report-dots {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-dots li {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--chart-color);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.report-dot-value {
+  bottom: calc(100% + 6px);
+}
+
+/* Puntos de datos: el valor aparece al pasar el mouse o al enfocar con teclado */
+.report-bars .report-point {
+  position: relative;
+}
+
+.report-point::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  padding: 4px 8px;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  color: var(--surface);
+  background: var(--text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.report-dots .report-point::after {
+  top: calc(100% + 8px);
+}
+
+.report-point:hover::after,
+.report-point:focus-visible::after {
+  opacity: 1;
+}
+
+.report-point:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.report-months {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0 var(--axis-width);
+  padding: 0;
+  list-style: none;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.report-months li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.report-months small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.report-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-ranking-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.report-ranking-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-ranking-count {
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-ranking-count small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.report-ranking-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--primary-soft);
+  overflow: hidden;
+}
+
+.report-ranking-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.report-state {
+  margin: 0;
+  padding: 36px 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.report-state-error {
+  border-style: solid;
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.report-state p {
+  margin: 0 0 12px;
+}
+
+.report-state p:last-child {
+  margin-bottom: 0;
+}
+
+.report-stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.report-retry-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.report-retry-button:hover {
+  color: #ffffff;
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.report-retry-button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.report-skeleton {
+  min-height: 330px;
+  animation: report-pulse 1.4s ease-in-out infinite;
+  background: var(--primary-soft);
+  border-color: transparent;
+}
+
+@keyframes report-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report-skeleton {
+    animation: none;
+  }
+}
+
+.report-export-error {
+  margin: 0 0 12px;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+@media (max-width: 1100px) {
+  .report-main-grid,
+  .report-secondary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .report-card {
+    padding: 18px 16px;
+  }
+
+  .report-card-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.report-deliveries {
+  margin-top: 36px;
+}
+
+.report-export-button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  color: var(--primary);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.report-export-button:hover:not(:disabled) {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.report-export-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.report-export-button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.report-export-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.report-receipt-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  color: var(--primary);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.report-receipt-button:hover {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.report-receipt-button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.report-receipt-none {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.receipt-modal {
+  width: min(560px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.receipt-modal .modal-heading h2 {
+  font-size: 26px;
+}
+
+.receipt-meta {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.receipt-body {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 20px 24px 24px;
+  background: var(--surface-raised);
+}
+
+.receipt-image {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.receipt-empty {
+  margin: 24px 0;
+  color: var(--danger);
+  font-size: 14px;
+}

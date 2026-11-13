@@ -1,0 +1,245 @@
+/* ==========================================
+   DISEÑO GENERAL DE LA PÁGINA DE LOGIN
+   ========================================== */
+.login-page-container {
+    min-height: 100vh;
+    background-color: var(--color-bg-main, #f8f9ff);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-family: var(--font-family-base, 'Segoe UI', sans-serif);
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* ==========================================
+   ESTILOS DEL HEADER (Con la curva inferior exacta)
+   ========================================== */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 50px;
+    background-color: var(--color-primary-blue, #0f1c2e);
+    color: #ffffff;
+    border-bottom-left-radius: 100% 60px;
+    border-bottom-right-radius: 100% 60px;
+    box-shadow: 0 10px 25px rgba(15, 28, 46, 0.2);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+}
+
+.header-logo {
+    height: 40px;
+    object-fit: contain;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #e2e8f0;
+}
+
+.secure-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--color-accent-teal, #00ffd1);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--color-accent-teal, #00ffd1);
+}
+
+/* ==========================================
+   CONTENIDO CENTRAL (Dos Columnas a 100% de ancho)
+   ========================================== */
+.login-main-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 5%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.login-grid-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    width: 100%;
+    max-width: 1400px; /* Se expande para ocupar toda la pantalla sin márgenes laterales oscuros */
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.login-left-col {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.login-right-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+}
+
+/* ==========================================
+   SECCIÓN DE BRANDING (Derecha - Centrada y Grande)
+   ========================================== */
+.brand-card-display {
+    text-align: center; /* <--- Centra el texto y el contenido debajo del logo */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* <--- Centra el logo horizontalmente */
+    max-width: 450px;
+    margin: 0 auto;
+}
+
+.brand-logo-large {
+    width: 130px; /* <--- Aumentado de tamaño para que se vea más grande y destacado */
+    height: 130px;
+    object-fit: contain;
+    background: var(--color-bg-card, #ffffff);
+    padding: 18px;
+    border-radius: 24px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 24px;
+    border: 1px solid var(--color-border, #e2e8f0);
+}
+
+.brand-desc-text {
+    font-size: 16px;
+    color: var(--color-text-secondary, #64748b);
+    line-height: 1.6;
+    margin: 0;
+    text-align: center; /* <--- Texto perfectamente centrado respecto al logo */
+}
+
+/* ==========================================
+   PIE DE PÁGINA GLOBAL
+   ========================================== */
+.page-global-footer {
+    padding: 25px 50px;
+    font-size: 12px;
+    color: var(--color-text-secondary, #64748b);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--color-border, #e2e8f0);
+    background-color: transparent;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.footer-links {
+    display: flex;
+    gap: 15px;
+}
+
+.footer-links a {
+    color: var(--color-text-secondary, #64748b);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-links a:hover {
+    color: var(--color-text-primary, #0f172a);
+    text-decoration: underline;
+}
+
+/* ==========================================
+   RESPONSIVO PARA PANTALLAS CHICAS
+   ========================================== */
+@media (max-width: 768px) {
+    .login-grid-layout {
+        grid-template-columns: 1fr;
+        gap: 40px;
+    }
+    .login-left-col {
+        justify-content: center;
+    }
+    .login-right-col {
+        align-items: center;
+        text-align: center;
+    }
+    .brand-card-display {
+        text-align: center;
+    }
+    .app-header {
+        padding: 15px 20px;
+    }
+    .page-global-footer {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+        padding: 20px;
+    }
+}
+
+/* ==========================================
+   VENTANA EMERGENTE (MODAL) PARA EL FOOTER
+   ========================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(15, 28, 46, 0.6); /* Fondo oscuro semitransparente */
+    display: flex;
+    justify-content: center; /* Centrado horizontal */
+    align-items: center; /* Centrado vertical */
+    z-index: 2000;
+    backdrop-filter: blur(2px);
+}
+
+.modal-content-box {
+    background-color: var(--color-bg-card, #ffffff);
+    padding: 30px;
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    max-width: 90%;
+    width: 380px;
+    box-sizing: border-box;
+    animation: modalAppear 0.2s ease-out;
+}
+
+@keyframes modalAppear {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.modal-content-box p {
+    font-size: var(--font-size-base, 16px);
+    color: var(--color-text-primary, #070c18);
+    font-weight: var(--font-weight-medium, 500);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.btn-modal-close {
+    background-color: var(--color-primary-dark, #0f1c2e);
+    color: var(--color-text-light, #ffffff);
+    border: none;
+    padding: 10px 30px;
+    border-radius: var(--radius-sm, 6px);
+    font-weight: var(--font-weight-semibold, 600);
+    cursor: pointer;
+    font-size: var(--font-size-sm, 14px);
+    transition: background-color 0.2s;
+}
+
+.btn-modal-close:hover {
+    background-color: #1e293b;
+}
