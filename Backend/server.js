@@ -9,7 +9,6 @@ const app = express();
 // 1. MIDDLEWARES GLOBALES (Siempre van primero)
 app.use(cors()); // Habilita la conexión con el frontend (Vite)
 app.use(express.json({ limit: '10mb' })); // Permite que Express entienda JSON (10mb por las imagenes de comprobantes)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Comprobantes de entrega
 
 
 // 2. RUTAS
