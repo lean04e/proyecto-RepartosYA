@@ -401,6 +401,94 @@ const obtenerPedidosEntregadosPorRepartidor = async (req, res) => {
     }
 };
 
+/**
+ * HISTORIA DE USUARIO #11: Ver Detalle Entrega
+ * Permite al administrador ver los detalles de un pedido que ya fue entregado.
+ * 
+ * Regla: Debe de aplicarse sobre un pedido ya entregado
+ * - Escenario 1: Sobre pedido ya entregado -> Devuelve ID, origen, destino, precio, repartidor, método de pago e imagen.
+ * - Escenario 2: Sobre pedido no entregado -> Devuelve 400 con mensaje "El pedido no ha sido entregado".
+ */
+const obtenerDetalleEntrega = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { ID: id };
+
+        const pedido = await Pedido.findOne(query)
+            .populate('comercioOrigen')
+            .populate('depositoOrigen')
+            .populate('comercioDestino');
+
+        if (!pedido) {
+            return res.status(404).json({ error: 'Pedido no encontrado en la base de datos' });
+        }
+
+        // =========================================================================
+        // ESCENARIO 2: El pedido no figura como entregado
+        // =========================================================================
+        if (pedido.estado !== 'ENTREGADO') {
+            return res.status(400).json({ 
+                mensaje: 'El pedido no ha sido entregado',
+                entregado: false,
+                estadoActual: pedido.estado 
+            });
+        }
+
+        // =========================================================================
+        // ESCENARIO 1: El pedido ya fue entregado -> Resolver datos
+        // =========================================================================
+
+        // 1. Origen (depósito o comercio)
+        const origenDoc = pedido.depositoOrigen || pedido.comercioOrigen 
+            || (await obtenerComercio(pedido.origen));
+        const origenNombre = origenDoc ? origenDoc.nombre : 'Origen no especificado';
+        const origenDireccion = origenDoc ? origenDoc.direccion : 'Dirección no especificada';
+
+        // 2. Destino (comercio de destino)
+        const destinoDoc = pedido.comercioDestino 
+            || (await obtenerComercio(pedido.destino));
+        const destinoNombre = destinoDoc ? destinoDoc.nombre : 'Destino no especificado';
+        const destinoDireccion = destinoDoc ? destinoDoc.direccion : 'Dirección no especificada';
+
+        // 3. Repartidor que lo entregó
+        let repartidorNombre = 'Sin repartidor registrado';
+        if (pedido.repartidor) {
+            const repartidorId = await resolverIdRepartidor(pedido.repartidor);
+            const rep = await Repartidor.findById(repartidorId).select('nombre apellido legajo').lean();
+            if (rep) {
+                repartidorNombre = `${rep.nombre || ''} ${rep.apellido || ''}`.trim() || `Legajo ${rep.legajo}`;
+            } else {
+                repartidorNombre = String(pedido.repartidor);
+            }
+        }
+
+        // 4. Retornar los campos requeridos
+        return res.status(200).json({
+            id: pedido.ID,
+            _id: pedido._id,
+            origen: {
+                nombre: origenNombre,
+                direccion: origenDireccion
+            },
+            destino: {
+                nombre: destinoNombre,
+                direccion: destinoDireccion
+            },
+            precio: pedido.comprobante?.precio ?? 0,
+            repartidor: repartidorNombre,
+            metodoPago: pedido.comprobante?.metodoPago || 'No especificado',
+            imagen: pedido.comprobante?.imagen || null
+        });
+
+    } catch (error) {
+        console.error('Error al obtener el detalle de la entrega:', error);
+        return res.status(500).json({ 
+            error: 'Error interno del servidor al consultar el detalle de entrega',
+            detalle: error.message 
+        });
+    }
+};
+
 module.exports = { 
     crearPedido, 
     obtenerPedidos, 
@@ -412,5 +500,6 @@ module.exports = {
     asignarRepartidor, 
     entregarPedido,
     desasignarRepartidor, 
-    obtenerPedidosEntregadosPorRepartidor 
+    obtenerPedidosEntregadosPorRepartidor,
+    obtenerDetalleEntrega
 };

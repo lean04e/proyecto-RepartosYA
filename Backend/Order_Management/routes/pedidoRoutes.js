@@ -9,11 +9,13 @@ const {
     obtenerPedidosEntregadosPorRepartidor,
     asignarRepartidor,
     entregarPedido,
-    desasignarRepartidor
+    desasignarRepartidor,
+    obtenerDetalleEntrega
 } = require('../pedidoController');
 
 router.post('/cargar', crearPedido);
 router.get('/', obtenerPedidos);
+router.get('/:id/detalle-entrega', obtenerDetalleEntrega);
 router.put('/modificar/:id', modificarPedido); 
 router.put('/cancelar/:id', cancelarPedido);
 router.put('/asignar/:id', asignarRepartidor);
