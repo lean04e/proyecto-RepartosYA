@@ -14,18 +14,21 @@ const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // 1. Buscamos si es un Administrador (no se toca absolutamente nada)
+    // 1. Buscamos si es un Administrador
     let usuarioEncontrado = await Admin.findOne({
       $or: [{ email: username }, { nombre: username }]
     });
     let rol = 'admin';
 
-    // 2. Si no es admin, buscamos en los Repartidores por email
+    // 2. Si no es admin, buscamos en los Repartidores por email o legajo
     if (!usuarioEncontrado) {
       usuarioEncontrado = await Repartidor.findOne({
-        email: new RegExp(`^${username.trim()}$`, 'i')
+        $or: [
+          { email: new RegExp(`^${(username || '').trim()}$`, 'i') },
+          { legajo: username }
+        ]
       });
-      rol = 'repartidor'; 
+      rol = 'repartidor';
     }
 
     if (!usuarioEncontrado) {
@@ -39,7 +42,6 @@ const login = async (req, res) => {
     } catch {
       passwordValid = false;
     }
-    // Fallback por si la contraseña en la BD está en texto plano (como en el seed)
     if (!passwordValid) {
       passwordValid = (password === usuarioEncontrado.password);
     }
@@ -98,7 +100,6 @@ const forgotPassword = async (req, res) => {
 
     // =========================================================================
     // ESCENARIO 2: El correo NO coincide con ningún Admin registrado
-    // "no se enviará ningun mail pero no se lo hará saber al admin"
     // =========================================================================
     if (!adminEncontrado) {
       console.log(`ℹ️ [Recuperación Admin] El correo "${cleanIdentifier}" no pertenece a un Administrador. No se envía correo.`);
@@ -109,10 +110,9 @@ const forgotPassword = async (req, res) => {
 
     // =========================================================================
     // ESCENARIO 1: El correo coincide con un Admin en la base de datos
-    // Generar token seguro, guardar expiración (30 minutos) y despachar email/enlace
     // =========================================================================
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpires = new Date(Date.now() + 1800000); // 30 minutos de validez
+    const resetTokenExpires = new Date(Date.now() + 3600000); // 1 hora de validez
 
     adminEncontrado.resetPasswordToken = resetToken;
     adminEncontrado.resetPasswordExpires = resetTokenExpires;
@@ -146,7 +146,7 @@ const forgotPassword = async (req, res) => {
  */
 const resetPassword = async (req, res) => {
   try {
-    const { token, newPassword, username, email } = req.body;
+    const { token, newPassword } = req.body;
 
     if (!newPassword || newPassword.trim().length === 0) {
       return res.status(400).json({ message: 'Debes ingresar una nueva contraseña.' });
@@ -156,38 +156,30 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'La contraseña debe tener entre 4 y 20 caracteres.' });
     }
 
-    let adminEncontrado = null;
-
-    // 1. Buscar en Admin por token vigente
-    if (token) {
-      adminEncontrado = await Admin.findOne({
-        resetPasswordToken: token,
-        resetPasswordExpires: { $gt: Date.now() }
-      });
+    if (!token) {
+      return res.status(400).json({ message: 'El token de recuperación es requerido.' });
     }
 
-    // 2. Fallback de compatibilidad por email o nombre en Admin
-    if (!adminEncontrado && (username || email)) {
-      const target = (username || email).trim().toLowerCase();
-      adminEncontrado = await Admin.findOne({
-        $or: [
-          { email: new RegExp(`^${target}$`, 'i') },
-          { nombre: new RegExp(`^${target}$`, 'i') }
-        ]
-      });
-    }
+    // 1. Buscar en Admin EXCLUSIVAMENTE por token vigente
+    const adminEncontrado = await Admin.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
 
     if (!adminEncontrado) {
       return res.status(400).json({ message: 'El enlace de recuperación es inválido o ha expirado.' });
     }
 
-    // 3. Actualizar la contraseña del Administrador y limpiar el token
-    adminEncontrado.password = newPassword;
+    // 2. Encriptar la nueva contraseña con bcrypt y limpiar el token
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    adminEncontrado.password = hashedPassword;
     adminEncontrado.resetPasswordToken = undefined;
     adminEncontrado.resetPasswordExpires = undefined;
     await adminEncontrado.save();
 
-    // 4. Generar credencial de sesión para acceder inmediatamente al sistema (Escenario 1)
+    // 3. Generar credencial de sesión para acceder inmediatamente al sistema (Escenario 1)
     const sessionToken = jwt.sign(
       { id: adminEncontrado._id, role: 'admin' },
       JWT_SECRET,
@@ -235,6 +227,7 @@ const verifyResetToken = async (req, res) => {
       email: admin.email
     });
 
+
   } catch (error) {
     console.error('Error al verificar token (Admin):', error);
     return res.status(500).json({ valid: false, message: 'Error interno del servidor.' });
@@ -258,7 +251,6 @@ const mobileLogin = async (req, res) => {
       return res.status(400).json({ message: 'La contraseña debe tener entre 4 y 20 caracteres.' });
     }
 
-    // En la app mobile se busca por el email creado por el admin (o por legajo si es del seed)
     const repartidor = await Repartidor.findOne({
       $or: [
         { email: new RegExp(`^${username}$`, 'i') },
