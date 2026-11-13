@@ -108,7 +108,7 @@ const obtenerPedidos = async (req, res) => {
         // Con ?incluirEntregadosBorrados=true también se devuelven los pedidos entregados que se borraron
         // de la lista (los usa el historial de los repartidores); el resto de los borrados siguen ocultos.
         const filtro = req.query.incluirEntregadosBorrados === 'true'
-            ? { $or: [{ borrado: { $ne: true } }, { estado: 'ENTREGADO' }] }
+            ? { $or: [{ borrado: { $ne: true } }, { estado: { $in: ['ENTREGADO', 'FALLIDO'] } }] }
             : { borrado: { $ne: true } };
 
         // Traemos los pedidos de la base de datos
