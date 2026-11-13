@@ -12,6 +12,7 @@ const STATUS_CONFIG = {
   'en-camino': { label: 'En Camino', order: 2 },
   entregado: { label: 'Entregado', order: 3 },
   cancelado: { label: 'Cancelado', order: 4 },
+  fallido: { label: 'Fallido', order: 5 },
 }
 
 const dateTimeFormatter = new Intl.DateTimeFormat('es-AR', {
@@ -175,14 +176,20 @@ try {
       });
 
       if (response.ok) {
-        // Si MongoDB lo actualiza bien, lo actualizamos visualmente en React
+        // El backend decide si queda cancelado o fallido (si ya estaba en camino)
+        const { pedido } = await response.json();
+        const nextStatus = pedido?.estado === 'FALLIDO' ? 'fallido' : 'cancelado'
         setOrderList((currentOrders) =>
           currentOrders.map((order) =>
-            order.id === cancelingOrder.id ? withStatusChange(order, 'cancelado') : order,
+            order.id === cancelingOrder.id ? withStatusChange(order, nextStatus) : order,
           ),
         )
         setCancelingOrder(null)
-        showSuccessToast('El pedido ha sido cancelado exitosamente')
+        showSuccessToast(
+          nextStatus === 'fallido'
+            ? 'El pedido fue marcado como fallido'
+            : 'El pedido ha sido cancelado exitosamente',
+        )
       } else {
         const errorData = await response.json();
         alert("Error al cancelar en BD: " + (errorData.error || errorData.detalle || "Ocurrió un error"));
@@ -523,7 +530,7 @@ const handleAddOrder = async (event) => {
                       >
                         <EditIcon />
                       </button>
-                      {order.status === 'cancelado' || order.status === 'entregado' ? (
+                      {['cancelado', 'fallido', 'entregado'].includes(order.status) ? (
                         <button
                           className="action-button action-button-danger"
                           type="button"
@@ -749,7 +756,7 @@ function OrderDetailModal({
         </div>
 
         <div className="detail-modal-footer">
-          {order.status === 'cancelado' || order.status === 'entregado' ? (
+          {['cancelado', 'fallido', 'entregado'].includes(order.status) ? (
             <button className="modal-delete" type="button" onClick={() => onRemove(order.id)}>
               Borrar pedido
             </button>

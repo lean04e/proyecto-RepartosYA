@@ -162,14 +162,15 @@ useEffect(() => {
         // Separamos los que están en viaje (pendientes) y los ya finalizados
         const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
         const entregados = misPedidos.filter(p => p.estado === 'ENTREGADO' || p.estado === 'entregado');
+        const fallidos = misPedidos.filter(p => p.estado === 'FALLIDO');
 
-        // Adaptamos los entregados para la tabla del modal
-        const pedidosAdaptados = entregados.map(p => ({
+        // Adaptamos los entregados y fallidos para la tabla del modal
+        const pedidosAdaptados = [...entregados, ...fallidos].sort((a, b) => String(a._id).localeCompare(String(b._id))).map(p => ({
             id: p.ID || p._id,
             date: p.createdAt ? new Intl.DateTimeFormat('es-AR').format(new Date(p.createdAt)) : 'Reciente',
             origin: p.nombreOrigen || p.comercioOrigen || p.origen,
             destination: p.destino,
-            status: 'entregado'
+            status: p.estado === 'FALLIDO' ? 'fallido' : 'entregado'
         })).reverse(); // Invertimos para que los más recientes queden arriba
 
         // Abrimos el modal inyectándole las métricas calculadas
@@ -899,7 +900,7 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
             <div className="detail-orders-header">
               <h3 className="detail-orders-title">Últimos pedidos completados</h3>
               <span className="detail-orders-count-badge">
-                {deliveredOrdersList.length} pedidos entregados
+                {deliveredOrdersList.filter((order) => order.status !== 'fallido').length} pedidos entregados
               </span>
             </div>
 
@@ -932,9 +933,9 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
                           </td>
                           <td className="order-route-cell">{route}</td>
                           <td>
-                            <span className="status-badge status-entregado">
+                            <span className={`status-badge status-${order.status === 'fallido' ? 'fallido' : 'entregado'}`}>
                               <span className="status-dot" aria-hidden="true" />
-                              <span>Entregado</span>
+                              <span>{order.status === 'fallido' ? 'Fallido' : 'Entregado'}</span>
                             </span>
                           </td>
                         </tr>

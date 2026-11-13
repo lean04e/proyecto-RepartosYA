@@ -4,6 +4,7 @@ export type OrderStatus =
   | 'MODIFICADO'
   | 'EN_CAMINO'
   | 'CANCELADO'
+  | 'FALLIDO'
   | 'ENTREGADO';
 
 export type DeliveryOrder = {

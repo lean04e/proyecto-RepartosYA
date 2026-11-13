@@ -33,7 +33,7 @@ const pedidoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'RECHAZADO', 'CANCELADO'],
+        enum: ['REGISTRADO', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO', 'CANCELADO', 'FALLIDO'],
         default: 'REGISTRADO'
     },
     comprobante: {
