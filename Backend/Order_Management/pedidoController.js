@@ -2,8 +2,7 @@ const Pedido = require('../Models/Pedido');
 const Repartidor = require('../Models/Repartidor');
 const Comercio = require('../Models/Comercio');
 const Deposito = require('../Models/Deposito');
-const fs = require('fs');
-const path = require('path');
+const Comprobante = require('../Models/Comprobante');
 
 const EXTENSIONES_COMPROBANTE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const MAX_COMPROBANTE_BYTES = 6 * 1024 * 1024;
@@ -325,16 +324,17 @@ const entregarPedido = async (req, res) => {
             return res.status(409).json({ error: 'El pedido ya fue entregado' });
         }
 
-        // El nombre del archivo sale del _id del pedido, nunca de datos del cliente
-        const carpeta = path.join(__dirname, '..', 'uploads', 'comprobantes');
-        await fs.promises.mkdir(carpeta, { recursive: true });
-        const nombreArchivo = `${pedido._id}.${extension}`;
-        await fs.promises.writeFile(path.join(carpeta, nombreArchivo), imagen);
+        // La imagen se guarda en MongoDB, asi se ve desde cualquier backend/red
+        await Comprobante.findOneAndUpdate(
+            { pedido: pedido._id },
+            { data: imagen, tipo: mimeType },
+            { upsert: true }
+        );
 
         const estadoAnterior = pedido.estado;
         pedido.estado = 'ENTREGADO';
         pedido.comprobante = {
-            imagen: `/uploads/comprobantes/${nombreArchivo}`,
+            imagen: `/api/pedidos/${pedido._id}/comprobante`,
             metodoPago: metodoPago.trim(),
             precio: precioNumero
         };
@@ -350,6 +350,24 @@ const entregarPedido = async (req, res) => {
         res.status(200).json({ mensaje: 'Pedido entregado exitosamente', pedido });
     } catch (error) {
         res.status(500).json({ error: 'Error al registrar la entrega', detalle: error.message });
+    }
+};
+
+// Devuelve la imagen del comprobante guardada en MongoDB
+const obtenerComprobante = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(404).json({ error: 'Comprobante no encontrado' });
+        }
+        const comprobante = await Comprobante.findOne({ pedido: id }).lean();
+        if (!comprobante) {
+            return res.status(404).json({ error: 'Comprobante no encontrado' });
+        }
+        res.set('Content-Type', comprobante.tipo);
+        res.send(comprobante.data.buffer ? Buffer.from(comprobante.data.buffer) : comprobante.data);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener el comprobante', detalle: error.message });
     }
 };
 
@@ -411,6 +429,7 @@ module.exports = {
     eliminarPedido, 
     asignarRepartidor, 
     entregarPedido,
+    obtenerComprobante,
     desasignarRepartidor, 
     obtenerPedidosEntregadosPorRepartidor 
 };
