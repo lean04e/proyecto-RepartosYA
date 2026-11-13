@@ -81,6 +81,11 @@ export function getUploadUrl(path) {
     return `${API_BASE_URL}${path}`;
 }
 
+// Rechaza una entrega: el backend la deja en estado FALLIDO (misma ruta que cancelar un pedido)
+export function rechazarEntrega(id) {
+    return request(`/api/pedidos/cancelar/${encodeURIComponent(id)}`, { method: 'PUT' });
+}
+
 export function getPedidosEntregados() {
     return request('/api/pedidos?incluirEntregadosBorrados=true');
 }
