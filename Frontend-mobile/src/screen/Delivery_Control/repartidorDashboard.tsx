@@ -7,13 +7,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { deliverOrder, fetchOrders, getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
+import { cancelOrder, deliverOrder, fetchOrders, getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
 import { useAppTheme } from '../../hooks/app-theme';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
-type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | 'deliveredDetail' | null;
-const DEMO_ETA_SECONDS = 30;
+type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | 'deliveredDetail' | 'cancelConfirm' | null;
+const DEMO_ETA_SECONDS = 15;
 const MAX_VISIBLE_ORDERS = 4;
+const OTHER_PAYMENT = 'Otro';
+const PAYMENT_OPTIONS = ['Transferencia', 'Tarjeta de débito', 'Tarjeta de crédito', 'Efectivo', OTHER_PAYMENT];
+// Pedidos asignados con menos de esta diferencia se consideran cargados juntos
+const SAME_BATCH_MS = 30_000;
 const POLL_INTERVAL_MS = 10000;
 
 function formatEta(seconds: number) {
@@ -86,6 +90,9 @@ export default function RepartidorDashboard() {
   }>();
   const { isDarkMode, toggleTheme } = useAppTheme();
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [isCancelingOrder, setIsCancelingOrder] = useState(false);
+  // Momento en que se cancelo el pedido activo: el siguiente pedido arranca su tiempo desde ahi
+  const [timerFloor, setTimerFloor] = useState(0);
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
@@ -101,7 +108,10 @@ export default function RepartidorDashboard() {
   const isBusyRef = useRef(false);
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
   const [receiptData, setReceiptData] = useState<{ base64: string; mimeType: string } | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentChoice, setPaymentChoice] = useState('');
+  const [customPayment, setCustomPayment] = useState('');
+  // Con "Otro" el repartidor escribe el metodo; con el resto se usa la opcion elegida
+  const paymentMethod = paymentChoice === OTHER_PAYMENT ? customPayment.trim() : paymentChoice;
   const [price, setPrice] = useState('');
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const palette = APP_THEMES[isDarkMode ? 'dark' : 'light'];
@@ -129,22 +139,35 @@ export default function RepartidorDashboard() {
     .sort((first, second) => (
       Date.parse(second.fechaEstado ?? '') - Date.parse(first.fechaEstado ?? '')
     ));
-  // El timer arranca cuando se asignó el pedido o cuando se entregó el anterior, lo que ocurra último
+  // El timer arranca cuando se asignó el pedido, cuando se entregó o canceló el anterior, lo que ocurra último
   const lastDeliveredAt = courierOrders.reduce((latest, order) => (
     order.estado === 'ENTREGADO' && order.fechaEstado
       ? Math.max(latest, Date.parse(order.fechaEstado))
       : latest
   ), 0);
   const timerStartedAt = activeOrder?.fechaEstado
-    ? Math.max(Date.parse(activeOrder.fechaEstado), lastDeliveredAt)
+    ? Math.max(Date.parse(activeOrder.fechaEstado), lastDeliveredAt, timerFloor)
     : 0;
   const elapsedSeconds = activeOrder
     ? Math.max(0, Math.floor((clock - timerStartedAt) / 1000))
     : 0;
-  const etaSeconds = activeOrder ? Math.max(0, DEMO_ETA_SECONDS - elapsedSeconds) : 0;
+  // Si el pedido se cargo junto a otro ya entregado con el mismo origen, el repartidor ya retiro
+  // la mercaderia en esa parada: solo le queda el tramo al destino (la mitad del tiempo)
+  const hasSharedPickup = Boolean(
+    activeOrder?.asignadoEn
+    && courierOrders.some((order) => (
+      order.id !== activeOrder.id
+      && order.estado === 'ENTREGADO'
+      && order.comercioOrigen === activeOrder.comercioOrigen
+      && order.asignadoEn
+      && Math.abs(Date.parse(order.asignadoEn) - Date.parse(activeOrder.asignadoEn as string)) <= SAME_BATCH_MS
+    )),
+  );
+  const etaTotalSeconds = hasSharedPickup ? DEMO_ETA_SECONDS / 2 : DEMO_ETA_SECONDS;
+  const etaSeconds = activeOrder ? Math.max(0, etaTotalSeconds - elapsedSeconds) : 0;
   const activeOrderId = activeOrder?.id;
   // Primera mitad del tiempo: rumbo al depósito de origen; segunda mitad: rumbo al destino
-  const currentLeg: Leg = etaSeconds > DEMO_ETA_SECONDS / 2 ? 'origen' : 'destino';
+  const currentLeg: Leg = !hasSharedPickup && etaSeconds > DEMO_ETA_SECONDS / 2 ? 'origen' : 'destino';
   const canStartSelected = Boolean(
     selectedOrder
     && !activeOrder
@@ -274,6 +297,29 @@ export default function RepartidorDashboard() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    if (!selectedOrder || isCancelingOrder) {
+      return;
+    }
+
+    try {
+      setIsCancelingOrder(true);
+      const wasActive = selectedOrder.id === activeOrder?.id;
+      const updatedOrders = await cancelOrder(selectedOrder.id);
+      if (wasActive) {
+        setTimerFloor(Date.now());
+      }
+      setOrders(updatedOrders);
+      setOrdersError(null);
+      setActiveModal(null);
+      setSelectedOrder(null);
+    } catch (error) {
+      setOrdersError(error instanceof Error ? error.message : 'No se pudo cancelar el pedido.');
+    } finally {
+      setIsCancelingOrder(false);
+    }
+  };
+
   const handleCompleteOrder = async () => {
     if (!activeOrder || etaSeconds > 0 || isCompletingOrder || !receiptData || !(parsedPrice > 0)) {
       return;
@@ -292,7 +338,8 @@ export default function RepartidorDashboard() {
       setOrdersError(null);
       setReceiptUri(null);
       setReceiptData(null);
-      setPaymentMethod('');
+      setPaymentChoice('');
+      setCustomPayment('');
       setPrice('');
       setActiveModal('completion');
     } catch (error) {
@@ -478,7 +525,7 @@ export default function RepartidorDashboard() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeadingGroup}>
                   <Text style={[styles.sectionTitle, { color: palette.heading }]}>
-                    ENTREGADOS / CANCELADOS / FALLIDOS
+                    ENTREGADOS / CANCELADOS
                   </Text>
                   <Text
                     style={[
@@ -524,7 +571,7 @@ export default function RepartidorDashboard() {
                         { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : palette.dangerSurface,
                           color: order.estado === 'ENTREGADO' ? palette.successText : palette.dangerText },
                       ]}>
-                        {order.estado === 'ENTREGADO' ? 'Entregado' : order.estado === 'FALLIDO' ? 'Fallido' : 'Cancelado'}
+                        {order.estado === 'ENTREGADO' ? 'Entregado' : 'Cancelado'}
                       </Text>
                       {order.estado === 'ENTREGADO' && (
                         <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
@@ -534,7 +581,7 @@ export default function RepartidorDashboard() {
                 ))
               ) : (
                 <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
-                  No hay pedidos entregados, cancelados o fallidos hoy.
+                  No hay pedidos entregados o cancelados hoy.
                 </Text>
               )}
               {historicalOrders.length > MAX_VISIBLE_ORDERS && (
@@ -640,13 +687,6 @@ export default function RepartidorDashboard() {
                   </>
                 )}
               </ScrollView>
-              {isSelectedActiveOrder && (
-                <View style={styles.startWarning}>
-                  <Text style={styles.startWarningText}>
-                    El tiempo estimado llegará a cero antes de habilitar la confirmación.
-                  </Text>
-                </View>
-              )}
               {!isSelectedActiveOrder && !activeOrder && selectedOrder && queuedOrders[0]?.id !== selectedOrder.id && (
                 <View style={styles.startWarning}>
                   <Text style={styles.startWarningText}>
@@ -691,10 +731,52 @@ export default function RepartidorDashboard() {
                 </Pressable>
               )}
               <Pressable
-                style={styles.cancelStartButton}
-                onPress={() => setActiveModal(null)}
+                style={({ pressed }) => [styles.cancelOrderButton, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  setOrdersError(null);
+                  setActiveModal('cancelConfirm');
+                }}
                 accessibilityRole="button">
-                <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Cancelar</Text>
+                <Text style={styles.cancelOrderButtonText}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={activeModal === 'cancelConfirm'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal('orderDetails')}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: palette.text }]}>¿Cancelar el pedido?</Text>
+              </View>
+              <Text style={[styles.startSubtitle, { color: palette.secondary, marginBottom: 16 }]}>
+                {selectedOrder ? `Se cancelará el pedido #${selectedOrder.codigo}. ` : ''}Esta acción no se puede deshacer.
+              </Text>
+              {ordersError && <Text style={styles.orderError} accessibilityRole="alert">{ordersError}</Text>}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.cancelOrderButton,
+                  isCancelingOrder && { opacity: 0.7 },
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={handleCancelOrder}
+                disabled={isCancelingOrder}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isCancelingOrder }}>
+                <Text style={styles.cancelOrderButtonText}>
+                  {isCancelingOrder ? 'Cancelando...' : 'Sí, cancelar pedido'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.cancelStartButton}
+                onPress={() => setActiveModal('orderDetails')}
+                disabled={isCancelingOrder}
+                accessibilityRole="button">
+                <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Volver</Text>
               </Pressable>
             </View>
           </View>
@@ -779,13 +861,34 @@ export default function RepartidorDashboard() {
                 </View>
 
                 <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>MÉTODO DE PAGO</Text>
-                <TextInput
-                  style={[styles.receiptInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.background }]}
-                  value={paymentMethod}
-                  onChangeText={setPaymentMethod}
-                  placeholder="Ej: Efectivo, Transferencia"
-                  placeholderTextColor={palette.secondary}
-                />
+                <View style={styles.paymentOptions} accessibilityRole="radiogroup">
+                  {PAYMENT_OPTIONS.map((option) => {
+                    const selected = paymentChoice === option;
+                    return (
+                      <Pressable
+                        key={option}
+                        style={[
+                          styles.paymentOption,
+                          { borderColor: selected ? palette.primary : palette.border, backgroundColor: selected ? palette.primary : palette.background },
+                        ]}
+                        onPress={() => setPaymentChoice(option)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}>
+                        <Text style={[styles.paymentOptionText, { color: selected ? '#FFFFFF' : palette.text }]}>{option}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {paymentChoice === OTHER_PAYMENT && (
+                  <TextInput
+                    style={[styles.receiptInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.background }]}
+                    value={customPayment}
+                    onChangeText={setCustomPayment}
+                    placeholder="Escribe el método de pago"
+                    placeholderTextColor={palette.secondary}
+                    autoFocus
+                  />
+                )}
                 <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>PRECIO</Text>
                 <TextInput
                   style={[styles.receiptInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.background }]}
