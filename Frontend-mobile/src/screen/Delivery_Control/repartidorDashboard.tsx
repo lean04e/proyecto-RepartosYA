@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { cancelOrder, deliverOrder, fetchOrders, getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
 import { useAppTheme } from '../../hooks/app-theme';
+import { getStoredUser } from '../../services/auth';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
 type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | 'deliveredDetail' | 'cancelConfirm' | null;
@@ -118,7 +119,7 @@ export default function RepartidorDashboard() {
   const courierOrders = orders.filter((order) => order.repartidorId === id);
   const activeOrder = courierOrders.find((order) => order.estado === 'EN_CAMINO');
 
-  // La cola incluye todos los pedidos asignados/en camino EXCEPTO el activo de arriba
+  // La cola incluye todos los pedidos asignados/en espera EXCEPTO el activo de arriba
   const queuedOrders = courierOrders
     .filter((order) => 
       order.id !== activeOrder?.id && (
@@ -128,11 +129,18 @@ export default function RepartidorDashboard() {
         || order.estado === 'EN_CAMINO' 
       )
     )
-    .sort((first, second) => first.codigo.localeCompare(second.codigo));
+    .sort((first, second) => {
+      const t1 = first.createdAt ? Date.parse(first.createdAt) : (first.fechaEstado ? Date.parse(first.fechaEstado) : 0);
+      const t2 = second.createdAt ? Date.parse(second.createdAt) : (second.fechaEstado ? Date.parse(second.fechaEstado) : 0);
+      if (t1 && t2 && t1 !== t2) {
+        return t1 - t2;
+      }
+      return first.codigo.localeCompare(second.codigo);
+    });
   const today = new Date().toDateString();
   const historicalOrders = courierOrders
     .filter((order) => (
-      (order.estado === 'CANCELADO' || order.estado === 'FALLIDO' || order.estado === 'ENTREGADO')
+      (order.estado === 'CANCELADO' || order.estado === 'FALLIDO' || order.estado === 'RECHAZADO' || order.estado === 'ENTREGADO')
       && order.fechaEstado
       && new Date(order.fechaEstado).toDateString() === today
     ))
@@ -571,7 +579,13 @@ export default function RepartidorDashboard() {
                         { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : palette.dangerSurface,
                           color: order.estado === 'ENTREGADO' ? palette.successText : palette.dangerText },
                       ]}>
-                        {order.estado === 'ENTREGADO' ? 'Entregado' : 'Cancelado'}
+                        {order.estado === 'ENTREGADO'
+                          ? 'Entregado'
+                          : order.estado === 'FALLIDO'
+                          ? 'Fallido'
+                          : order.estado === 'RECHAZADO'
+                          ? 'Rechazado'
+                          : 'Cancelado'}
                       </Text>
                       {order.estado === 'ENTREGADO' && (
                         <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
@@ -613,14 +627,17 @@ export default function RepartidorDashboard() {
           </Pressable>
           <Pressable
             style={({ pressed }) => [styles.menuButton, pressed && styles.buttonPressed]}
-            onPress={() => router.push({
-              pathname: '/options',
-              params: {
-                id: id ?? '',
-                nombre: nombre ?? '',
-                apellido: apellido ?? '',
-              },
-            })}
+            onPress={async () => {
+              const stored = await getStoredUser();
+              router.push({
+                pathname: '/options',
+                params: {
+                  id: (stored?.id && stored.id === id ? stored.id : id) ?? '',
+                  nombre: (stored?.id && stored.id === id ? stored.nombre : nombre) ?? '',
+                  apellido: (stored?.id && stored.id === id ? stored.apellido : apellido) ?? '',
+                },
+              });
+            }}
             accessibilityRole="button"
             accessibilityLabel="Opciones">
             <Text style={[styles.menuIcon, { color: palette.text }]}>☰</Text>

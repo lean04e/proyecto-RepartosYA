@@ -13,6 +13,7 @@ const STATUS_CONFIG = {
   entregado: { label: 'Entregado', order: 3 },
   cancelado: { label: 'Cancelado', order: 4 },
   fallido: { label: 'Fallido', order: 5 },
+  rechazado: { label: 'Rechazado', order: 6 },
 }
 
 const dateTimeFormatter = new Intl.DateTimeFormat('es-AR', {
@@ -179,11 +180,36 @@ try {
         // El backend decide si queda cancelado o fallido (si ya estaba en camino)
         const { pedido } = await response.json();
         const nextStatus = pedido?.estado === 'FALLIDO' ? 'fallido' : 'cancelado'
-        setOrderList((currentOrders) =>
-          currentOrders.map((order) =>
-            order.id === cancelingOrder.id ? withStatusChange(order, nextStatus) : order,
-          ),
-        )
+        
+        // Refrescamos pedidos desde el backend para actualizar también el siguiente pedido que haya pasado a EN_CAMINO
+        const resPed = await fetch('http://localhost:3001/api/pedidos');
+        if (resPed.ok) {
+          const pedidosData = await resPed.json();
+          const fechaCreacion = (p) => p.createdAt
+            || (p._id ? new Date(parseInt(p._id.substring(0, 8), 16) * 1000).toISOString() : new Date().toISOString());
+          const pedidosMapeados = pedidosData.map(p => ({
+            id: p.ID,
+            origin: p.nombreOrigen || p.comercioOrigen || p.origen,
+            destination: p.nombreDestino || (p.destinatario && p.destinatario !== 'Consumidor Final' ? p.destinatario : null) || p.destino,
+            driver: p.repartidorNombre || p.repartidor || null,
+            status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
+            createdAt: fechaCreacion(p),
+            statusHistory: p.historialEstados && p.historialEstados.length > 0 
+              ? p.historialEstados.map(h => ({
+                  at: h.fecha,
+                  from: h.estadoAnterior ? h.estadoAnterior.toLowerCase().replace('_', '-') : null,
+                  to: h.estadoNuevo.toLowerCase().replace('_', '-')
+                }))
+              : [{ at: fechaCreacion(p), from: null, to: 'registrado' }]
+          }));
+          setOrderList(pedidosMapeados);
+        } else {
+          setOrderList((currentOrders) =>
+            currentOrders.map((order) =>
+              order.id === cancelingOrder.id ? withStatusChange(order, nextStatus) : order,
+            ),
+          );
+        }
         setCancelingOrder(null)
         showSuccessToast(
           nextStatus === 'fallido'
@@ -1110,7 +1136,7 @@ function SortableHeader({ column, label, sort, onSort }) {
 }
 
 function OrderStatusBadge({ status }) {
-  const { label } = STATUS_CONFIG[status]
+  const { label } = STATUS_CONFIG[status] || { label: status }
 
   return (
     <span className={`status-badge status-${status}`}>

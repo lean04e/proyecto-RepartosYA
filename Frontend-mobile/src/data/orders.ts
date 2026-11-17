@@ -5,6 +5,7 @@ export type OrderStatus =
   | 'EN_CAMINO'
   | 'CANCELADO'
   | 'FALLIDO'
+  | 'RECHAZADO'
   | 'ENTREGADO';
 
 export type DeliveryOrder = {
@@ -18,6 +19,7 @@ export type DeliveryOrder = {
   contacto: string;
   estado: OrderStatus;
   fechaEstado?: string;
+  createdAt?: string;
   // Momento en que se le asigno el repartidor (sirve para detectar pedidos cargados juntos)
   asignadoEn?: string;
   metodoPago?: string;
@@ -49,6 +51,7 @@ export async function fetchOrders(): Promise<DeliveryOrder[]> {
     contacto: pedido.contacto || pedido.comercioDestino?.telefono || 'Sin especificar',
     estado: (pedido.estado || 'PENDIENTE').toUpperCase() as OrderStatus,
     fechaEstado: pedido.updatedAt || pedido.createdAt || new Date().toISOString(),
+    createdAt: pedido.createdAt,
     asignadoEn: pedido.historialEstados?.find((h: any) => h.estadoNuevo === 'ASIGNADO' || h.estadoNuevo === 'EN_CAMINO')?.fecha,
     metodoPago: pedido.comprobante?.metodoPago ?? undefined,
     precio: pedido.comprobante?.precio ?? undefined,

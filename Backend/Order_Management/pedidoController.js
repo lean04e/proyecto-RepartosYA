@@ -69,6 +69,52 @@ async function obtenerDeposito(id) {
     return await Deposito.findOne({ nombre: new RegExp(`^${input}$`, 'i') }).lean();
 }
 
+// Activa automáticamente el siguiente pedido en cola (ASIGNADO) para el repartidor dado, pasándolo a EN_CAMINO
+async function activarSiguientePedidoRepartidor(repartidorInput) {
+    if (!repartidorInput) return null;
+    const repartidorId = await resolverIdRepartidor(repartidorInput);
+
+    const filtroRepartidor = {
+        $or: [
+            { repartidor: repartidorId },
+            { repartidor: String(repartidorInput) }
+        ]
+    };
+
+    // 1. Verificar si el repartidor ya tiene algún pedido EN_CAMINO activo
+    const tieneEnCamino = await Pedido.findOne({
+        ...filtroRepartidor,
+        estado: 'EN_CAMINO',
+        borrado: { $ne: true }
+    });
+    if (tieneEnCamino) {
+        return null;
+    }
+
+    // 2. Buscar el siguiente pedido ASIGNADO más antiguo (orden cronológico)
+    const siguientePedido = await Pedido.findOne({
+        ...filtroRepartidor,
+        estado: 'ASIGNADO',
+        borrado: { $ne: true }
+    }).sort({ createdAt: 1, _id: 1 });
+
+    if (!siguientePedido) {
+        return null;
+    }
+
+    // 3. Pasar el siguiente pedido a EN_CAMINO y registrar el cambio en su historial
+    const estadoAnterior = siguientePedido.estado;
+    siguientePedido.estado = 'EN_CAMINO';
+    siguientePedido.historialEstados.push({
+        fecha: new Date().toISOString(),
+        estadoAnterior,
+        estadoNuevo: 'EN_CAMINO'
+    });
+
+    await siguientePedido.save();
+    return siguientePedido;
+}
+
 const crearPedido = async (req, res) => {
     try {
         const { origen, destino, depositoOrigen, comercioDestino, repartidor } = req.body;
@@ -209,12 +255,13 @@ const cancelarPedido = async (req, res) => {
             return res.status(404).json({ error: 'Pedido no encontrado en la base de datos' });
         }
 
-        if (pedido.estado === 'CANCELADO' || pedido.estado === 'FALLIDO') {
-            return res.status(409).json({ error: 'El pedido ya fue cancelado' });
+        if (pedido.estado === 'CANCELADO' || pedido.estado === 'FALLIDO' || pedido.estado === 'RECHAZADO') {
+            return res.status(409).json({ error: 'El pedido ya fue cancelado o rechazado' });
         }
 
         // Cancelado: se corta antes de salir. Fallido: ya estaba en camino o entregado.
         const estadoAnterior = pedido.estado;
+        const repartidorAsignado = pedido.repartidor;
         const estadoNuevo = ['EN_CAMINO', 'ENTREGADO'].includes(estadoAnterior) ? 'FALLIDO' : 'CANCELADO';
         pedido.estado = estadoNuevo;
 
@@ -225,6 +272,12 @@ const cancelarPedido = async (req, res) => {
         });
 
         await pedido.save();
+
+        // Si el pedido finalizado estaba en camino, activar el siguiente pedido en cola del repartidor
+        if (repartidorAsignado && estadoAnterior === 'EN_CAMINO') {
+            await activarSiguientePedidoRepartidor(repartidorAsignado);
+        }
+
         res.status(200).json({
             mensaje: estadoNuevo === 'FALLIDO' ? 'Pedido marcado como fallido' : 'Pedido cancelado exitosamente',
             pedido
@@ -249,6 +302,11 @@ const eliminarPedido = async (req, res) => {
             return res.status(404).json({ error: 'Pedido no encontrado en la base de datos' });
         }
 
+        // Si el pedido borrado estaba en camino, activar el siguiente pedido en cola
+        if (pedidoBorrado.repartidor && pedidoBorrado.estado === 'EN_CAMINO') {
+            await activarSiguientePedidoRepartidor(pedidoBorrado.repartidor);
+        }
+
         res.status(200).json({ mensaje: 'Pedido borrado exitosamente', pedido: pedidoBorrado });
     } catch (error) {
         res.status(400).json({ error: 'Error al borrar el pedido', detalle: error.message });
@@ -268,16 +326,42 @@ const asignarRepartidor = async (req, res) => {
         }
 
         const estadoAnterior = pedido.estado;
-        
-        if (estado) {
-            pedido.estado = estado.toUpperCase();
-        } else {
-            pedido.estado = 'EN_CAMINO';
+        let nuevoEstado = estado ? estado.toUpperCase() : null;
+
+        let repartidorDestino = pedido.repartidor;
+        if (repartidor) {
+            repartidorDestino = await resolverIdRepartidor(repartidor);
+            pedido.repartidor = repartidorDestino;
         }
 
-        if (repartidor) {
-            pedido.repartidor = await resolverIdRepartidor(repartidor);
+        const esEstadoFinal = ['ENTREGADO', 'CANCELADO', 'FALLIDO', 'RECHAZADO'].includes(nuevoEstado);
+
+        if (!esEstadoFinal) {
+            if (repartidorDestino) {
+                // Verificar si el repartidor ya tiene algún pedido EN_CAMINO activo (excluyendo este pedido)
+                const tieneEnCamino = await Pedido.findOne({
+                    $or: [
+                        { repartidor: repartidorDestino },
+                        { repartidor: repartidor }
+                    ],
+                    estado: 'EN_CAMINO',
+                    borrado: { $ne: true },
+                    _id: { $ne: pedido._id }
+                });
+
+                if (tieneEnCamino) {
+                    // Si ya tiene un pedido en camino, el nuevo pedido queda como ASIGNADO
+                    nuevoEstado = 'ASIGNADO';
+                } else {
+                    // Si no tiene ninguno en camino, este pedido pasa a EN_CAMINO
+                    nuevoEstado = (nuevoEstado && nuevoEstado !== 'REGISTRADO') ? nuevoEstado : 'EN_CAMINO';
+                }
+            } else {
+                nuevoEstado = nuevoEstado || 'REGISTRADO';
+            }
         }
+
+        pedido.estado = nuevoEstado;
 
         pedido.historialEstados.push({
             fecha: new Date().toISOString(),
@@ -290,6 +374,11 @@ const asignarRepartidor = async (req, res) => {
         // Cuenta un pedido entregado para el comercio destino (solo en la transición a ENTREGADO)
         if (pedido.estado === 'ENTREGADO' && estadoAnterior !== 'ENTREGADO') {
             await Comercio.findByIdAndUpdate(pedido.comercioDestino, { $inc: { cantPedidos: 1 } });
+        }
+
+        // Si este pedido finalizó (o dejó de estar EN_CAMINO) y tiene repartidor, activar el siguiente pedido en cola
+        if (repartidorDestino && (esEstadoFinal || (estadoAnterior === 'EN_CAMINO' && pedido.estado !== 'EN_CAMINO'))) {
+            await activarSiguientePedidoRepartidor(repartidorDestino);
         }
 
         res.status(200).json({ mensaje: 'Pedido actualizado exitosamente', pedido });
@@ -356,6 +445,11 @@ const entregarPedido = async (req, res) => {
 
         await Comercio.findByIdAndUpdate(pedido.comercioDestino, { $inc: { cantPedidos: 1 } });
 
+        // Activar automáticamente el siguiente pedido asignado en cola para este repartidor
+        if (pedido.repartidor) {
+            await activarSiguientePedidoRepartidor(pedido.repartidor);
+        }
+
         res.status(200).json({ mensaje: 'Pedido entregado exitosamente', pedido });
     } catch (error) {
         res.status(500).json({ error: 'Error al registrar la entrega', detalle: error.message });
@@ -391,6 +485,7 @@ const desasignarRepartidor = async (req, res) => {
         }
 
         const estadoAnterior = pedido.estado;
+        const repartidorAnterior = pedido.repartidor;
         
         pedido.repartidor = null;
         pedido.estado = 'REGISTRADO';
@@ -402,6 +497,12 @@ const desasignarRepartidor = async (req, res) => {
         });
 
         await pedido.save();
+
+        // Si el pedido desasignado estaba EN_CAMINO, activar el siguiente pedido en cola del repartidor
+        if (repartidorAnterior && estadoAnterior === 'EN_CAMINO') {
+            await activarSiguientePedidoRepartidor(repartidorAnterior);
+        }
+
         res.status(200).json({ mensaje: 'Repartidor desasignado exitosamente', pedido });
     } catch (error) {
         res.status(400).json({ error: 'Error al desasignar el repartidor', detalle: error.message });

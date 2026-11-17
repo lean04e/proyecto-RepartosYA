@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPedidos } from '../services/api'
 import './RouteSheetSection.css'
+import './OrdersSection.css'
 
 const UNASSIGNED_TAB = 'unassigned'
 const ASSIGNED_TAB = 'assigned'
@@ -44,31 +45,30 @@ useEffect(() => {
           throw new Error('La respuesta de pedidos no tiene un formato válido.')
         }
         
-        // 2. Traemos los pedidos pendientes Y los que ya están en viaje
+        // 2. Traemos los pedidos registrados (por asignar) y los asignados/en camino
         const pedidosValidos = dataPedidos.filter((pedido) => 
-          pedido.estado === 'REGISTRADO' || pedido.estado === 'EN_CAMINO'
+          pedido.estado === 'REGISTRADO' || pedido.estado === 'ASIGNADO' || pedido.estado === 'EN_CAMINO'
         )
         setPedidos(pedidosValidos)
         setLoadError('')
 
-// 3. Sincronizamos las asignaciones reales que vienen del backend
+        // 3. Sincronizamos las asignaciones reales que vienen del backend
         const asignacionesBackend = {}
         pedidosValidos.forEach((p) => {
-          if (p.repartidor && p.estado === 'EN_CAMINO') {
-            
+          if (p.repartidor && (p.estado === 'ASIGNADO' || p.estado === 'EN_CAMINO')) {
             const repartidorBd = String(p.repartidor).trim().toLowerCase();
             
             const driverMatch = dataRepartidores.find(d => {
+              const dId = String(d.id || d._id || d.ID || '').trim().toLowerCase();
               const fullName = String(d.name || `${d.nombre || ''} ${d.apellido || ''}`).trim().toLowerCase();
               const justName = String(d.nombre || '').trim().toLowerCase();
               
-              // Coincide si es exactamente igual al nombre completo o aunque sea al primer nombre
-              return fullName === repartidorBd || justName === repartidorBd;
+              return dId === repartidorBd || fullName === repartidorBd || justName === repartidorBd;
             });
 
             if (driverMatch) {
               const pId = p.ID || p._id;
-              const dId = driverMatch.id || driverMatch._id;
+              const dId = driverMatch.id || driverMatch._id || driverMatch.ID;
               asignacionesBackend[pId] = String(dId);
             }
           }
@@ -127,7 +127,15 @@ const unassignedGroups = useMemo(() => {
       })
     return [...groups.entries()].map(([driverId, list]) => [
       driverId,
-      [...list].sort((a, b) => a.origen.localeCompare(b.origen, 'es')),
+      [...list].sort((a, b) => {
+        // El pedido EN_CAMINO siempre queda primero
+        if (a.estado === 'EN_CAMINO' && b.estado !== 'EN_CAMINO') return -1;
+        if (b.estado === 'EN_CAMINO' && a.estado !== 'EN_CAMINO') return 1;
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        if (timeA !== timeB) return timeA - timeB;
+        return (a.origen || '').localeCompare(b.origen || '', 'es');
+      }),
     ])
   }, [pedidos, assignments])
 
@@ -148,14 +156,14 @@ const unassignedGroups = useMemo(() => {
     setDriverErrors((current) => ({ ...current, [origin]: false }))
   }
 
-const handleAssign = async (origin, groupPedidos) => {
+  const handleAssign = async (origin, groupPedidos) => {
     const driverId = driverByOrigin[origin]
     if (!driverId) {
       setDriverErrors((current) => ({ ...current, [origin]: true }))
       return
     }
 
-    // ARREGLO: Buscamos el nombre completo (nombre + apellido) para mandarlo a la BD
+    // Buscamos el nombre completo para mandarlo a la BD
     const d = driversById[driverId];
     const driverName = d?.name || `${d?.nombre || ''} ${d?.apellido || ''}`.trim() || driverId;
 
@@ -165,19 +173,27 @@ const handleAssign = async (origin, groupPedidos) => {
       : groupPedidos
 
     try {
-      // Mandamos la orden al backend para cada pedido seleccionado
-      await Promise.all(toAssign.map(async (pedido) => {
+      // Mandamos la orden al backend para cada pedido seleccionado secuencialmente
+      for (const pedido of toAssign) {
         const idPedido = pedido.ID || pedido._id;
         const response = await fetch(`http://localhost:3001/api/pedidos/asignar/${idPedido}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repartidor: driverName }) // Enviamos el nombre completo
+          body: JSON.stringify({ repartidor: driverName })
         });
         
         if (!response.ok) {
           console.error(`Falló la asignación del pedido ${idPedido}`);
         }
-      }));
+      }
+
+      // Volvemos a consultar los pedidos desde el backend para tener los estados reales actualizados
+      const freshPedidos = await getPedidos();
+      if (Array.isArray(freshPedidos)) {
+        setPedidos(freshPedidos.filter((p) =>
+          p.estado === 'REGISTRADO' || p.estado === 'ASIGNADO' || p.estado === 'EN_CAMINO'
+        ));
+      }
 
       // Lo movemos visualmente a la pestaña "Asignados"
       onAssignmentsChange((current) => {
@@ -195,7 +211,7 @@ const handleAssign = async (origin, groupPedidos) => {
     }
   }
 
-const handleUnassign = async (pedidoId) => {
+  const handleUnassign = async (pedidoId) => {
     try {
       // Le avisamos a MongoDB que devuelva el pedido a estado REGISTRADO
       const response = await fetch(`http://localhost:3001/api/pedidos/desasignar/${pedidoId}`, {
@@ -203,6 +219,14 @@ const handleUnassign = async (pedidoId) => {
       });
 
       if (response.ok) {
+        // Volvemos a consultar los pedidos para tener los estados actualizados (si el siguiente pasó a EN_CAMINO)
+        const freshPedidos = await getPedidos();
+        if (Array.isArray(freshPedidos)) {
+          setPedidos(freshPedidos.filter((p) =>
+            p.estado === 'REGISTRADO' || p.estado === 'ASIGNADO' || p.estado === 'EN_CAMINO'
+          ));
+        }
+
         // Si sale bien, lo borramos de la pestaña "Asignados" en pantalla
         onAssignmentsChange((current) => {
           const next = { ...current }
@@ -374,32 +398,40 @@ const handleUnassign = async (pedidoId) => {
                     <th scope="col">ID del pedido</th>
                     <th scope="col">Origen</th>
                     <th scope="col">Destino</th>
+                    <th scope="col">Estado</th>
                     <th scope="col" className="route-action-col">
                       <span className="sr-only">Acciones</span>
                     </th>
                   </tr>
                 </thead>
-                    <tbody>
-                    {groupPedidos.map((pedido) => {
-                      const idReal = pedido.ID || pedido._id;
-                      return (
-                        <tr key={idReal}>
-                          <td><code>{shortId(pedido)}</code></td>
-                          <td>{pedido.comercioOrigen || pedido.nombreOrigen || pedido.origen}</td>
-                          <td>{pedido.destino}</td>
-                          <td className="route-action-col">
-                            <button
-                              className="modal-cancel"
-                              type="button"
-                              onClick={() => handleUnassign(idReal)}
-                            >
-                              Quitar
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
+                <tbody>
+                  {groupPedidos.map((pedido) => {
+                    const idReal = pedido.ID || pedido._id;
+                    const estadoActual = pedido.estado ? pedido.estado.toLowerCase().replace('_', '-') : 'asignado';
+                    return (
+                      <tr key={idReal}>
+                        <td><code>{shortId(pedido)}</code></td>
+                        <td>{pedido.comercioOrigen || pedido.nombreOrigen || pedido.origen}</td>
+                        <td>{pedido.destino}</td>
+                        <td>
+                          <span className={`status-badge status-${estadoActual}`}>
+                            <span className="status-dot" aria-hidden="true" />
+                            <span>{estadoActual === 'en-camino' ? 'En Camino' : 'Asignado'}</span>
+                          </span>
+                        </td>
+                        <td className="route-action-col">
+                          <button
+                            className="modal-cancel"
+                            type="button"
+                            onClick={() => handleUnassign(idReal)}
+                          >
+                            Quitar
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
               </table>
             </article>
           ))

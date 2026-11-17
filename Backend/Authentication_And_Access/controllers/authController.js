@@ -300,6 +300,9 @@ const mobileLogin = async (req, res) => {
         email: repartidor.email,
         name: repartidor.nombre,
         surname: repartidor.apellido,
+        telefono: repartidor.telefono || '',
+        fotoPerfil: repartidor.fotoPerfil || '',
+        legajo: repartidor.legajo || repartidor.ID || '',
         role: 'repartidor',
       },
     });
