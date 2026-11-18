@@ -3,12 +3,14 @@ const router = express.Router();
 const { 
     crearPedido, 
     obtenerPedidos, 
+    obtenerSeguimientoPedido,
     modificarPedido, 
     cancelarPedido, 
     eliminarPedido, 
     obtenerPedidosEntregadosPorRepartidor,
     asignarRepartidor,
     entregarPedido,
+    obtenerComprobante,
     desasignarRepartidor,
     obtenerDetalleEntrega
 } = require('../pedidoController');
@@ -16,6 +18,8 @@ const {
 router.post('/cargar', crearPedido);
 router.get('/', obtenerPedidos);
 router.get('/:id/detalle-entrega', obtenerDetalleEntrega);
+router.get('/:id/seguimiento', obtenerSeguimientoPedido);
+router.get('/:id/comprobante', obtenerComprobante);
 router.put('/modificar/:id', modificarPedido); 
 router.put('/cancelar/:id', cancelarPedido);
 router.put('/asignar/:id', asignarRepartidor);

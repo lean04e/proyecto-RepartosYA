@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import writeExcelFile from 'write-excel-file/browser';
-import { getPedidosEntregados, getUploadUrl } from '../services/api';
+import { getPedidosEntregados, getUploadUrl, rechazarEntrega } from '../services/api';
 import './CommercesSection.css';
 import './OrdersSection.css';
 import './ReportsSection.css';
@@ -18,6 +18,7 @@ const DELIVERY_COLUMNS = [
     { key: 'origin', label: 'Origen' },
     { key: 'destination', label: 'Destino' },
     { key: 'driver', label: 'Repartidor' },
+    { key: 'status', label: 'Estado' },
     { key: 'paymentMethod', label: 'Método de pago' },
     { key: 'price', label: 'Precio' },
 ];
@@ -60,7 +61,10 @@ function getCreationDate(order) {
 function getDeliveredDate(order) {
     const deliveredEntry = [...(order.historialEstados ?? [])]
         .reverse()
-        .find((change) => change.estadoNuevo === 'ENTREGADO');
+        .find((change) => change.estadoNuevo === 'ENTREGADO')
+        ?? [...(order.historialEstados ?? [])]
+            .reverse()
+            .find((change) => change.estadoNuevo === 'FALLIDO');
     const date = deliveredEntry?.fecha ? new Date(deliveredEntry.fecha) : getCreationDate(order);
     return date && !Number.isNaN(date.getTime()) ? date : null;
 }
@@ -82,8 +86,9 @@ function buildDeliveryRows(orders) {
                 origin: order.comercioOrigen ?? '',
                 destination: order.comercioDestino ?? '',
                 driver: order.repartidorNombre ?? '',
-                paymentMethod: order.comprobante?.metodoPago ?? '',
-                price: typeof order.comprobante?.precio === 'number' ? currencyFormat.format(order.comprobante.precio) : '',
+                status: order.estado === 'FALLIDO' ? 'Fallido' : 'Entregado',
+                paymentMethod: order.comprobante?.metodoPago || '-',
+                price: typeof order.comprobante?.precio === 'number' ? currencyFormat.format(order.comprobante.precio) : '-',
                 receiptUrl: order.comprobante?.imagen ? getUploadUrl(order.comprobante.imagen) : '',
             };
         })
@@ -113,6 +118,10 @@ function getMonthKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function getDayKey(date) {
+    return `${getMonthKey(date)}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function formatMonth(key) {
     const [year, month] = key.split('-').map(Number);
     const label = new Intl.DateTimeFormat('es-AR', { month: 'short' })
@@ -121,34 +130,93 @@ function formatMonth(key) {
     return { label, year };
 }
 
-// Un grupo por mes, desde la primera entrega hasta hoy, con los meses sin entregas en cero
-function buildTimeline(orders) {
+// Rangos de tiempo de Reportes: filtran la lista de entregas, el Excel y los graficos
+// El rango diario se agrupa por hora, los de hasta 30 dias por dia y los largos por mes
+const RANGES = [
+    { key: 'today', label: 'Diario', unit: 'hour', days: 1 },
+    { key: 'week', label: '7 días', unit: 'day', days: 7 },
+    { key: 'month', label: '30 días', unit: 'day', days: 30 },
+    { key: 'half', label: '6 meses', unit: 'month', months: 6 },
+    { key: 'all', label: 'Histórico', unit: 'month' },
+];
+
+function getRangeStart(range) {
+    const now = new Date();
+    if (range.days) {
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate() - (range.days - 1));
+    }
+    if (range.months) {
+        return new Date(now.getFullYear(), now.getMonth() - (range.months - 1), 1);
+    }
+    return null;
+}
+
+function filterByRange(orders, range) {
+    const start = getRangeStart(range);
+    if (!start) {
+        return orders;
+    }
+    return orders.filter((order) => {
+        const date = getDeliveredDate(order);
+        return date && date >= start;
+    });
+}
+
+// Un grupo por dia o mes del rango, con los periodos sin entregas en cero
+function buildTimeline(orders, range) {
     const dated = orders
         .map((order) => ({ date: getDeliveredDate(order), revenue: getRevenue(order) }))
         .filter((entry) => entry.date);
 
-    if (dated.length === 0) {
-        return [];
+    const unit = range.unit;
+    let start = getRangeStart(range);
+    if (!start) {
+        if (dated.length === 0) {
+            return [];
+        }
+        const first = dated.reduce((min, entry) => (entry.date < min ? entry.date : min), dated[0].date);
+        start = new Date(first.getFullYear(), first.getMonth(), 1);
     }
 
-    const first = dated.reduce((min, entry) => (entry.date < min ? entry.date : min), dated[0].date);
     const buckets = new Map();
-    const cursor = new Date(first.getFullYear(), first.getMonth(), 1);
+    const cursor = new Date(start);
     const end = new Date();
+    const getKey = (date) => {
+        if (unit === 'hour') {
+            return `${getDayKey(date)}-${String(date.getHours()).padStart(2, '0')}`;
+        }
+        return unit === 'day' ? getDayKey(date) : getMonthKey(date);
+    };
     while (cursor <= end) {
-        buckets.set(getMonthKey(cursor), { count: 0, revenue: 0 });
-        cursor.setMonth(cursor.getMonth() + 1);
+        const key = getKey(cursor);
+        let meta;
+        if (unit === 'hour') {
+            // Bajo la primera hora se muestra la fecha en lugar del anio
+            meta = { label: `${cursor.getHours()}h`, year: `${cursor.getDate()}/${cursor.getMonth() + 1}` };
+        } else if (unit === 'day') {
+            meta = { label: `${cursor.getDate()}/${cursor.getMonth() + 1}`, year: cursor.getFullYear() };
+        } else {
+            meta = formatMonth(key);
+        }
+        buckets.set(key, { ...meta, count: 0, revenue: 0 });
+        if (unit === 'hour') {
+            cursor.setHours(cursor.getHours() + 1);
+        } else if (unit === 'day') {
+            cursor.setDate(cursor.getDate() + 1);
+        } else {
+            cursor.setMonth(cursor.getMonth() + 1);
+        }
     }
 
     dated.forEach(({ date, revenue }) => {
-        const bucket = buckets.get(getMonthKey(date));
+        const bucket = buckets.get(getKey(date));
         if (bucket) {
             bucket.count += 1;
             bucket.revenue += revenue;
         }
     });
 
-    return [...buckets].map(([key, value]) => ({ key, ...formatMonth(key), ...value }));
+    return [...buckets].map(([key, value]) => ({ key, ...value }));
 }
 
 function rankBy(orders, getName) {
@@ -282,7 +350,7 @@ function CloseIcon() {
     );
 }
 
-function ReceiptModal({ row, onClose }) {
+function ReceiptModal({ row, onClose, onReject }) {
     const [imageFailed, setImageFailed] = useState(false);
 
     useEffect(() => {
@@ -327,14 +395,53 @@ function ReceiptModal({ row, onClose }) {
                         />
                     )}
                 </div>
+                {row.status !== 'Fallido' && (
+                    <div className="receipt-footer">
+                        <button className="modal-delete" type="button" onClick={onReject}>
+                            Rechazar entrega
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-function DeliveriesList({ rows }) {
+function RejectDeliveryModal({ row, busy, error, onCancel, onConfirm }) {
+    return (
+        <div className="modal-backdrop" role="presentation">
+            <div
+                className="confirmation-modal delete-confirmation-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="reject-delivery-title"
+            >
+                <h2 id="reject-delivery-title">¿Confirmas rechazar la entrega?</h2>
+                <p className="confirmation-copy">
+                    Se rechazará la entrega del pedido <strong>{row.id.split('-')[0]}</strong>. El pedido pasará
+                    al estado Fallido.
+                </p>
+                {error && <p className="report-export-error" role="alert">{error}</p>}
+                <div className="confirmation-actions">
+                    <button className="modal-cancel" type="button" onClick={onCancel} disabled={busy}>
+                        Volver
+                    </button>
+                    <button className="modal-delete" type="button" onClick={onConfirm} disabled={busy} aria-busy={busy}>
+                        {busy ? 'Rechazando...' : 'Rechazar entrega'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DeliveriesList({ rows, onRejected }) {
     const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
     const [receiptRow, setReceiptRow] = useState(null);
+    const [rejectRow, setRejectRow] = useState(null);
+    const [rejecting, setRejecting] = useState(false);
+    const [rejectError, setRejectError] = useState('');
+    const [toast, setToast] = useState('');
     const [isExporting, setIsExporting] = useState(false);
     const [exportFailed, setExportFailed] = useState(false);
     const visibleRows = rows.slice(0, visibleCount);
@@ -348,6 +455,23 @@ function DeliveriesList({ rows }) {
             setExportFailed(true);
         } finally {
             setIsExporting(false);
+        }
+    };
+
+    const handleReject = async () => {
+        setRejecting(true);
+        setRejectError('');
+        try {
+            await rechazarEntrega(rejectRow.id);
+            setRejectRow(null);
+            setReceiptRow(null);
+            setToast('La entrega fue rechazada y el pedido quedó como fallido');
+            window.setTimeout(() => setToast(''), 3500);
+            onRejected?.();
+        } catch (error) {
+            setRejectError(error.message || 'No se pudo rechazar la entrega');
+        } finally {
+            setRejecting(false);
         }
     };
 
@@ -395,6 +519,12 @@ function DeliveriesList({ rows }) {
                                     <td data-label="Origen">{row.origin}</td>
                                     <td data-label="Destino">{row.destination}</td>
                                     <td data-label="Repartidor">{row.driver}</td>
+                                    <td data-label="Estado">
+                                        <span className={`status-badge status-${row.status === 'Fallido' ? 'fallido' : 'entregado'}`}>
+                                            <span className="status-dot" aria-hidden="true" />
+                                            <span>{row.status}</span>
+                                        </span>
+                                    </td>
                                     <td data-label="Método de pago">{row.paymentMethod}</td>
                                     <td data-label="Precio" className="order-date-cell">{row.price}</td>
                                     <td data-label="Comprobante">
@@ -408,14 +538,21 @@ function DeliveriesList({ rows }) {
                                                 Ver comprobante
                                             </button>
                                         ) : (
-                                            <span className="report-receipt-none">Sin comprobante</span>
+                                            <button
+                                                type="button"
+                                                className="report-receipt-button"
+                                                disabled
+                                                aria-label={`El pedido ${row.id} no tiene comprobante`}
+                                            >
+                                                Ver comprobante
+                                            </button>
                                         )}
                                     </td>
                                 </tr>
                             ))}
                             {rows.length === 0 && (
                                 <tr className="empty-results-row">
-                                    <td colSpan={DELIVERY_COLUMNS.length + 1}>No hay pedidos entregados</td>
+                                    <td colSpan={DELIVERY_COLUMNS.length + 1}>No hay entregas en el período seleccionado</td>
                                 </tr>
                             )}
                             {rows.length > visibleCount && (
@@ -436,7 +573,26 @@ function DeliveriesList({ rows }) {
                 </div>
             </div>
 
-            {receiptRow && <ReceiptModal row={receiptRow} onClose={() => setReceiptRow(null)} />}
+            {receiptRow && (
+                <ReceiptModal
+                    row={receiptRow}
+                    onClose={() => setReceiptRow(null)}
+                    onReject={() => {
+                        setRejectError('');
+                        setRejectRow(receiptRow);
+                    }}
+                />
+            )}
+            {rejectRow && (
+                <RejectDeliveryModal
+                    row={rejectRow}
+                    busy={rejecting}
+                    error={rejectError}
+                    onCancel={() => setRejectRow(null)}
+                    onConfirm={handleReject}
+                />
+            )}
+            {toast && <div className="success-toast" role="status">{toast}</div>}
         </section>
     );
 }
@@ -445,6 +601,9 @@ function ReportsSection() {
     const [orders, setOrders] = useState(null);
     const [error, setError] = useState('');
     const [updatedAt, setUpdatedAt] = useState(null);
+    const [tab, setTab] = useState('deliveries');
+    const [rangeKey, setRangeKey] = useState('week');
+    const range = RANGES.find((item) => item.key === rangeKey);
     // Reintentar vuelve a montar la carga y el refresco periodico
     const [reloadCount, setReloadCount] = useState(0);
     const retry = () => setReloadCount((count) => count + 1);
@@ -459,7 +618,8 @@ function ReportsSection() {
                     throw new Error('La respuesta de pedidos no tiene un formato válido.');
                 }
                 if (isMounted) {
-                    setOrders(data.filter((order) => order.estado === 'ENTREGADO'));
+                    // La lista de entregas muestra los entregados y los fallidos; los cancelados no
+                    setOrders(data.filter((order) => order.estado === 'ENTREGADO' || order.estado === 'FALLIDO'));
                     setUpdatedAt(new Date());
                     setError('');
                 }
@@ -482,28 +642,60 @@ function ReportsSection() {
         if (!orders) {
             return null;
         }
+        // Los graficos cuentan solo las entregas vigentes: los fallidos quedan fuera
+        const entregados = orders.filter((order) => order.estado === 'ENTREGADO');
+        const rangeOrders = filterByRange(entregados, range);
         return {
-            timeline: buildTimeline(orders),
-            deliveries: buildDeliveryRows(orders),
-            totalRevenue: orders.reduce((sum, order) => sum + getRevenue(order), 0),
-            drivers: rankBy(orders, (order) => order.repartidorNombre || 'Sin repartidor'),
-            commerces: rankBy(orders, (order) => order.comercioDestino || 'Comercio no especificado'),
+            entregados,
+            rangeOrders,
+            timeline: buildTimeline(rangeOrders, range),
+            deliveries: buildDeliveryRows(filterByRange(orders, range)),
+            totalRevenue: rangeOrders.reduce((sum, order) => sum + getRevenue(order), 0),
+            drivers: rankBy(rangeOrders, (order) => order.repartidorNombre || 'Sin repartidor'),
+            commerces: rankBy(rangeOrders, (order) => order.comercioDestino || 'Comercio no especificado'),
         };
-    }, [orders]);
+    }, [orders, range]);
 
     return (
         <section className="reports-section" aria-labelledby="reports-title">
             <div className="admin-header-title-row">
                 <div>
                     <h1 className="main-title" id="reports-title">Reportes</h1>
-                    <p className="subtitle-date">
-                        Incluye pedidos ya eliminados del listado
-                        {updatedAt && ` · Actualizado a las ${timeFormat.format(updatedAt)}`}
-                    </p>
+                    {updatedAt && (
+                        <p className="subtitle-date">Actualizado a las {timeFormat.format(updatedAt)}</p>
+                    )}
                 </div>
 
-                {/* Cuando exista el filtrado por fecha, este rango pasa a ser un selector (diario, mensual, histórico) */}
-                <p className="report-scope">Histórico</p>
+                <div className="report-range" role="group" aria-label="Rango de tiempo">
+                    {RANGES.map((item) => (
+                        <button
+                            key={item.key}
+                            type="button"
+                            className={`report-range-button${rangeKey === item.key ? ' is-active' : ''}`}
+                            aria-pressed={rangeKey === item.key}
+                            onClick={() => setRangeKey(item.key)}
+                        >
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="report-tabs" role="tablist" aria-label="Secciones de reportes">
+                {[['deliveries', 'Entregas'], ['charts', 'Gráficos']].map(([key, label]) => (
+                    <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        id={`report-tab-${key}`}
+                        aria-selected={tab === key}
+                        aria-controls={`report-panel-${key}`}
+                        className={`report-tab${tab === key ? ' is-active' : ''}`}
+                        onClick={() => setTab(key)}
+                    >
+                        {label}
+                    </button>
+                ))}
             </div>
 
             {error && orders && (
@@ -523,17 +715,21 @@ function ReportsSection() {
                     <div className="report-card report-skeleton" />
                     <div className="report-card report-skeleton" />
                 </div>
-            ) : orders.length === 0 ? (
+            ) : tab === 'deliveries' ? (
+                <div role="tabpanel" id="report-panel-deliveries" aria-labelledby="report-tab-deliveries">
+                    <DeliveriesList rows={report.deliveries} onRejected={retry} />
+                </div>
+            ) : report.entregados.length === 0 ? (
                 <p className="report-state" role="status">
                     Todavía no hay pedidos entregados. Los gráficos aparecen con la primera entrega.
                 </p>
             ) : (
-                <>
+                <div className="report-charts-panel" role="tabpanel" id="report-panel-charts" aria-labelledby="report-tab-charts">
                     <div className="report-main-grid">
                         <Chart
                             title="Pedidos entregados"
-                            note="Entregas por mes"
-                            total={`${numberFormat.format(orders.length)} en total`}
+                            note={{ hour: 'Entregas por hora', day: 'Entregas por día', month: 'Entregas por mes' }[range.unit]}
+                            total={`${numberFormat.format(report.rangeOrders.length)} en el período`}
                             timeline={report.timeline}
                             valueKey="count"
                             formatValue={(value) => numberFormat.format(value)}
@@ -610,7 +806,7 @@ function ReportsSection() {
                     <div className="report-secondary-grid">
                         <RankingCard
                             title="Repartidores con más entregas"
-                            subtitle={`Top ${TOP_LIMIT} del historial`}
+                            subtitle={`Top ${TOP_LIMIT} del período`}
                             items={report.drivers}
                             unit={{ singular: 'entrega', plural: 'entregas' }}
                             emptyText="Todavía no hay entregas asignadas a repartidores."
@@ -623,9 +819,7 @@ function ReportsSection() {
                             emptyText="Todavía no hay pedidos entregados a comercios."
                         />
                     </div>
-
-                    <DeliveriesList rows={report.deliveries} />
-                </>
+                </div>
             )}
         </section>
     );

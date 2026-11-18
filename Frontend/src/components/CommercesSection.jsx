@@ -951,8 +951,8 @@ const ORDER_STATUS_LABELS = {
   asignado: 'Asignado',
   'en-camino': 'En Camino',
   entregado: 'Entregado',
-  rechazado: 'Rechazado',
   cancelado: 'Cancelado',
+  fallido: 'Fallido',
 }
 
 function OrderStatusBadge({ status }) {

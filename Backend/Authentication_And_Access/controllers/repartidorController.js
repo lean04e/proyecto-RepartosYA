@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Repartidor = require('../../Models/Repartidor');
 const bcrypt = require('bcrypt');
 
@@ -75,6 +76,77 @@ const modificarRepartidor = async (req, res) => {
     }
 };
 
+// Función para obtener el perfil de un repartidor (sin password)
+const obtenerPerfilRepartidor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = mongoose.Types.ObjectId.isValid(id)
+            ? { _id: id }
+            : { $or: [{ ID: id }, { legajo: id }, { email: id }] };
+
+        const repartidor = await Repartidor.findOne(query).select('-password');
+        if (!repartidor) {
+            return res.status(404).json({ error: 'Repartidor no encontrado' });
+        }
+
+        res.status(200).json(repartidor);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener el perfil del repartidor', detalle: error.message });
+    }
+};
+
+// Función para modificar únicamente el perfil del repartidor (nombre, apellido, telefono, fotoPerfil)
+const modificarPerfilRepartidor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nombre, apellido, telefono, fotoPerfil } = req.body;
+
+        // Validar que nombre, apellido y telefono existan y no estén vacíos
+        if (!nombre || typeof nombre !== 'string' || !nombre.trim()) {
+            return res.status(400).json({ error: 'El nombre es obligatorio' });
+        }
+        if (!apellido || typeof apellido !== 'string' || !apellido.trim()) {
+            return res.status(400).json({ error: 'El apellido es obligatorio' });
+        }
+        if (!telefono || typeof telefono !== 'string' || !telefono.trim()) {
+            return res.status(400).json({ error: 'El teléfono es obligatorio' });
+        }
+
+        // Construir actualización SOLO con los campos permitidos
+        // Bloquea explícitamente cualquier cambio a ID, legajo, email, status, destination o password
+        const actualizacion = {
+            nombre: nombre.trim(),
+            apellido: apellido.trim(),
+            telefono: telefono.trim()
+        };
+
+        if (fotoPerfil !== undefined) {
+            actualizacion.fotoPerfil = typeof fotoPerfil === 'string' ? fotoPerfil.trim() : '';
+        }
+
+        const query = mongoose.Types.ObjectId.isValid(id)
+            ? { _id: id }
+            : { $or: [{ ID: id }, { legajo: id }, { email: id }] };
+
+        const repartidorActualizado = await Repartidor.findOneAndUpdate(
+            query,
+            { $set: actualizacion },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!repartidorActualizado) {
+            return res.status(404).json({ error: 'Repartidor no encontrado' });
+        }
+
+        res.status(200).json({
+            mensaje: 'Perfil actualizado con éxito',
+            repartidor: repartidorActualizado
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar el perfil del repartidor', detalle: error.message });
+    }
+};
+
 const borrarRepartidor = async (req, res) => {
     try {
         const { id } = req.params;
@@ -91,4 +163,11 @@ const borrarRepartidor = async (req, res) => {
     }
 };
 
-module.exports = { cargarRepartidor, obtenerRepartidores, modificarRepartidor, borrarRepartidor };
+module.exports = {
+    cargarRepartidor,
+    obtenerRepartidores,
+    modificarRepartidor,
+    borrarRepartidor,
+    obtenerPerfilRepartidor,
+    modificarPerfilRepartidor
+};

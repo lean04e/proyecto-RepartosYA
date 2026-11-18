@@ -60,14 +60,15 @@ useEffect(() => {
               return nombreRep === String(driver._id || driver.id || '').toLowerCase() || nombreRep === displayName.toLowerCase() || nombreRep === String(driver.nombre).trim().toLowerCase();
             });
 
-            const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
+            const enCamino = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
+            const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino' || p.estado === 'ASIGNADO' || p.estado === 'asignado');
             const entregados = misPedidos.filter(p => p.estado === 'ENTREGADO' || p.estado === 'entregado');
 
             return {
               ...driver,
               pendingOrders: pendientes.length,
               deliveredOrders: entregados.length,
-              destination: pendientes.length > 0 ? pendientes[0].destino : 'En base'
+              destination: enCamino.length > 0 ? enCamino[0].destino : 'En base'
             };
           });
 
@@ -160,16 +161,18 @@ useEffect(() => {
         });
 
         // Separamos los que están en viaje (pendientes) y los ya finalizados
-        const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
+        const enCamino = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
+        const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino' || p.estado === 'ASIGNADO' || p.estado === 'asignado');
         const entregados = misPedidos.filter(p => p.estado === 'ENTREGADO' || p.estado === 'entregado');
+        const fallidos = misPedidos.filter(p => p.estado === 'FALLIDO' || p.estado === 'fallido' || p.estado === 'CANCELADO' || p.estado === 'cancelado' || p.estado === 'RECHAZADO' || p.estado === 'rechazado');
 
-        // Adaptamos los entregados para la tabla del modal
-        const pedidosAdaptados = entregados.map(p => ({
+        // Adaptamos los entregados y fallidos para la tabla del modal
+        const pedidosAdaptados = [...entregados, ...fallidos].sort((a, b) => String(a._id).localeCompare(String(b._id))).map(p => ({
             id: p.ID || p._id,
             date: p.createdAt ? new Intl.DateTimeFormat('es-AR').format(new Date(p.createdAt)) : 'Reciente',
             origin: p.nombreOrigen || p.comercioOrigen || p.origen,
             destination: p.destino,
-            status: 'entregado'
+            status: p.estado === 'FALLIDO' ? 'fallido' : 'entregado'
         })).reverse(); // Invertimos para que los más recientes queden arriba
 
         // Abrimos el modal inyectándole las métricas calculadas
@@ -179,7 +182,7 @@ useEffect(() => {
             deliveredOrders: entregados.length,
             historicalOrders: entregados.length > 0 ? entregados.length * 4 : 0, // Estimación visual
             recentOrders: pedidosAdaptados,
-            destination: pendientes.length > 0 ? pendientes[0].destino : 'En base' // Si está en viaje, mostramos a dónde va
+            destination: enCamino.length > 0 ? enCamino[0].destino : 'En base' // Si está en viaje, mostramos a dónde va
         });
       } else {
         setDetailDriver(driver); // Si falla, abre igual pero sin métricas
@@ -899,7 +902,7 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
             <div className="detail-orders-header">
               <h3 className="detail-orders-title">Últimos pedidos completados</h3>
               <span className="detail-orders-count-badge">
-                {deliveredOrdersList.length} pedidos entregados
+                {deliveredOrdersList.filter((order) => order.status !== 'fallido').length} pedidos entregados
               </span>
             </div>
 
@@ -932,9 +935,9 @@ function DriverDetailModal({ driver, onClose, onEdit }) {
                           </td>
                           <td className="order-route-cell">{route}</td>
                           <td>
-                            <span className="status-badge status-entregado">
+                            <span className={`status-badge status-${order.status === 'fallido' ? 'fallido' : 'entregado'}`}>
                               <span className="status-dot" aria-hidden="true" />
-                              <span>Entregado</span>
+                              <span>{order.status === 'fallido' ? 'Fallido' : 'Entregado'}</span>
                             </span>
                           </td>
                         </tr>

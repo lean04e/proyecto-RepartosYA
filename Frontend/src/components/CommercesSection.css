@@ -893,13 +893,15 @@
   background: var(--status-warning-text);
 }
 
-.status-cancelado {
+.status-cancelado,
+.status-fallido {
   color: var(--danger);
   background: var(--danger-soft);
   border-color: var(--danger);
 }
 
-.status-cancelado .status-dot {
+.status-cancelado .status-dot,
+.status-fallido .status-dot {
   background: var(--danger);
 }
 

@@ -42,7 +42,25 @@ function HeaderRotator({ isDarkMode }) {
     );
 }
 
-function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme }) {
+function EyeIcon({ crossed }) {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
+            <circle cx="12" cy="12" r="3" />
+            {crossed && <path d="M3 3l18 18" />}
+        </svg>
+    );
+}
+
+function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme, isDataHidden, onToggleData }) {
+    const dataLabel = isDataHidden ? 'Mostrar los datos cargados' : 'Ocultar los datos cargados';
+
+    const handleOpenDamagedToken = () => {
+        const testUrl = `${window.location.origin}/seguimiento/token-danado-demo`;
+        window.open(testUrl, '_blank', 'noopener,noreferrer');
+    };
+
     return (
         <header className="admin-top-navbar">
             <div className="top-navbar-left">
@@ -60,6 +78,25 @@ function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme }) {
             <HeaderRotator isDarkMode={isDarkMode} />
 
             <div className="top-nav-right">
+                <button
+                    type="button"
+                    onClick={handleOpenDamagedToken}
+                    className="top-icon-btn token-test-btn"
+                    aria-label="Probar enlace con token dañado"
+                    title="Probar enlace con token dañado"
+                >
+                    !
+                </button>
+                <button
+                    type="button"
+                    onClick={onToggleData}
+                    className="top-icon-btn"
+                    aria-label={dataLabel}
+                    aria-pressed={isDataHidden}
+                    title={dataLabel}
+                >
+                    <EyeIcon crossed={isDataHidden} />
+                </button>
                 <button
                     type="button"
                     onClick={onToggleTheme}

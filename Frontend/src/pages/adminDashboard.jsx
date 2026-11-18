@@ -7,6 +7,7 @@ import ReportsSection from '../components/ReportsSection';
 import RepartidoresSection from '../components/RepartidoresSection';
 import RouteSheetSection from '../components/RouteSheetSection';
 import { getAll, getPedidos } from '../services/api';
+import { hideLoadedData, showLoadedData } from '../services/dataVisibility';
 import '../styles/admin.css';
 
 
@@ -102,6 +103,24 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     const [openAddCommerce, setOpenAddCommerce] = useState(false);
     const [drivers, setDrivers] = useState([]);
     const [routeAssignments, setRouteAssignments] = useState({});
+    const [isDataHidden, setIsDataHidden] = useState(false);
+    // Cambia al ocultar/mostrar: recarga los datos y remonta las secciones que cargan por su cuenta
+    const [dataVersion, setDataVersion] = useState(0);
+
+    const handleToggleData = async () => {
+        try {
+            if (isDataHidden) {
+                showLoadedData();
+            } else {
+                await hideLoadedData();
+            }
+            setIsDataHidden(!isDataHidden);
+            setRouteAssignments({});
+            setDataVersion((version) => version + 1);
+        } catch (error) {
+            console.error('No se pudo cambiar la visibilidad de los datos:', error);
+        }
+    };
 
     const sections = [
         { id: 'orders', icon: '📋', label: 'Gestión de Pedidos', href: '#pedidos' },
@@ -120,7 +139,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
     useEffect(() => {
         getAll('repartidores')
             .then((data) => {
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data) && (data.length > 0 || dataVersion > 0)) {
                     const repartidoresAdaptados = data.map((repartidor) => ({
                         id: repartidor._id || repartidor.id,
                         name: `${repartidor.nombre || ''} ${repartidor.apellido || ''}`.trim() || repartidor.name,
@@ -141,7 +160,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                 }
             })
             .catch((err) => console.error('Error al cargar repartidores:', err));
-    }, []);
+    }, [dataVersion]);
 
 
     // EFFECT PARA COMERCIOS (Con traducción de datos backend -> frontend)
@@ -178,7 +197,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
             isMounted = false;
             window.clearInterval(commercesRefreshInterval);
         };
-    }, [activeSection]);
+    }, [activeSection, dataVersion]);
 
     useEffect(() => {
         const dateRefreshInterval = window.setInterval(() => {
@@ -222,7 +241,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
             isMounted = false;
             window.clearInterval(ordersRefreshInterval);
         };
-    }, [activeSection, ordersVersion]);
+    }, [activeSection, ordersVersion, dataVersion]);
 
     useEffect(() => {
         if (!activeOrderView) {
@@ -286,6 +305,8 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                 onLogout={() => setIsLogoutDialogOpen(true)}
                 isDarkMode={isDarkMode}
                 onToggleTheme={onToggleTheme}
+                isDataHidden={isDataHidden}
+                onToggleData={handleToggleData}
             />
 
             {isSidebarOpen && (
@@ -331,13 +352,14 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
 
             <main className={`admin-content-area${isSidebarOpen ? ' sidebar-is-open' : ''}`}>
                 {activeSection === 'commerces' ? (
-                    <CommercesSection commerces={commerces} onCommercesChange={setCommerces} openAddOnMount={openAddCommerce} />
+                    <CommercesSection key={dataVersion} commerces={commerces} onCommercesChange={setCommerces} openAddOnMount={openAddCommerce} />
                 ) : activeSection === 'reports' ? (
-                    <ReportsSection />
+                    <ReportsSection key={dataVersion} />
                 ) : activeSection === 'drivers' ? (
-                    <RepartidoresSection drivers={drivers} onDriversChange={setDrivers} />
+                    <RepartidoresSection key={dataVersion} drivers={drivers} onDriversChange={setDrivers} />
                 ) : activeSection === 'routes' ? (
                     <RouteSheetSection
+                        key={dataVersion}
                         drivers={drivers}
                         assignments={routeAssignments}
                         onAssignmentsChange={setRouteAssignments}
@@ -421,6 +443,7 @@ function AdminDashboard({ onLogout, isDarkMode, onToggleTheme }) {
                         </section>
 
                         <OrdersSection
+                            key={dataVersion}
                             orders={[]}
                             openOrderId={requestedOrderId}
                             addOrderRequest={addOrderRequest}

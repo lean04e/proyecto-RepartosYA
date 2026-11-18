@@ -34,6 +34,10 @@ const repartidorSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    fotoPerfil: {
+        type: String,
+        default: ''
+    },
     status: {
         type: String,
         default: 'Activo'

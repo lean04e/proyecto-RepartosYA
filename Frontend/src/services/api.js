@@ -18,7 +18,10 @@ async function request(path, options = {}) {
 
     const data = await response.json();
     if (!response.ok) {
-        throw new Error(data.message || `La solicitud falló (${response.status}).`);
+        const error = new Error(data.message || data.mensaje || data.error || `La solicitud falló (${response.status}).`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
     }
 
     return data;
@@ -75,10 +78,23 @@ export function getPedidos() {
     return request('/api/pedidos');
 }
 
+export function getDetalleEntrega(orderId) {
+    return request(`/api/pedidos/${encodeURIComponent(orderId)}/detalle-entrega`);
+}
+
+export function getPublicOrderTracking(orderId) {
+    return request(`/api/pedidos/${encodeURIComponent(orderId)}/seguimiento`);
+}
+
 // Pedidos activos mas los ENTREGADOS que se borraron de la lista (base de los reportes).
 // URL publica de un archivo subido al backend (por ejemplo la imagen de un comprobante)
 export function getUploadUrl(path) {
     return `${API_BASE_URL}${path}`;
+}
+
+// Rechaza una entrega: el backend la deja en estado FALLIDO (misma ruta que cancelar un pedido)
+export function rechazarEntrega(id) {
+    return request(`/api/pedidos/cancelar/${encodeURIComponent(id)}`, { method: 'PUT' });
 }
 
 export function getPedidosEntregados() {

@@ -756,6 +756,23 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
   },
+  paymentOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  paymentOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  paymentOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   receiptInput: {
     marginTop: 4,
     marginBottom: 6,
@@ -831,6 +848,18 @@ export const DELIVERY_DASHBOARD_STYLES = StyleSheet.create({
   cancelStartText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  cancelOrderButton: {
+    alignItems: 'center',
+    marginTop: 7,
+    paddingVertical: 12,
+    borderRadius: GLOBAL_STYLES.inputRadius,
+    backgroundColor: COLORS.danger,
+  },
+  cancelOrderButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   modalHeader: {
     flexDirection: 'row',

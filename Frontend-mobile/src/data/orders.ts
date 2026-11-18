@@ -4,6 +4,8 @@ export type OrderStatus =
   | 'MODIFICADO'
   | 'EN_CAMINO'
   | 'CANCELADO'
+  | 'FALLIDO'
+  | 'RECHAZADO'
   | 'ENTREGADO';
 
 export type DeliveryOrder = {
@@ -17,12 +19,28 @@ export type DeliveryOrder = {
   contacto: string;
   estado: OrderStatus;
   fechaEstado?: string;
+  timerReferenceAt?: string;
+  createdAt?: string;
+  // Momento en que se le asigno el repartidor (sirve para detectar pedidos cargados juntos)
+  asignadoEn?: string;
   metodoPago?: string;
   precio?: number;
   comprobanteUrl?: string;
 };
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+
+function getStatusTimestamp(pedido: any): string | undefined {
+  const estado = String(pedido.estado || '').toUpperCase();
+  const history = Array.isArray(pedido.historialEstados) ? pedido.historialEstados : [];
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const event = history[index];
+    if (String(event.estadoNuevo || '').toUpperCase() === estado && event.fecha) {
+      return String(event.fecha);
+    }
+  }
+  return pedido.updatedAt || pedido.createdAt;
+}
 
 // Igual que getOrders pero propaga el error: sirve para refrescar sin vaciar la lista si falla la red
 export async function fetchOrders(): Promise<DeliveryOrder[]> {
@@ -46,6 +64,9 @@ export async function fetchOrders(): Promise<DeliveryOrder[]> {
     contacto: pedido.contacto || pedido.comercioDestino?.telefono || 'Sin especificar',
     estado: (pedido.estado || 'PENDIENTE').toUpperCase() as OrderStatus,
     fechaEstado: pedido.updatedAt || pedido.createdAt || new Date().toISOString(),
+    timerReferenceAt: getStatusTimestamp(pedido),
+    createdAt: pedido.createdAt,
+    asignadoEn: pedido.historialEstados?.find((h: any) => h.estadoNuevo === 'ASIGNADO' || h.estadoNuevo === 'EN_CAMINO')?.fecha,
     metodoPago: pedido.comprobante?.metodoPago ?? undefined,
     precio: pedido.comprobante?.precio ?? undefined,
     comprobanteUrl: pedido.comprobante?.imagen ? `${API_URL}${pedido.comprobante.imagen}` : undefined,
@@ -81,6 +102,18 @@ export async function updateOrderStatus(
     console.error('Error al actualizar estado en el servidor:', error);
     throw error;
   }
+}
+
+// Cancela el pedido: el backend lo deja CANCELADO, o FALLIDO si ya estaba en camino
+export async function cancelOrder(orderId: string): Promise<DeliveryOrder[]> {
+  const response = await fetch(`${API_URL}/api/pedidos/cancelar/${orderId}`, { method: 'PUT' });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? 'No se pudo cancelar el pedido.');
+  }
+
+  return await getOrders();
 }
 
 export type DeliveryReceipt = {
