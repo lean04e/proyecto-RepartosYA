@@ -90,6 +90,24 @@
     color: #155dfc;
 }
 
+.token-test-btn {
+    color: #be185d;
+    background: #fff1f7;
+    border-color: #f9a8d4;
+    font-weight: 800;
+}
+
+.token-test-btn:hover {
+    color: #9d174d;
+    background: #fce7f3;
+}
+
+[data-theme='dark'] .token-test-btn {
+    color: #f9a8d4;
+    background: rgba(236, 72, 153, 0.18);
+    border-color: #be185d;
+}
+
 .top-rotator {
     position: relative;
     width: min(31vw, 430px);

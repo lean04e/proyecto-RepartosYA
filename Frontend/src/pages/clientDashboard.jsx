@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import repartosYaLogo from '../assets/repartosYA-logo.png';
 import Header from '../components/header';
@@ -6,6 +6,7 @@ import { getPublicOrderTracking } from '../services/api';
 import '../styles/login.css';
 
 const TRACKING_REFRESH_INTERVAL_MS = 1000;
+const CLIENT_COUNTDOWN_SECONDS = 15;
 
 const trackingCardStyle = {
     width: '100%',
@@ -42,7 +43,13 @@ const supportedStatuses = new Map([
 
 function getClientStatus(status) {
     const normalizedStatus = String(status || '').trim().toLocaleLowerCase('es');
-    return supportedStatuses.get(normalizedStatus) || 'Desconectado';
+    return supportedStatuses.get(normalizedStatus) || 'Pendiente de Asignación';
+}
+
+function isUnassignedStatus(status) {
+    return ['registrado', 'pendiente'].includes(
+        String(status || '').trim().toLocaleLowerCase('es'),
+    );
 }
 
 function isDeliveredStatus(status) {
@@ -61,19 +68,16 @@ function isUnavailableStatus(status) {
     );
 }
 
-function formatRemainingTime(tracking, now) {
-    const startedAt = Date.parse(tracking?.timerStartedAt || '');
-    const durationSeconds = tracking?.timerDurationSeconds;
+function formatRemainingTime(status, startedAt, now) {
     if (
-        !isInTransitStatus(tracking?.status)
+        !isInTransitStatus(status)
         || !Number.isFinite(startedAt)
-        || typeof durationSeconds !== 'number'
     ) {
         return '-- : --';
     }
 
     const elapsedSeconds = Math.max(0, Math.floor((now - startedAt) / 1000));
-    const remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
+    const remainingSeconds = Math.max(0, CLIENT_COUNTDOWN_SECONDS - elapsedSeconds);
     const minutes = Math.floor(remainingSeconds / 60);
     const seconds = remainingSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -87,10 +91,11 @@ function getStatusClass(status) {
         entregado: 'status-entregado',
         pendiente: 'status-pendiente',
         asignado: 'status-asignado',
+        'pendiente de asignación': 'status-pendiente-asignacion',
         desconectado: 'status-desconectado',
     };
 
-    return statusClasses[normalizedStatus] || 'status-desconectado';
+    return statusClasses[normalizedStatus] || 'status-pendiente-asignacion';
 }
 
 function ClientDashboard() {
@@ -98,16 +103,25 @@ function ClientDashboard() {
     const [tracking, setTracking] = useState(null);
     const [resolvedTrackingId, setResolvedTrackingId] = useState(null);
     const [clock, setClock] = useState(Date.now);
+    const [localTimerStartedAt, setLocalTimerStartedAt] = useState(null);
+    const [trackingError, setTrackingError] = useState(null);
+    const lastTrackingStatus = useRef({ trackingId: null, status: null });
     const currentTracking = tracking?.requestId === trackingId ? tracking : null;
+    const currentTrackingError = trackingError?.requestId === trackingId ? trackingError : null;
     const trackingLoaded = !trackingId || resolvedTrackingId === trackingId;
-    const productId = currentTracking?.id || trackingId || 'No es posible mostrar en este momento.';
-    const courierName = currentTracking?.driver || 'No es posible mostrar en este momento.';
+    const orderId = currentTracking?.id || trackingId || 'No es posible mostrar en este momento.';
     const currentOrderStatus = currentTracking?.status;
     const isDelivered = isDeliveredStatus(currentOrderStatus);
     const isUnavailable = isUnavailableStatus(currentOrderStatus);
-    const [trackingUnavailable, setTrackingUnavailable] = useState(false);
+    const courierName = currentTracking?.driver || (
+        isUnassignedStatus(currentOrderStatus)
+            ? 'Sin Asignar'
+            : 'No es posible mostrar en este momento.'
+    );
+    const origin = currentTracking?.origin || 'No es posible mostrar en este momento.';
+    const destination = currentTracking?.destination || 'No es posible mostrar en este momento.';
     const status = isDelivered ? 'Entregado' : getClientStatus(currentOrderStatus);
-    const remainingTime = formatRemainingTime(currentTracking, clock);
+    const remainingTime = formatRemainingTime(currentOrderStatus, localTimerStartedAt, clock);
 
     useEffect(() => {
         const clockInterval = window.setInterval(() => setClock(Date.now()), 1000);
@@ -125,9 +139,21 @@ function ClientDashboard() {
                 try {
                     const result = await getPublicOrderTracking(trackingId);
                     if (isCurrent) {
+                        const previousStatus = lastTrackingStatus.current;
+                        if (isInTransitStatus(result.status)) {
+                            if (
+                                previousStatus.trackingId !== trackingId
+                                || !isInTransitStatus(previousStatus.status)
+                            ) {
+                                setLocalTimerStartedAt(Date.now());
+                            }
+                        } else {
+                            setLocalTimerStartedAt(null);
+                        }
+                        lastTrackingStatus.current = { trackingId, status: result.status };
                         setTracking({ ...result, requestId: trackingId });
                         setResolvedTrackingId(trackingId);
-                        setTrackingUnavailable(isUnavailableStatus(result.status));
+                        setTrackingError(null);
                         if (isUnavailableStatus(result.status)) {
                             window.clearInterval(refreshInterval);
                         }
@@ -137,7 +163,12 @@ function ClientDashboard() {
                         setTracking(null);
                         setResolvedTrackingId(trackingId);
                         if (error.status === 404) {
-                            setTrackingUnavailable(true);
+                            setTrackingError({
+                                requestId: trackingId,
+                                type: /pedido no encontrado/i.test(error.message || '')
+                                    ? 'invalid-token'
+                                    : 'not-found',
+                            });
                             window.clearInterval(refreshInterval);
                             return;
                         }
@@ -167,18 +198,30 @@ function ClientDashboard() {
                         <section style={trackingCardStyle} aria-label="Seguimiento del pedido">
                             {!trackingLoaded ? (
                                 <p role="status" style={eyebrowStyle}>Consultando seguimiento…</p>
-                            ) : trackingUnavailable || isUnavailable ? (
+                            ) : currentTrackingError || isUnavailable ? (
                                 <div role="status" aria-labelledby="tracking-title">
-                                    <p style={eyebrowStyle}>Página no encontrada</p>
-                                    <h1 id="tracking-title" style={titleStyle}>
-                                        La página solicitada no existe.
-                                    </h1>
+                                    {currentTrackingError?.type === 'invalid-token' ? (
+                                        <>
+                                            <p style={eyebrowStyle}>Error de seguimiento</p>
+                                            <h1 id="tracking-title" style={titleStyle}>Token dañado</h1>
+                                            <p style={{ margin: '12px 0 0', color: 'var(--color-text-secondary)' }}>
+                                                El token no existe en la base de datos.
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p style={eyebrowStyle}>Página no encontrada</p>
+                                            <h1 id="tracking-title" style={titleStyle}>
+                                                La página solicitada no existe.
+                                            </h1>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <>
                                     <p style={eyebrowStyle}>Seguimiento del pedido</p>
                                     <h1 id="tracking-title" style={titleStyle}>
-                                        ID del Producto: {productId}
+                                        ID del Pedido: {orderId}
                                     </h1>
 
                                     <div style={dividerStyle} />
@@ -193,13 +236,15 @@ function ClientDashboard() {
                                                     value={courierName}
                                                     icon={<PersonIcon />}
                                                 />
+                                                <TrackingDetail label="Comercio Origen" value={origin} />
+                                                <TrackingDetail label="Comercio Destino" value={destination} />
                                                 <TrackingDetail
                                                     label="Estado"
                                                     value={status}
                                                     status
                                                 />
                                                 <TrackingDetail
-                                                    label="Tiempo Restante"
+                                                    label="Tiempo Estimado de Llegada"
                                                     value={remainingTime}
                                                     icon={<ClockIcon />}
                                                 />

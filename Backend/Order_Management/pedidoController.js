@@ -236,7 +236,10 @@ const obtenerSeguimientoPedido = async (req, res) => {
             ...query,
             borrado: { $ne: true }
         })
-            .select('ID estado repartidor updatedAt createdAt historialEstados')
+            .select('ID estado repartidor updatedAt createdAt historialEstados comercioOrigen depositoOrigen comercioDestino')
+            .populate('comercioOrigen', 'nombre')
+            .populate('depositoOrigen', 'nombre')
+            .populate('comercioDestino', 'nombre')
             .lean();
 
         if (!pedido) {
@@ -265,6 +268,8 @@ const obtenerSeguimientoPedido = async (req, res) => {
             id: pedido.ID,
             driver: repartidor ? `${repartidor.nombre || ''} ${repartidor.apellido || ''}`.trim() : null,
             status: pedido.estado,
+            origin: pedido.depositoOrigen?.nombre || pedido.comercioOrigen?.nombre || null,
+            destination: pedido.comercioDestino?.nombre || null,
             timerStartedAt,
             timerDurationSeconds
         });
