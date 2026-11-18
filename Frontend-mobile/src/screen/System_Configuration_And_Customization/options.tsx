@@ -101,6 +101,10 @@ export default function OptionsScreen() {
   }, [paramId]);
 
   const fullName = [profile.nombre, profile.apellido].filter(Boolean).join(' ') || 'Repartidor';
+  const isInactive = profile.status?.trim().toLocaleLowerCase('es') === 'inactivo';
+  const statusLabel = isInactive ? 'Inactivo' : 'Disponible';
+  const statusBackgroundColor = isInactive ? palette.backgroundElement : palette.successSurface;
+  const statusColor = isInactive ? palette.secondary : palette.successText;
 
   const handleStartEdit = () => {
     setEditForm({
@@ -663,12 +667,11 @@ export default function OptionsScreen() {
               )}
             </View>
 
-            {/* Badge de Estado: Disponible (original intacto) */}
             <View style={styles.content}>
               <Text style={[styles.title, { color: palette.text }]}>Estado:</Text>
-              <View style={[styles.statusCard, { backgroundColor: palette.successSurface }]}>
-                <View style={styles.statusDot} />
-                <Text style={[styles.statusText, { color: palette.text }]}>Disponible</Text>
+              <View style={[styles.statusCard, { backgroundColor: statusBackgroundColor }]}>
+                <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
               </View>
             </View>
 

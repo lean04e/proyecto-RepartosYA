@@ -3,6 +3,7 @@ const router = express.Router();
 const { 
     crearPedido, 
     obtenerPedidos, 
+    obtenerSeguimientoPedido,
     modificarPedido, 
     cancelarPedido, 
     eliminarPedido, 
@@ -15,6 +16,7 @@ const {
 
 router.post('/cargar', crearPedido);
 router.get('/', obtenerPedidos);
+router.get('/:id/seguimiento', obtenerSeguimientoPedido);
 router.get('/:id/comprobante', obtenerComprobante);
 router.put('/modificar/:id', modificarPedido); 
 router.put('/cancelar/:id', cancelarPedido);

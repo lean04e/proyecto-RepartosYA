@@ -69,6 +69,16 @@
   background: var(--primary);
 }
 
+.status-desconectado {
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+}
+
+.status-desconectado .status-dot {
+  background: var(--text-muted);
+}
+
 [data-theme='dark'] .status-en-camino {
   color: var(--accent);
   border-color: var(--accent);

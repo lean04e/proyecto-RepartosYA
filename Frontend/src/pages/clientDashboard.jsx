@@ -1,8 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import repartosYaLogo from '../assets/repartosYA-logo.png';
 import Header from '../components/header';
+import { getPublicOrderTracking } from '../services/api';
 import '../styles/login.css';
+
+const TRACKING_REFRESH_INTERVAL_MS = 1000;
 
 const trackingCardStyle = {
     width: '100%',
@@ -42,21 +45,117 @@ function getClientStatus(status) {
     return supportedStatuses.get(normalizedStatus) || 'Desconectado';
 }
 
+function isDeliveredStatus(status) {
+    return String(status || '').trim().toLocaleLowerCase('es') === 'entregado';
+}
+
+function isInTransitStatus(status) {
+    return ['en_camino', 'en camino'].includes(
+        String(status || '').trim().toLocaleLowerCase('es'),
+    );
+}
+
+function isUnavailableStatus(status) {
+    return ['fallido', 'cancelado', 'rechazado'].includes(
+        String(status || '').trim().toLocaleLowerCase('es'),
+    );
+}
+
+function formatRemainingTime(tracking, now) {
+    const startedAt = Date.parse(tracking?.timerStartedAt || '');
+    const durationSeconds = tracking?.timerDurationSeconds;
+    if (
+        !isInTransitStatus(tracking?.status)
+        || !Number.isFinite(startedAt)
+        || typeof durationSeconds !== 'number'
+    ) {
+        return '-- : --';
+    }
+
+    const elapsedSeconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+    const remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function getStatusClass(status) {
+    const normalizedStatus = String(status || '').trim().toLocaleLowerCase('es');
+    const statusClasses = {
+        'en camino': 'status-en-camino',
+        en_camino: 'status-en-camino',
+        entregado: 'status-entregado',
+        pendiente: 'status-pendiente',
+        asignado: 'status-asignado',
+        desconectado: 'status-desconectado',
+    };
+
+    return statusClasses[normalizedStatus] || 'status-desconectado';
+}
+
 function ClientDashboard() {
     const { trackingId } = useParams();
-    const productId = trackingId || 'No es posible mostrar en este momento.';
-    const courierName = 'No es posible mostrar en este momento.';
-    const status = getClientStatus(null);
-    const remainingTime = '-- : --';
+    const [tracking, setTracking] = useState(null);
+    const [resolvedTrackingId, setResolvedTrackingId] = useState(null);
+    const [clock, setClock] = useState(Date.now);
+    const currentTracking = tracking?.requestId === trackingId ? tracking : null;
+    const trackingLoaded = !trackingId || resolvedTrackingId === trackingId;
+    const productId = currentTracking?.id || trackingId || 'No es posible mostrar en este momento.';
+    const courierName = currentTracking?.driver || 'No es posible mostrar en este momento.';
+    const currentOrderStatus = currentTracking?.status;
+    const isDelivered = isDeliveredStatus(currentOrderStatus);
+    const isUnavailable = isUnavailableStatus(currentOrderStatus);
+    const [trackingUnavailable, setTrackingUnavailable] = useState(false);
+    const status = isDelivered ? 'Entregado' : getClientStatus(currentOrderStatus);
+    const remainingTime = formatRemainingTime(currentTracking, clock);
+
+    useEffect(() => {
+        const clockInterval = window.setInterval(() => setClock(Date.now()), 1000);
+        return () => window.clearInterval(clockInterval);
+    }, []);
 
     useEffect(() => {
         const previousMinWidth = document.body.style.minWidth;
         document.body.style.minWidth = '320px';
 
+        let isCurrent = true;
+        let refreshInterval;
+        if (trackingId) {
+            const loadTracking = async () => {
+                try {
+                    const result = await getPublicOrderTracking(trackingId);
+                    if (isCurrent) {
+                        setTracking({ ...result, requestId: trackingId });
+                        setResolvedTrackingId(trackingId);
+                        setTrackingUnavailable(isUnavailableStatus(result.status));
+                        if (isUnavailableStatus(result.status)) {
+                            window.clearInterval(refreshInterval);
+                        }
+                    }
+                } catch (error) {
+                    if (isCurrent) {
+                        setTracking(null);
+                        setResolvedTrackingId(trackingId);
+                        if (error.status === 404) {
+                            setTrackingUnavailable(true);
+                            window.clearInterval(refreshInterval);
+                            return;
+                        }
+                        console.error('No se pudo cargar la información del seguimiento:', error);
+                    }
+                }
+            };
+
+            loadTracking();
+            refreshInterval = window.setInterval(loadTracking, TRACKING_REFRESH_INTERVAL_MS);
+        }
+
         return () => {
+            isCurrent = false;
+            window.clearInterval(refreshInterval);
             document.body.style.minWidth = previousMinWidth;
         };
-    }, []);
+    }, [trackingId]);
 
     return (
         <div className="login-page-container">
@@ -65,31 +164,50 @@ function ClientDashboard() {
             <main className="login-main-content">
                 <div className="login-grid-layout">
                     <div className="login-left-col">
-                        <section style={trackingCardStyle} aria-labelledby="tracking-title">
-                            <p style={eyebrowStyle}>Seguimiento del pedido</p>
-                            <h1 id="tracking-title" style={titleStyle}>
-                                ID del Producto: {productId}
-                            </h1>
+                        <section style={trackingCardStyle} aria-label="Seguimiento del pedido">
+                            {!trackingLoaded ? (
+                                <p role="status" style={eyebrowStyle}>Consultando seguimiento…</p>
+                            ) : trackingUnavailable || isUnavailable ? (
+                                <div role="status" aria-labelledby="tracking-title">
+                                    <p style={eyebrowStyle}>Página no encontrada</p>
+                                    <h1 id="tracking-title" style={titleStyle}>
+                                        La página solicitada no existe.
+                                    </h1>
+                                </div>
+                            ) : (
+                                <>
+                                    <p style={eyebrowStyle}>Seguimiento del pedido</p>
+                                    <h1 id="tracking-title" style={titleStyle}>
+                                        ID del Producto: {productId}
+                                    </h1>
 
-                            <div style={dividerStyle} />
+                                    <div style={dividerStyle} />
 
-                            <dl style={{ display: 'grid', gap: '14px', margin: 0 }}>
-                                <TrackingDetail
-                                    label="Nombre del Repartidor"
-                                    value={courierName}
-                                    icon={<PersonIcon />}
-                                />
-                                <TrackingDetail
-                                    label="Estado"
-                                    value={status}
-                                    status
-                                />
-                                <TrackingDetail
-                                    label="Tiempo Restante"
-                                    value={remainingTime}
-                                    icon={<ClockIcon />}
-                                />
-                            </dl>
+                                    <dl style={{ display: 'grid', gap: '14px', margin: 0 }}>
+                                        {isDelivered ? (
+                                            <TrackingDetail label="Estado" value={status} status />
+                                        ) : (
+                                            <>
+                                                <TrackingDetail
+                                                    label="Nombre del Repartidor"
+                                                    value={courierName}
+                                                    icon={<PersonIcon />}
+                                                />
+                                                <TrackingDetail
+                                                    label="Estado"
+                                                    value={status}
+                                                    status
+                                                />
+                                                <TrackingDetail
+                                                    label="Tiempo Restante"
+                                                    value={remainingTime}
+                                                    icon={<ClockIcon />}
+                                                />
+                                            </>
+                                        )}
+                                    </dl>
+                                </>
+                            )}
                         </section>
                     </div>
 
@@ -118,8 +236,8 @@ function TrackingDetail({ label, value, icon, status = false }) {
             <dd style={detailValueStyle}>
                 {icon}
                 {status ? (
-                    <span style={statusBadgeStyle}>
-                        <span aria-hidden="true" style={statusDotStyle} />
+                    <span className={`status-badge ${getStatusClass(value)}`} style={statusBadgeStyle}>
+                        <span className="status-dot" aria-hidden="true" style={statusDotStyle} />
                         {value}
                     </span>
                 ) : (
@@ -178,9 +296,6 @@ const statusBadgeStyle = {
     alignItems: 'center',
     gap: '7px',
     padding: '5px 11px',
-    color: '#2b0101',
-    background: 'rgba(205, 14, 14, 0.16)',
-    border: '1px solid rgba(0, 180, 145, 0.24)',
     borderRadius: '999px',
     fontSize: '12px',
     fontWeight: 700,
@@ -190,7 +305,6 @@ const statusDotStyle = {
     width: '9px',
     height: '9px',
     flex: '0 0 9px',
-    background: '#620606',
     borderRadius: '50%',
 };
 

@@ -6,6 +6,26 @@ const Comprobante = require('../Models/Comprobante');
 
 const EXTENSIONES_COMPROBANTE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const MAX_COMPROBANTE_BYTES = 6 * 1024 * 1024;
+const DEMO_ETA_SECONDS = 15;
+
+function getOrderTimestamp(order) {
+    const timestamp = Date.parse(order.updatedAt || order.createdAt || '');
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getOrderStatusTimestamp(order, status) {
+    for (let index = (order.historialEstados || []).length - 1; index >= 0; index -= 1) {
+        const event = order.historialEstados[index];
+        if (String(event.estadoNuevo || '').toUpperCase() === status) {
+            const timestamp = Date.parse(event.fecha || '');
+            if (Number.isFinite(timestamp)) {
+                return timestamp;
+            }
+        }
+    }
+
+    return getOrderTimestamp(order);
+}
 
 // Función auxiliar para resolver el _id de Mongo de Repartidor
 async function resolverIdRepartidor(repartidorInput) {
@@ -205,6 +225,52 @@ const obtenerPedidos = async (req, res) => {
     } catch (error) {
         console.error('Error al obtener los pedidos:', error);
         res.status(500).json({ error: 'Error al obtener los pedidos' });
+    }
+};
+
+const obtenerSeguimientoPedido = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { ID: id };
+        const pedido = await Pedido.findOne({
+            ...query,
+            borrado: { $ne: true }
+        })
+            .select('ID estado repartidor updatedAt createdAt historialEstados')
+            .lean();
+
+        if (!pedido) {
+            return res.status(404).json({ message: 'Pedido no encontrado.' });
+        }
+
+        const estadoActual = String(pedido.estado || '').trim().toUpperCase();
+        if (['FALLIDO', 'CANCELADO', 'RECHAZADO'].includes(estadoActual)) {
+            return res.status(404).json({ message: 'Seguimiento no encontrado.' });
+        }
+
+        let timerStartedAt = null;
+        let timerDurationSeconds = null;
+        if (estadoActual === 'EN_CAMINO') {
+            const startTimestamp = getOrderStatusTimestamp(pedido, 'EN_CAMINO');
+            timerStartedAt = startTimestamp ? new Date(startTimestamp).toISOString() : null;
+            timerDurationSeconds = DEMO_ETA_SECONDS;
+        }
+
+        const repartidorId = await resolverIdRepartidor(pedido.repartidor);
+        const repartidor = repartidorId && /^[0-9a-fA-F]{24}$/.test(String(repartidorId))
+            ? await Repartidor.findById(repartidorId).select('nombre apellido').lean()
+            : null;
+
+        return res.status(200).json({
+            id: pedido.ID,
+            driver: repartidor ? `${repartidor.nombre || ''} ${repartidor.apellido || ''}`.trim() : null,
+            status: pedido.estado,
+            timerStartedAt,
+            timerDurationSeconds
+        });
+    } catch (error) {
+        console.error('Error al obtener el seguimiento del pedido:', error);
+        return res.status(500).json({ message: 'No se pudo cargar el seguimiento del pedido.' });
     }
 };
 
@@ -532,6 +598,7 @@ const obtenerPedidosEntregadosPorRepartidor = async (req, res) => {
 module.exports = { 
     crearPedido, 
     obtenerPedidos, 
+    obtenerSeguimientoPedido,
     obtenerComercio,
     modificarPedido, 
     cancelaPedido: cancelarPedido, 

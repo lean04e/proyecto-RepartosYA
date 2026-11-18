@@ -18,7 +18,9 @@ async function request(path, options = {}) {
 
     const data = await response.json();
     if (!response.ok) {
-        throw new Error(data.message || `La solicitud falló (${response.status}).`);
+        const error = new Error(data.message || `La solicitud falló (${response.status}).`);
+        error.status = response.status;
+        throw error;
     }
 
     return data;
@@ -73,6 +75,10 @@ export function verifyResetToken(token) {
 // El backend expone los pedidos en /api/pedidos (a diferencia de comercios y repartidores).
 export function getPedidos() {
     return request('/api/pedidos');
+}
+
+export function getPublicOrderTracking(orderId) {
+    return request(`/api/pedidos/${encodeURIComponent(orderId)}/seguimiento`);
 }
 
 // Pedidos activos mas los ENTREGADOS que se borraron de la lista (base de los reportes).

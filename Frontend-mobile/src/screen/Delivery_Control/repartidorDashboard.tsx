@@ -92,8 +92,6 @@ export default function RepartidorDashboard() {
   const { isDarkMode, toggleTheme } = useAppTheme();
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [isCancelingOrder, setIsCancelingOrder] = useState(false);
-  // Momento en que se cancelo el pedido activo: el siguiente pedido arranca su tiempo desde ahi
-  const [timerFloor, setTimerFloor] = useState(0);
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
@@ -140,7 +138,7 @@ export default function RepartidorDashboard() {
   const today = new Date().toDateString();
   const historicalOrders = courierOrders
     .filter((order) => (
-      (order.estado === 'CANCELADO' || order.estado === 'FALLIDO' || order.estado === 'RECHAZADO' || order.estado === 'ENTREGADO')
+      order.estado === 'ENTREGADO'
       && order.fechaEstado
       && new Date(order.fechaEstado).toDateString() === today
     ))
@@ -148,14 +146,8 @@ export default function RepartidorDashboard() {
       Date.parse(second.fechaEstado ?? '') - Date.parse(first.fechaEstado ?? '')
     ));
   // El timer arranca cuando se asignó el pedido, cuando se entregó o canceló el anterior, lo que ocurra último
-  const lastDeliveredAt = courierOrders.reduce((latest, order) => (
-    order.estado === 'ENTREGADO' && order.fechaEstado
-      ? Math.max(latest, Date.parse(order.fechaEstado))
-      : latest
-  ), 0);
-  const timerStartedAt = activeOrder?.fechaEstado
-    ? Math.max(Date.parse(activeOrder.fechaEstado), lastDeliveredAt, timerFloor)
-    : 0;
+  const timerReferenceAt = activeOrder?.timerReferenceAt || activeOrder?.fechaEstado;
+  const timerStartedAt = timerReferenceAt ? Date.parse(timerReferenceAt) : 0;
   const elapsedSeconds = activeOrder
     ? Math.max(0, Math.floor((clock - timerStartedAt) / 1000))
     : 0;
@@ -171,7 +163,7 @@ export default function RepartidorDashboard() {
       && Math.abs(Date.parse(order.asignadoEn) - Date.parse(activeOrder.asignadoEn as string)) <= SAME_BATCH_MS
     )),
   );
-  const etaTotalSeconds = hasSharedPickup ? DEMO_ETA_SECONDS / 2 : DEMO_ETA_SECONDS;
+  const etaTotalSeconds = DEMO_ETA_SECONDS;
   const etaSeconds = activeOrder ? Math.max(0, etaTotalSeconds - elapsedSeconds) : 0;
   const activeOrderId = activeOrder?.id;
   // Primera mitad del tiempo: rumbo al depósito de origen; segunda mitad: rumbo al destino
@@ -312,11 +304,7 @@ export default function RepartidorDashboard() {
 
     try {
       setIsCancelingOrder(true);
-      const wasActive = selectedOrder.id === activeOrder?.id;
       const updatedOrders = await cancelOrder(selectedOrder.id);
-      if (wasActive) {
-        setTimerFloor(Date.now());
-      }
       setOrders(updatedOrders);
       setOrdersError(null);
       setActiveModal(null);
@@ -533,7 +521,7 @@ export default function RepartidorDashboard() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeadingGroup}>
                   <Text style={[styles.sectionTitle, { color: palette.heading }]}>
-                    ENTREGADOS / CANCELADOS
+                    ENTREGADOS
                   </Text>
                   <Text
                     style={[
@@ -558,12 +546,9 @@ export default function RepartidorDashboard() {
                       { borderBottomColor: palette.border },
                       pressed && styles.buttonPressed,
                     ]}
-                    disabled={order.estado !== 'ENTREGADO'}
                     onPress={() => openDeliveredDetail(order)}
-                    accessibilityRole={order.estado === 'ENTREGADO' ? 'button' : undefined}
-                    accessibilityLabel={
-                      order.estado === 'ENTREGADO' ? `Ver detalle del pedido ${order.codigo}` : undefined
-                    }>
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver detalle del pedido ${order.codigo}`}>
                     <View style={styles.queueCardText}>
                       <Text style={[styles.queueOrderCode, { color: palette.text }]}>#{order.codigo}</Text>
                       <Text style={[styles.queueRecipient, { color: palette.text }]} numberOfLines={1}>
@@ -576,26 +561,17 @@ export default function RepartidorDashboard() {
                     <View style={styles.historyTrailing}>
                       <Text style={[
                         styles.historyStatus,
-                        { backgroundColor: order.estado === 'ENTREGADO' ? palette.successSurface : palette.dangerSurface,
-                          color: order.estado === 'ENTREGADO' ? palette.successText : palette.dangerText },
+                        { backgroundColor: palette.successSurface, color: palette.successText },
                       ]}>
-                        {order.estado === 'ENTREGADO'
-                          ? 'Entregado'
-                          : order.estado === 'FALLIDO'
-                          ? 'Fallido'
-                          : order.estado === 'RECHAZADO'
-                          ? 'Rechazado'
-                          : 'Cancelado'}
+                        Entregado
                       </Text>
-                      {order.estado === 'ENTREGADO' && (
-                        <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
-                      )}
+                      <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
                     </View>
                   </Pressable>
                 ))
               ) : (
                 <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
-                  No hay pedidos entregados o cancelados hoy.
+                  No hay pedidos entregados hoy.
                 </Text>
               )}
               {historicalOrders.length > MAX_VISIBLE_ORDERS && (
