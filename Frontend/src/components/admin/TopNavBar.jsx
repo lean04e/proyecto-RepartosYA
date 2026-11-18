@@ -55,6 +55,12 @@ function EyeIcon({ crossed }) {
 
 function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme, isDataHidden, onToggleData }) {
     const dataLabel = isDataHidden ? 'Mostrar los datos cargados' : 'Ocultar los datos cargados';
+
+    const handleOpenDamagedToken = () => {
+        const testUrl = `${window.location.origin}/seguimiento/token-danado-demo`;
+        window.open(testUrl, '_blank', 'noopener,noreferrer');
+    };
+
     return (
         <header className="admin-top-navbar">
             <div className="top-navbar-left">
@@ -72,6 +78,15 @@ function TopNavbar({ onToggleSidebar, onLogout, isDarkMode, onToggleTheme, isDat
             <HeaderRotator isDarkMode={isDarkMode} />
 
             <div className="top-nav-right">
+                <button
+                    type="button"
+                    onClick={handleOpenDamagedToken}
+                    className="top-icon-btn token-test-btn"
+                    aria-label="Probar enlace con token dañado"
+                    title="Probar enlace con token dañado"
+                >
+                    !
+                </button>
                 <button
                     type="button"
                     onClick={onToggleData}

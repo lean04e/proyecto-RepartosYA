@@ -22,6 +22,43 @@
   font-style: italic;
 }
 
+.tracking-link-section {
+  grid-column: span 2;
+  justify-content: center;
+  gap: 12px;
+}
+
+.tracking-link-section p {
+  margin: 0;
+}
+
+.tracking-link-section .tracking-link-value {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.tracking-link-section button {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .tracking-link-section {
+    grid-column: span 1;
+  }
+}
+
 .status-en-camino {
   color: var(--primary);
   background: var(--primary-soft);
@@ -30,6 +67,16 @@
 
 .status-en-camino .status-dot {
   background: var(--primary);
+}
+
+.status-desconectado {
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+}
+
+.status-desconectado .status-dot {
+  background: var(--text-muted);
 }
 
 [data-theme='dark'] .status-en-camino {

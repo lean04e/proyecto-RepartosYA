@@ -8,6 +8,7 @@ export type CourierUserProfile = {
   email?: string;
   legajo?: string;
   fotoPerfil?: string;
+  status?: string;
 };
 
 export const USER_STORAGE_KEY = '@repartosya_courier_user';
@@ -204,6 +205,7 @@ export async function getCourierProfile(courierId: string): Promise<CourierUserP
     email: data.email || '',
     legajo: data.legajo || data.ID || '',
     fotoPerfil: data.fotoPerfil || '',
+    status: typeof data.status === 'string' ? data.status : undefined,
   };
 
   await saveStoredUser(profile);

@@ -613,6 +613,7 @@ const handleAddOrder = async (event) => {
       </div>
       {detailOrder && (
         <OrderDetailModal
+          key={detailOrder.id}
           order={detailOrder}
           origin={findCommerce(detailOrder.origin)}
           destination={findCommerce(detailOrder.destination)}
@@ -685,6 +686,9 @@ function OrderDetailModal({
   onCancelOrder,
   onRemove,
 }) {
+  const [copiedTrackingLink, setCopiedTrackingLink] = useState(false)
+  const [trackingCopyError, setTrackingCopyError] = useState('')
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
@@ -694,6 +698,8 @@ function OrderDetailModal({
   }, [onClose])
 
   const history = [...order.statusHistory].reverse()
+  const trackingLink = `${window.location.origin}/seguimiento/${encodeURIComponent(order.id)}`
+  const canShareTracking = !['fallido', 'cancelado', 'rechazado'].includes(order.status)
 
   return (
     <div className="modal-backdrop detail-backdrop" role="presentation" onClick={onClose}>
@@ -740,6 +746,32 @@ function OrderDetailModal({
 
             <OrderPartyCard title="Origen" name={order.origin} commerce={origin} />
             <OrderPartyCard title="Destino" name={order.destination} commerce={destination} />
+
+            {canShareTracking && (
+              <section className="detail-card tracking-link-section" aria-labelledby="tracking-link-title">
+                <span className="detail-card-label" id="tracking-link-title">
+                  <ExternalLinkIcon />
+                  <span>Enlace para el cliente</span>
+                </span>
+                <a className="tracking-link-value" href={trackingLink} target="_blank" rel="noreferrer">
+                  {trackingLink}
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(trackingLink)
+                      setCopiedTrackingLink(true)
+                    } catch {
+                      setTrackingCopyError('No se pudo copiar el enlace. Selecciónalo y cópialo manualmente.')
+                    }
+                  }}
+                >
+                  {copiedTrackingLink ? 'Enlace copiado' : 'Copiar enlace para WhatsApp'}
+                </button>
+                {trackingCopyError && <p role="alert">{trackingCopyError}</p>}
+              </section>
+            )}
           </div>
 
           <div className="detail-orders-section">

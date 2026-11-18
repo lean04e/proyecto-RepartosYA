@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import Login from './pages/login';
 import AdminDashboard from './pages/adminDashboard';
 import ResetPassword from './pages/ResetPassword';
+import ClientDashboard from './pages/clientDashboard';
 
 function getStoredAdminSession() {
     const storedSession = sessionStorage.getItem('repartosya_session');
@@ -51,6 +52,10 @@ function App() {
                 <Route
                     path="/reset-password"
                     element={<ResetPassword />}
+                />
+                <Route
+                    path="/seguimiento/:trackingId"
+                    element={<ClientDashboard />}
                 />
                 <Route
                     path="/*"
