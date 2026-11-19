@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import repartosYaLogo from '../assets/repartosYA-logo.png';
 import Header from '../components/header';
 import LoginForm from '../components/loginForm';
-import repartosYaLogo from '../assets/repartosYA-logo.png'; 
 import '../styles/login.css';
 
 // 1. Añadimos { onLoginSuccess } como parámetro aquí
