@@ -6,6 +6,7 @@ import PasswordRecoveryModal from './PasswordRecoveryModal';
 function LoginForm({ onLoginSuccess }) {
     const [usuario, setUsuario] = useState('');
     const [contraseña, setContraseña] = useState('');
+    const [mostrarContraseña, setMostrarContraseña] = useState(false);
 
     // Estados para controlar el modal y su mensaje
     const [modalOpen, setModalOpen] = useState(false);
@@ -35,11 +36,13 @@ function LoginForm({ onLoginSuccess }) {
             setModalOpen(true);
             setUsuario('');
             setContraseña('');
+            setMostrarContraseña(false);
         } catch (error) {
             setPendingSession(null);
             setModalMessage(error.message);
             setModalOpen(true);
             setContraseña('');
+            setMostrarContraseña(false);
         } finally {
             setIsSubmitting(false);
         }
@@ -105,37 +108,70 @@ function LoginForm({ onLoginSuccess }) {
                      />
                 </div>
 
-                <div style={{ marginBottom: '20px', textAlign: 'left' }}>
-                    <label style={{ display: 'block', fontSize: '12px', color:'var(--color-text-primary)', fontWeight:'600', marginBottom: '6px', textTransform: 'uppercase' }}>Contraseña</label>
-                    <input
-                        type="password"
-                        value={contraseña}
-                        onChange={(e) => setContraseña(e.target.value)}
-                        placeholder="********"
-                        maxLength={20}
-                        style={{ 
-                            width: '100%', 
-                            padding: '12px 14px', 
-                            background: '#f8fafc', 
-                            border: contraseña.length > 0 && contraseña.length < 4 ? '1px solid #ef4444' : '1px solid var(--color-border)', 
-                            borderRadius: 'var(--radius-sm)', 
-                            fontSize: '14px', 
-                            boxSizing: 'border-box',
-                            color: '#070c18' 
-                        }}
-                     />
-                    {contraseña.length > 0 && contraseña.length < 4 && (
-                        <span style={{ 
-                            display: 'block', 
-                            color: '#ef4444', 
-                            fontSize: '11px', 
-                            marginTop: '4px',
-                            fontWeight: '500' 
-                        }}>
-                            La contraseña debe tener como mínimo 4 caracteres y un máximo de 20 caracteres.
-                        </span>
-                    )}
-                </div>
+<div style={{ marginBottom: '20px', textAlign: 'left' }}>
+    <label style={{ display: 'block', fontSize: '12px', color:'var(--color-text-primary)', fontWeight:'600', marginBottom: '6px', textTransform: 'uppercase' }}>Contraseña</label>
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input
+            type={mostrarContraseña ? 'text' : 'password'}
+            value={contraseña}
+            onChange={(e) => setContraseña(e.target.value)}
+            placeholder="********"
+            maxLength={20}
+            style={{ 
+                width: '100%', 
+                padding: '12px 42px 12px 14px', 
+                background: '#f8fafc', 
+                border: contraseña.length > 0 && contraseña.length < 4 ? '1px solid #ef4444' : '1px solid var(--color-border)', 
+                borderRadius: 'var(--radius-sm)', 
+                fontSize: '14px', 
+                boxSizing: 'border-box',
+                color: '#070c18' 
+            }}
+        />
+        <button
+            type="button"
+            onClick={() => setMostrarContraseña((prev) => !prev)}
+            aria-label={mostrarContraseña ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            title={mostrarContraseña ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            style={{
+                position: 'absolute',
+                right: '10px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '4px',
+                color: '#475569'
+            }}
+        >
+            {mostrarContraseña ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+            ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                </svg>
+            )}
+        </button>
+    </div>
+    {contraseña.length > 0 && contraseña.length < 4 && (
+        <span style={{ 
+            display: 'block', 
+            color: '#ef4444', 
+            fontSize: '11px', 
+            marginTop: '4px',
+            fontWeight: '500' 
+        }}>
+            La contraseña debe tener como mínimo 4 caracteres y un máximo de 20 caracteres.
+        </span>
+    )}
+</div>
 
                 {/* Botón para recuperar contraseña */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px', marginBottom: '22px' }}>
