@@ -62,6 +62,11 @@ body {
   margin: 0;
 }
 
+html:has([aria-modal='true']),
+body:has([aria-modal='true']) {
+  overflow: hidden;
+}
+
 #root {
   width: 100%;
   max-width: 100%;

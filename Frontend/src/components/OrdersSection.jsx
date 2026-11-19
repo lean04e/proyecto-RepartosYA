@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getDetalleEntrega, getUploadUrl } from '../services/api'
 import './CommercesSection.css'
 import './OrdersSection.css'
 
@@ -23,6 +24,12 @@ const dateTimeFormatter = new Intl.DateTimeFormat('es-AR', {
   hour: '2-digit',
   minute: '2-digit',
   hour12: false,
+})
+
+const currencyFormatter = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS',
+  maximumFractionDigits: 0,
 })
 
 // Normaliza el texto para buscar sin distinguir mayúsculas ni tildes.
@@ -90,6 +97,8 @@ function OrdersSection({ orders, onGoToCommerces, openOrderId, onOrderOpened, ad
   const [dbComercios, setDbComercios] = useState([]);
   const [dbDepositos, setDbDepositos] = useState([]);
   const [editErrors, setEditErrors] = useState({})
+  const [deliveryDetail, setDeliveryDetail] = useState(null)
+  const [notDeliveredMessage, setNotDeliveredMessage] = useState('')
 
 useEffect(() => {
     const cargarDatos = async () => {
@@ -453,6 +462,22 @@ const handleAddOrder = async (event) => {
     setVisibleCount(INITIAL_VISIBLE_COUNT)
   }
 
+  // HISTORIA DE USUARIO #11: Ver Detalle Entrega
+  const handleOpenDeliveryDetail = async (order) => {
+    try {
+      const data = await getDetalleEntrega(order.id)
+      setDeliveryDetail(data)
+      setNotDeliveredMessage('')
+    } catch (error) {
+      if (error.status === 400 || error.data?.entregado === false || order.status !== 'entregado') {
+        setDeliveryDetail(null)
+        setNotDeliveredMessage(error.data?.mensaje || 'El pedido no ha sido entregado')
+      } else {
+        alert(error.message || 'No se pudo obtener el detalle de la entrega.')
+      }
+    }
+  }
+
   return (
     <section className="orders-section" aria-labelledby="orders-list-title">
       <div className="orders-list-heading">
@@ -548,6 +573,15 @@ const handleAddOrder = async (event) => {
                   >
                     <div className="row-actions">
                       <button
+                        className="delivery-detail-button"
+                        type="button"
+                        onClick={() => handleOpenDeliveryDetail(order)}
+                        aria-label={`Ver entrega del pedido ${order.id}`}
+                        title="Ver entrega"
+                      >
+                        Ver entrega
+                      </button>
+                      <button
                         className="action-button"
                         type="button"
                         onClick={() => handleOpenEdit(order)}
@@ -618,6 +652,10 @@ const handleAddOrder = async (event) => {
           origin={findCommerce(detailOrder.origin)}
           destination={findCommerce(detailOrder.destination)}
           onClose={() => setDetailOrderId(null)}
+          onOpenDeliveryDetail={(order) => {
+            setDetailOrderId(null)
+            handleOpenDeliveryDetail(order)
+          }}
           onEdit={(order) => {
             setDetailOrderId(null)
             handleOpenEdit(order)
@@ -627,6 +665,18 @@ const handleAddOrder = async (event) => {
             setCancelingOrder(order)
           }}
           onRemove={handleRemoveOrder}
+        />
+      )}
+      {deliveryDetail && (
+        <DeliveryDetailModal
+          detail={deliveryDetail}
+          onClose={() => setDeliveryDetail(null)}
+        />
+      )}
+      {notDeliveredMessage && (
+        <NotDeliveredModal
+          message={notDeliveredMessage}
+          onClose={() => setNotDeliveredMessage('')}
         />
       )}
       {editingOrder &&
@@ -682,6 +732,7 @@ function OrderDetailModal({
   origin,
   destination,
   onClose,
+  onOpenDeliveryDetail,
   onEdit,
   onCancelOrder,
   onRemove,
@@ -814,6 +865,13 @@ function OrderDetailModal({
         </div>
 
         <div className="detail-modal-footer">
+          <button
+            className="modal-apply"
+            type="button"
+            onClick={() => onOpenDeliveryDetail(order)}
+          >
+            Ver entrega
+          </button>
           {['cancelado', 'fallido', 'entregado'].includes(order.status) ? (
             <button className="modal-delete" type="button" onClick={() => onRemove(order.id)}>
               Borrar pedido
@@ -828,6 +886,185 @@ function OrderDetailModal({
               </button>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function DeliveryDetailModal({ detail, onClose }) {
+  const [imageError, setImageError] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  const origenNombre = typeof detail.origen === 'object' ? detail.origen?.nombre : detail.origen
+  const origenDireccion = typeof detail.origen === 'object' ? detail.origen?.direccion : null
+  const destinoNombre = typeof detail.destino === 'object' ? detail.destino?.nombre : detail.destino
+  const destinoDireccion = typeof detail.destino === 'object' ? detail.destino?.direccion : null
+  const imageUrl = detail.imagen
+    ? detail.imagen.startsWith('http')
+      ? detail.imagen
+      : getUploadUrl(detail.imagen)
+    : ''
+
+  return (
+    <div className="modal-backdrop detail-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delivery-detail-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-heading">
+          <div>
+            <p className="eyebrow">Control de entregas</p>
+            <h2 id="delivery-detail-title">Detalle de entrega · Pedido {detail.id}</h2>
+          </div>
+          <button
+            className="modal-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar detalle de entrega"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div className="detail-modal-body">
+          <div className="detail-summary-grid">
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <PackageIcon />
+                <span>ID del pedido</span>
+              </span>
+              <span className="detail-card-value">{detail.id}</span>
+            </div>
+
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <DriverIcon />
+                <span>Repartidor que lo entregó</span>
+              </span>
+              <span className="detail-card-value">
+                {detail.repartidor || 'Sin repartidor registrado'}
+              </span>
+            </div>
+
+            <div className="detail-card detail-card-highlight">
+              <span className="detail-card-label">
+                <LocationIcon />
+                <span>Origen</span>
+              </span>
+              <span className="detail-card-value">{origenNombre || 'Origen no especificado'}</span>
+              {origenDireccion && (
+                <span className="detail-party-line">
+                  <span className="detail-party-label">Dirección</span>
+                  {origenDireccion}
+                </span>
+              )}
+            </div>
+
+            <div className="detail-card detail-card-highlight">
+              <span className="detail-card-label">
+                <LocationIcon />
+                <span>Destino</span>
+              </span>
+              <span className="detail-card-value">{destinoNombre || 'Destino no especificado'}</span>
+              {destinoDireccion && (
+                <span className="detail-party-line">
+                  <span className="detail-party-label">Dirección</span>
+                  {destinoDireccion}
+                </span>
+              )}
+            </div>
+
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <PriceIcon />
+                <span>Precio</span>
+              </span>
+              <span className="detail-card-value delivery-price-value">
+                {typeof detail.precio === 'number'
+                  ? currencyFormatter.format(detail.precio)
+                  : '$ 0'}
+              </span>
+            </div>
+
+            <div className="detail-card">
+              <span className="detail-card-label">
+                <PaymentMethodIcon />
+                <span>Método de pago usado</span>
+              </span>
+              <span className="detail-card-value">
+                {detail.metodoPago || 'No especificado'}
+              </span>
+            </div>
+          </div>
+
+          <div className="detail-orders-section">
+            <h3 className="detail-orders-title">Imagen del pedido en el lugar de destino</h3>
+            <div className="delivery-image-frame">
+              {imageUrl && !imageError ? (
+                <img
+                  className="delivery-detail-image"
+                  src={imageUrl}
+                  alt={`Imagen del pedido ${detail.id} en el lugar de destino`}
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <p className="delivery-image-empty">
+                  {imageUrl
+                    ? 'No se pudo cargar la imagen del pedido en el lugar de destino.'
+                    : 'No hay imagen registrada para esta entrega.'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="detail-modal-footer">
+          <button className="modal-apply" type="button" onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function NotDeliveredModal({ message, onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="confirmation-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="not-delivered-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="not-delivered-title">{message || 'El pedido no ha sido entregado'}</h2>
+        <p className="confirmation-copy">
+          Solo es posible consultar el detalle de entrega sobre un pedido que ya fue entregado.
+        </p>
+        <div className="confirmation-actions">
+          <button className="modal-apply" type="button" onClick={onClose}>
+            Aceptar
+          </button>
         </div>
       </div>
     </div>
@@ -1266,6 +1503,23 @@ function ChevronUpIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="m6 15 6-6 6 6" />
+    </svg>
+  )
+}
+
+function PriceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  )
+}
+
+function PaymentMethodIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
     </svg>
   )
 }

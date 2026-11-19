@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import writeExcelFile from 'write-excel-file/browser';
-import { getPedidosEntregados, getUploadUrl, rechazarEntrega } from '../services/api';
+import { getDetalleEntrega, getPedidosEntregados, getUploadUrl, rechazarEntrega } from '../services/api';
+import { DeliveryDetailModal, NotDeliveredModal } from './OrdersSection';
 import './CommercesSection.css';
 import './OrdersSection.css';
 import './ReportsSection.css';
@@ -444,7 +445,24 @@ function DeliveriesList({ rows, onRejected }) {
     const [toast, setToast] = useState('');
     const [isExporting, setIsExporting] = useState(false);
     const [exportFailed, setExportFailed] = useState(false);
+    const [deliveryDetail, setDeliveryDetail] = useState(null);
+    const [notDeliveredMessage, setNotDeliveredMessage] = useState('');
     const visibleRows = rows.slice(0, visibleCount);
+
+    const handleOpenDeliveryDetail = async (row) => {
+        try {
+            const data = await getDetalleEntrega(row.id);
+            setDeliveryDetail(data);
+            setNotDeliveredMessage('');
+        } catch (error) {
+            if (error.status === 400 || error.data?.entregado === false || row.status !== 'Entregado') {
+                setDeliveryDetail(null);
+                setNotDeliveredMessage(error.data?.mensaje || 'El pedido no ha sido entregado');
+            } else {
+                alert(error.message || 'No se pudo obtener el detalle de la entrega.');
+            }
+        }
+    };
 
     const handleExport = async () => {
         setIsExporting(true);
@@ -506,14 +524,27 @@ function DeliveriesList({ rows, onRejected }) {
                                 {DELIVERY_COLUMNS.map((column) => (
                                     <th key={column.key} scope="col">{column.label}</th>
                                 ))}
-                                <th scope="col">Comprobante</th>
+                                <th scope="col" className="actions-column">Comprobante</th>
                             </tr>
                         </thead>
                         <tbody>
                             {visibleRows.map((row, index) => (
-                                <tr key={`${row.id}-${index}`}>
+                                <tr
+                                    key={`${row.id}-${index}`}
+                                    className="delivery-row"
+                                    tabIndex={0}
+                                    role="button"
+                                    aria-label={`Ver detalle entrega del pedido ${row.id}`}
+                                    onClick={() => handleOpenDeliveryDetail(row)}
+                                    onKeyDown={(event) => {
+                                        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                                            event.preventDefault();
+                                            handleOpenDeliveryDetail(row);
+                                        }
+                                    }}
+                                >
                                     <th scope="row" data-label="ID">
-                                        <span className="commerce-name">{row.id}</span>
+                                        <span className="commerce-name" title={row.id}>{row.id}</span>
                                     </th>
                                     <td data-label="Fecha y hora" className="order-date-cell">{row.dateTime}</td>
                                     <td data-label="Origen">{row.origin}</td>
@@ -527,13 +558,17 @@ function DeliveriesList({ rows, onRejected }) {
                                     </td>
                                     <td data-label="Método de pago">{row.paymentMethod}</td>
                                     <td data-label="Precio" className="order-date-cell">{row.price}</td>
-                                    <td data-label="Comprobante">
+                                    <td data-label="Comprobante" className="deliveries-actions-cell" onClick={(e) => e.stopPropagation()}>
                                         {row.receiptUrl ? (
                                             <button
                                                 type="button"
                                                 className="report-receipt-button"
-                                                onClick={() => setReceiptRow(row)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setReceiptRow(row);
+                                                }}
                                                 aria-label={`Ver comprobante del pedido ${row.id}`}
+                                                title="Ver comprobante"
                                             >
                                                 Ver comprobante
                                             </button>
@@ -542,6 +577,7 @@ function DeliveriesList({ rows, onRejected }) {
                                                 type="button"
                                                 className="report-receipt-button"
                                                 disabled
+                                                onClick={(e) => e.stopPropagation()}
                                                 aria-label={`El pedido ${row.id} no tiene comprobante`}
                                             >
                                                 Ver comprobante
@@ -590,6 +626,18 @@ function DeliveriesList({ rows, onRejected }) {
                     error={rejectError}
                     onCancel={() => setRejectRow(null)}
                     onConfirm={handleReject}
+                />
+            )}
+            {deliveryDetail && (
+                <DeliveryDetailModal
+                    detail={deliveryDetail}
+                    onClose={() => setDeliveryDetail(null)}
+                />
+            )}
+            {notDeliveredMessage && (
+                <NotDeliveredModal
+                    message={notDeliveredMessage}
+                    onClose={() => setNotDeliveredMessage('')}
                 />
             )}
             {toast && <div className="success-toast" role="status">{toast}</div>}

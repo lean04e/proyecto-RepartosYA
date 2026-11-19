@@ -121,7 +121,7 @@ const forgotPassword = async (req, res) => {
     const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetLink = `${frontendBaseUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(adminEncontrado.email)}`;
 
-    await sendRecoveryEmail({
+    const emailResult = await sendRecoveryEmail({
       to: adminEncontrado.email,
       name: adminEncontrado.nombre,
       resetLink,
@@ -131,7 +131,8 @@ const forgotPassword = async (req, res) => {
     return res.status(200).json({
       message: 'Si el correo electrónico coincide con una cuenta registrada, se enviará un enlace de recuperación.',
       token: resetToken,
-      resetLink
+      resetLink,
+      previewUrl: emailResult?.previewUrl || null
     });
 
   } catch (error) {
