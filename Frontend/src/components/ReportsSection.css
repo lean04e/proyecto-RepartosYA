@@ -10,10 +10,45 @@
   margin-inline: auto;
 }
 
-/* El ID es un UUID largo: en una sola linea para que las filas no crezcan en altura */
+/* El ID es un UUID largo: con ellipsis para no ensanchar la tabla desproporcionadamente */
 .deliveries-table .commerce-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
   font-size: 13px;
+  font-family: monospace;
+}
+
+.deliveries-table th,
+.deliveries-table td {
+  padding: 14px 12px;
+}
+
+.deliveries-table tbody tr.delivery-row {
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.deliveries-table tbody tr.delivery-row:hover {
+  background: var(--surface-raised, #f4f6f8);
+}
+
+.deliveries-table tbody tr.delivery-row:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.deliveries-table .actions-column {
+  text-align: right;
+  min-width: 140px;
+}
+
+.deliveries-table .deliveries-actions-cell {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .report-tabs {

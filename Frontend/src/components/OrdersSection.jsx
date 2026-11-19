@@ -576,10 +576,10 @@ const handleAddOrder = async (event) => {
                         className="delivery-detail-button"
                         type="button"
                         onClick={() => handleOpenDeliveryDetail(order)}
-                        aria-label={`Ver detalle entrega del pedido ${order.id}`}
-                        title="Ver detalle entrega"
+                        aria-label={`Ver entrega del pedido ${order.id}`}
+                        title="Ver entrega"
                       >
-                        Ver detalle entrega
+                        Ver entrega
                       </button>
                       <button
                         className="action-button"
@@ -870,7 +870,7 @@ function OrderDetailModal({
             type="button"
             onClick={() => onOpenDeliveryDetail(order)}
           >
-            Ver detalle entrega
+            Ver entrega
           </button>
           {['cancelado', 'fallido', 'entregado'].includes(order.status) ? (
             <button className="modal-delete" type="button" onClick={() => onRemove(order.id)}>
@@ -892,7 +892,7 @@ function OrderDetailModal({
   )
 }
 
-function DeliveryDetailModal({ detail, onClose }) {
+export function DeliveryDetailModal({ detail, onClose }) {
   const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
@@ -1039,7 +1039,7 @@ function DeliveryDetailModal({ detail, onClose }) {
   )
 }
 
-function NotDeliveredModal({ message, onClose }) {
+export function NotDeliveredModal({ message, onClose }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
