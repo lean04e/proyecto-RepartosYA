@@ -156,7 +156,7 @@ export default function Login() {
             </View>
           </View>
 
-          <View style={styles.credentialsNotice}>
+          {/*<View style={styles.credentialsNotice}>
             <Text style={styles.credentialsText}>Datos de prueba para la demo 1</Text>
             <Text style={styles.credentialsText}> </Text>
             <Text style={styles.credentialsText}>Usuario Existente en el Sistema</Text>
@@ -167,7 +167,7 @@ export default function Login() {
             <Text style={styles.credentialsText}>Usuario inexistente</Text>
             <Text style={styles.credentialsText} selectable>Correo: inexistente@repartosya.com</Text>
             <Text style={styles.credentialsText} selectable>Contraseña: 123456</Text>
-          </View>
+          //  </View>**/}
 
           <View style={styles.legalFooter}>
             <Text style={styles.legalText}>Términos de Servicio</Text>

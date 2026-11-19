@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import './RepartidoresSection.css';
 
 const INITIAL_VISIBLE_COUNT = 6;
@@ -38,51 +38,65 @@ function RepartidoresSection({ drivers = [], openAddOnMount = false, onDriversCh
   const [statusFilter, setStatusFilter] = useState('');
   const [minimumOrders, setMinimumOrders] = useState('');
 
-useEffect(() => {
+const obtenerRepartidoresConMetricas = useCallback(async () => {
+    const [resRepartidores, resPedidos] = await Promise.all([
+      fetch('http://localhost:3001/api/repartidores'),
+      fetch('http://localhost:3001/api/pedidos?incluirEntregadosBorrados=true')
+    ]);
+
+    if (!resRepartidores.ok || !resPedidos.ok) {
+      return null;
+    }
+
+    const dataRepartidores = await resRepartidores.json();
+    const dataPedidos = await resPedidos.json();
+
+    return dataRepartidores.map((driver) => {
+      const displayName = driver.name || `${driver.nombre || ''} ${driver.apellido || ''}`.trim();
+
+      const misPedidos = dataPedidos.filter((p) => {
+        const nombreRep = String(p.repartidor || '').trim().toLowerCase();
+        return (
+          nombreRep === String(driver._id || driver.id || '').toLowerCase() ||
+          nombreRep === displayName.toLowerCase() ||
+          nombreRep === String(driver.nombre).trim().toLowerCase()
+        );
+      });
+
+      const enCamino = misPedidos.filter((p) => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
+      const pendientes = misPedidos.filter(
+        (p) =>
+          p.estado === 'EN_CAMINO' ||
+          p.estado === 'en-camino' ||
+          p.estado === 'ASIGNADO' ||
+          p.estado === 'asignado'
+      );
+      const entregados = misPedidos.filter((p) => p.estado === 'ENTREGADO' || p.estado === 'entregado');
+
+      return {
+        ...driver,
+        pendingOrders: pendientes.length,
+        deliveredOrders: entregados.length,
+        destination: enCamino.length > 0 ? enCamino[0].destino : 'En base',
+      };
+    });
+  }, []);
+
+  useEffect(() => {
     const obtenerRepartidores = async () => {
       try {
-        // Hacemos las dos peticiones al mismo tiempo
-        const [resRepartidores, resPedidos] = await Promise.all([
-          fetch('http://localhost:3001/api/repartidores'),
-          fetch('http://localhost:3001/api/pedidos?incluirEntregadosBorrados=true')
-        ]);
-
-        if (resRepartidores.ok && resPedidos.ok) {
-          const dataRepartidores = await resRepartidores.json();
-          const dataPedidos = await resPedidos.json();
-
-          // Calculamos las métricas para cada repartidor
-          const repartidoresConMetricas = dataRepartidores.map(driver => {
-            const displayName = driver.name || `${driver.nombre || ''} ${driver.apellido || ''}`.trim();
-
-            const misPedidos = dataPedidos.filter(p => {
-              const nombreRep = String(p.repartidor || '').trim().toLowerCase();
-              return nombreRep === String(driver._id || driver.id || '').toLowerCase() || nombreRep === displayName.toLowerCase() || nombreRep === String(driver.nombre).trim().toLowerCase();
-            });
-
-            const enCamino = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino');
-            const pendientes = misPedidos.filter(p => p.estado === 'EN_CAMINO' || p.estado === 'en-camino' || p.estado === 'ASIGNADO' || p.estado === 'asignado');
-            const entregados = misPedidos.filter(p => p.estado === 'ENTREGADO' || p.estado === 'entregado');
-
-            return {
-              ...driver,
-              pendingOrders: pendientes.length,
-              deliveredOrders: entregados.length,
-              destination: enCamino.length > 0 ? enCamino[0].destino : 'En base'
-            };
-          });
-
-          // Guardamos la lista ya procesada en tu tabla visual
+        const repartidoresConMetricas = await obtenerRepartidoresConMetricas();
+        if (repartidoresConMetricas) {
           setDriverList(repartidoresConMetricas);
           if (onDriversChange) onDriversChange(repartidoresConMetricas);
         }
       } catch (error) {
-        console.error("Error al cargar repartidores y pedidos:", error);
+        console.error('Error al cargar repartidores y pedidos:', error);
       }
     };
 
     obtenerRepartidores();
-  }, [onDriversChange]);
+  }, [obtenerRepartidoresConMetricas, onDriversChange]);
 
 
   const showSuccessToast = (message) => {
@@ -403,20 +417,21 @@ const handleConfirmDelete = async () => {
         })
       });
 
-      if (response.ok) {
-        const refreshResponse = await fetch('http://localhost:3001/api/repartidores');
-        const dataActualizada = await refreshResponse.json();
-        
-        setDriverList(dataActualizada);
-        if (onDriversChange) {
-          onDriversChange(dataActualizada);
+if (response.ok) {
+        const dataActualizada = await obtenerRepartidoresConMetricas();
+
+        if (dataActualizada) {
+          setDriverList(dataActualizada);
+          if (onDriversChange) {
+            onDriversChange(dataActualizada);
+          }
+
+          if (detailDriver && (detailDriver._id || detailDriver.id) === idRepartidor) {
+            const updatedDriver = dataActualizada.find((d) => (d._id || d.id) === idRepartidor);
+            setDetailDriver(updatedDriver);
+          }
         }
-        
-        if (detailDriver && (detailDriver._id || detailDriver.id) === idRepartidor) {
-          const updatedDriver = dataActualizada.find(d => (d._id || d.id) === idRepartidor);
-          setDetailDriver(updatedDriver);
-        }
-        
+
         handleCloseDelete();
         showSuccessToast(`Repartidor dado de ${isInactive ? 'alta' : 'baja'} correctamente`);
       } else {
