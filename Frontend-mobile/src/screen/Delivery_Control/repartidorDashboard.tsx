@@ -1,23 +1,47 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import * as ImagePicker from 'expo-image-picker';
 import {
   AppState, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { cancelOrder, deliverOrder, fetchOrders, getOrders, updateOrderStatus, type DeliveryOrder } from '../../data/orders';
+import {
+  cancelOrder,
+  deliverOrder,
+  fetchOrders,
+  getOrders,
+  reportFailedOrder,
+  updateOrderStatus,
+  type DeliveryOrder,
+} from '../../data/orders';
 import { useAppTheme } from '../../hooks/app-theme';
 import { getStoredUser } from '../../services/auth';
 import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
 
-type ActiveModal = 'orderDetails' | 'receipt' | 'completion' | 'deliveredDetail' | 'cancelConfirm' | null;
+type ActiveModal =
+  | 'orderDetails'
+  | 'receipt'
+  | 'completion'
+  | 'deliveredDetail'
+  | 'cancelConfirm'
+  | 'failedDelivery'
+  | null;
+
 const DEMO_ETA_SECONDS = 15;
 const STAGE_TWO_START_SECONDS = 7;
 const MAX_VISIBLE_ORDERS = 4;
 const OTHER_PAYMENT = 'Otro';
 const PAYMENT_OPTIONS = ['Transferencia', 'Tarjeta de débito', 'Tarjeta de crédito', 'Efectivo', OTHER_PAYMENT];
+const OTHER_FAILURE_REASON = 'Otro';
+const FAILURE_REASONS = [
+  'Cliente ausente',
+  'Dirección incorrecta',
+  'Rechazado por el destinatario',
+  'Local cerrado',
+  OTHER_FAILURE_REASON,
+];
 const POLL_INTERVAL_MS = 10000;
 
 function formatEta(seconds: number) {
@@ -113,6 +137,14 @@ export default function RepartidorDashboard() {
   const paymentMethod = paymentChoice === OTHER_PAYMENT ? customPayment.trim() : paymentChoice;
   const [price, setPrice] = useState('');
   const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [failureChoice, setFailureChoice] = useState('');
+  const [customFailureReason, setCustomFailureReason] = useState('');
+  const [failureObservation, setFailureObservation] = useState('');
+  const [failureError, setFailureError] = useState<string | null>(null);
+  const [isReportingFailure, setIsReportingFailure] = useState(false);
+
+  const selectedFailureReason =
+    failureChoice === OTHER_FAILURE_REASON ? customFailureReason.trim() : failureChoice;
   const activeTimerOrderId = useRef<string | null>(null);
   const palette = APP_THEMES[isDarkMode ? 'dark' : 'light'];
   const applyOrders = useCallback((nextOrders: DeliveryOrder[]) => {
@@ -222,8 +254,8 @@ export default function RepartidorDashboard() {
   }, [applyOrders]);
 
   useEffect(() => {
-    isBusyRef.current = isStartingOrder || isCompletingOrder;
-  }, [isStartingOrder, isCompletingOrder]);
+  isBusyRef.current = isStartingOrder || isCompletingOrder || isReportingFailure;
+}, [isStartingOrder, isCompletingOrder, isReportingFailure]);
 
   // Refresco automatico: cada 10 s mientras la app esta en primer plano y al volver a ella.
   // Se omite mientras se inicia/completa un pedido para no pisar ese cambio con datos viejos.
@@ -317,35 +349,83 @@ export default function RepartidorDashboard() {
     }
   };
 
-  const handleCompleteOrder = async () => {
-    if (!activeOrder || etaSeconds > 0 || isCompletingOrder || !receiptData || !(parsedPrice > 0)) {
-      return;
-    }
+const handleCompleteOrder = async () => {
+  if (!activeOrder || etaSeconds > 0 || isCompletingOrder) {
+    return;
+  }
 
-    try {
-      setIsCompletingOrder(true);
-      setCompletedOrder(activeOrder);
-      const updatedOrders = await deliverOrder(activeOrder.id, {
-        imagenBase64: receiptData.base64,
-        mimeType: receiptData.mimeType,
-        metodoPago: paymentMethod.trim(),
-        precio: parsedPrice,
-      });
-      applyOrders(updatedOrders);
-      setOrdersError(null);
-      setReceiptUri(null);
-      setReceiptData(null);
-      setPaymentChoice('');
-      setCustomPayment('');
-      setPrice('');
-      setActiveModal('completion');
-    } catch (error) {
-      setCompletedOrder(null);
-      setOrdersError(error instanceof Error ? error.message : 'No se pudo completar el pedido.');
-    } finally {
-      setIsCompletingOrder(false);
-    }
-  };
+  // Escenario 2: Intento de confirmación sin adjuntar foto o sin campos obligatorios
+  if (!receiptData || !paymentMethod.trim() || !(parsedPrice > 0)) {
+    setReceiptError(
+      'Debe adjuntar la foto del comprobante y completar los campos requeridos para finalizar',
+    );
+    return;
+  }
+
+  try {
+    setReceiptError(null);
+    setIsCompletingOrder(true);
+    setCompletedOrder(activeOrder);
+    const updatedOrders = await deliverOrder(activeOrder.id, {
+      imagenBase64: receiptData.base64,
+      mimeType: receiptData.mimeType,
+      metodoPago: paymentMethod.trim(),
+      precio: parsedPrice,
+    });
+    applyOrders(updatedOrders);
+    setOrdersError(null);
+    setReceiptUri(null);
+    setReceiptData(null);
+    setPaymentChoice('');
+    setCustomPayment('');
+    setPrice('');
+    setActiveModal('completion');
+  } catch (error) {
+    setCompletedOrder(null);
+    setOrdersError(error instanceof Error ? error.message : 'No se pudo completar el pedido.');
+  } finally {
+    setIsCompletingOrder(false);
+  }
+};
+
+const openFailedDeliveryModal = () => {
+  setFailureChoice('');
+  setCustomFailureReason('');
+  setFailureObservation('');
+  setFailureError(null);
+  setOrdersError(null);
+  setActiveModal('failedDelivery');
+};
+
+const handleReportFailedDelivery = async () => {
+  if (!activeOrder || isReportingFailure) {
+    return;
+  }
+
+  if (!selectedFailureReason || !failureObservation.trim()) {
+    setFailureError('Debes seleccionar un motivo e ingresar una observación para reportar la incidencia.');
+    return;
+  }
+
+  try {
+    setFailureError(null);
+    setIsReportingFailure(true);
+    const updatedOrders = await reportFailedOrder(activeOrder.id, {
+      motivo: selectedFailureReason,
+      observacion: failureObservation.trim(),
+    });
+    applyOrders(updatedOrders);
+    setOrdersError(null);
+    setSelectedOrder(null);
+    setActiveModal(null);
+  } catch (error) {
+    setFailureError(
+      error instanceof Error ? error.message : 'No se pudo registrar la entrega fallida.',
+    );
+  } finally {
+    setIsReportingFailure(false);
+  }
+};
 
   const pickReceipt = async (source: 'library' | 'camera') => {
     try {
@@ -696,38 +776,59 @@ export default function RepartidorDashboard() {
                 </View>
               )}
               {ordersError && <Text style={styles.orderError} accessibilityRole="alert">{ordersError}</Text>}
-              {isSelectedActiveOrder ? (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.startButton,
-                    { backgroundColor: canCompleteSelected ? '#00ffd1' : palette.border },
-                    !canCompleteSelected && { opacity: 0.7 },
-                    pressed && canCompleteSelected && styles.buttonPressed,
-                  ]}
-                  onPress={openReceipt}
-                  disabled={!canCompleteSelected}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !canCompleteSelected }}>
-                  <Text style={[styles.startButtonText, { color: canCompleteSelected ? palette.text : palette.secondary }]}>
-                    {etaSeconds > 0 ? 'Entrega en curso' : '✓  Entregar pedido'}
-                  </Text>
-                </Pressable>
+{isSelectedActiveOrder ? (
+                <>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.startButton,
+                      { backgroundColor: canCompleteSelected ? '#00ffd1' : palette.border },
+                      !canCompleteSelected && { opacity: 0.7 },
+                      pressed && canCompleteSelected && styles.buttonPressed,
+                    ]}
+                    onPress={openReceipt}
+                    disabled={!canCompleteSelected}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canCompleteSelected }}>
+                    <Text style={[styles.startButtonText, { color: canCompleteSelected ? palette.text : palette.secondary }]}>
+                      {etaSeconds > 0 ? 'Entrega en curso' : '✓  Registrar Entrega Exitosa'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.cancelOrderButton, pressed && styles.buttonPressed]}
+                    onPress={openFailedDeliveryModal}
+                    accessibilityRole="button">
+                    <Text style={styles.cancelOrderButtonText}>
+                      Reportar incidencia / Entrega Fallida
+                    </Text>
+                  </Pressable>
+                </>
               ) : (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.startButton,
-                    { backgroundColor: canStartSelected ? '#00ffd1' : palette.border },
-                    !canStartSelected && { opacity: 0.7 },
-                    pressed && canStartSelected && styles.buttonPressed,
-                  ]}
-                  onPress={handleStartOrder}
-                  disabled={!canStartSelected}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !canStartSelected }}>
-                  <Text style={[styles.startButtonText, { color: canStartSelected ? palette.text : palette.secondary }]}>
-                    {isStartingOrder ? 'Iniciando...' : '✓  Comenzar entrega'}
-                  </Text>
-                </Pressable>
+                <>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.startButton,
+                      { backgroundColor: canStartSelected ? '#00ffd1' : palette.border },
+                      !canStartSelected && { opacity: 0.7 },
+                      pressed && canStartSelected && styles.buttonPressed,
+                    ]}
+                    onPress={handleStartOrder}
+                    disabled={!canStartSelected}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canStartSelected }}>
+                    <Text style={[styles.startButtonText, { color: canStartSelected ? palette.text : palette.secondary }]}>
+                      {isStartingOrder ? 'Iniciando...' : '✓  Comenzar entrega'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.cancelOrderButton, pressed && styles.buttonPressed]}
+                    onPress={() => {
+                      setOrdersError(null);
+                      setActiveModal('cancelConfirm');
+                    }}
+                    accessibilityRole="button">
+                    <Text style={styles.cancelOrderButtonText}>Cancelar</Text>
+                  </Pressable>
+                </>
               )}
               <Pressable
                 style={({ pressed }) => [styles.cancelOrderButton, pressed && styles.buttonPressed]}
@@ -905,13 +1006,13 @@ export default function RepartidorDashboard() {
                 style={({ pressed }) => [
                   styles.startButton,
                   { backgroundColor: canConfirmReceipt ? '#00ffd1' : palette.border },
-                  !canConfirmReceipt && { opacity: 0.7 },
-                  pressed && canConfirmReceipt && styles.buttonPressed,
+                  isCompletingOrder && { opacity: 0.7 },
+                  pressed && !isCompletingOrder && styles.buttonPressed,
                 ]}
                 onPress={handleCompleteOrder}
-                disabled={!canConfirmReceipt}
+                disabled={isCompletingOrder}
                 accessibilityRole="button"
-                accessibilityState={{ disabled: !canConfirmReceipt }}>
+                accessibilityState={{ disabled: isCompletingOrder }}>
                 <Text style={[styles.startButtonText, { color: canConfirmReceipt ? palette.text : palette.secondary }]}>
                   {isCompletingOrder ? 'Guardando...' : '✓  Confirmar entrega'}
                 </Text>
@@ -925,7 +1026,133 @@ export default function RepartidorDashboard() {
             </View>
           </View>
         </Modal>
+        <Modal
+          visible={activeModal === 'failedDelivery'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal('orderDetails')}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.modalTitle, { color: palette.text }]}>
+                    Reportar incidencia / Entrega Fallida
+                  </Text>
+                  <Text style={[styles.startSubtitle, { color: palette.secondary }]}>
+                    {activeOrder ? `Pedido #${activeOrder.codigo} · Pasará a estado Rechazado` : 'Indica el motivo de la incidencia'}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setActiveModal('orderDetails')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
 
+              <ScrollView
+                style={styles.orderDetailScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>MOTIVO DE LA INCIDENCIA</Text>
+                <View style={styles.paymentOptions} accessibilityRole="radiogroup">
+                  {FAILURE_REASONS.map((reason) => {
+                    const selected = failureChoice === reason;
+                    return (
+                      <Pressable
+                        key={reason}
+                        style={[
+                          styles.paymentOption,
+                          {
+                            borderColor: selected ? palette.primary : palette.border,
+                            backgroundColor: selected ? palette.primary : palette.background,
+                          },
+                        ]}
+                        onPress={() => {
+                          setFailureChoice(reason);
+                          setFailureError(null);
+                        }}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}>
+                        <Text style={[styles.paymentOptionText, { color: selected ? '#FFFFFF' : palette.text }]}>
+                          {reason}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {failureChoice === OTHER_FAILURE_REASON && (
+                  <TextInput
+                    style={[
+                      styles.receiptInput,
+                      { color: palette.text, borderColor: palette.border, backgroundColor: palette.background },
+                    ]}
+                    value={customFailureReason}
+                    onChangeText={(text) => {
+                      setCustomFailureReason(text);
+                      setFailureError(null);
+                    }}
+                    placeholder="Especifica el motivo"
+                    placeholderTextColor={palette.secondary}
+                    autoFocus
+                  />
+                )}
+
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>OBSERVACIÓN</Text>
+                <TextInput
+                  style={[
+                    styles.receiptInput,
+                    {
+                      color: palette.text,
+                      borderColor: palette.border,
+                      backgroundColor: palette.background,
+                      minHeight: 84,
+                      textAlignVertical: 'top',
+                    },
+                  ]}
+                  value={failureObservation}
+                  onChangeText={(text) => {
+                    setFailureObservation(text);
+                    setFailureError(null);
+                  }}
+                  placeholder="Describe lo ocurrido en el domicilio..."
+                  placeholderTextColor={palette.secondary}
+                  multiline
+                />
+              </ScrollView>
+
+              {failureError && (
+                <Text style={styles.orderError} accessibilityRole="alert">
+                  {failureError}
+                </Text>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.cancelOrderButton,
+                  isReportingFailure && { opacity: 0.7 },
+                  pressed && !isReportingFailure && styles.buttonPressed,
+                ]}
+                onPress={handleReportFailedDelivery}
+                disabled={isReportingFailure}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isReportingFailure }}>
+                <Text style={styles.cancelOrderButtonText}>
+                  {isReportingFailure ? 'Registrando...' : 'Confirmar entrega fallida'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.cancelStartButton}
+                onPress={() => setActiveModal('orderDetails')}
+                disabled={isReportingFailure}
+                accessibilityRole="button">
+                <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Volver</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>        
         <Modal
           visible={activeModal === 'deliveredDetail'}
           transparent

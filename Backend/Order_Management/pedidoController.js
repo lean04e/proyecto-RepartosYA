@@ -8,6 +8,7 @@ const EXTENSIONES_COMPROBANTE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'imag
 const MAX_COMPROBANTE_BYTES = 6 * 1024 * 1024;
 const DEMO_ETA_SECONDS = 15;
 
+
 function getOrderTimestamp(order) {
     const timestamp = Date.parse(order.updatedAt || order.createdAt || '');
     return Number.isFinite(timestamp) ? timestamp : 0;
@@ -387,7 +388,7 @@ const eliminarPedido = async (req, res) => {
 const asignarRepartidor = async (req, res) => {
     try {
         const { id } = req.params;
-        const { repartidor, estado } = req.body;
+        const { repartidor, estado, motivoIncidencia, observacionIncidencia } = req.body;
 
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { ID: id };
         const pedido = await Pedido.findOne(query);
@@ -439,6 +440,27 @@ const asignarRepartidor = async (req, res) => {
             estadoAnterior: estadoAnterior,
             estadoNuevo: pedido.estado
         });
+        const entradaHistorial = {
+            fecha: new Date().toISOString(),
+            estadoAnterior: estadoAnterior,
+            estadoNuevo: pedido.estado
+        };
+
+        if (pedido.estado === 'RECHAZADO') {
+            const motivoLimpio = typeof motivoIncidencia === 'string' ? motivoIncidencia.trim() : '';
+            const obsLimpia = typeof observacionIncidencia === 'string' ? observacionIncidencia.trim() : '';
+
+            pedido.incidencia = {
+                motivo: motivoLimpio || null,
+                observacion: obsLimpia || null,
+                fecha: new Date()
+            };
+
+            if (motivoLimpio) entradaHistorial.motivo = motivoLimpio;
+            if (obsLimpia) entradaHistorial.observacion = obsLimpia;
+        }
+
+        pedido.historialEstados.push(entradaHistorial);
 
         await pedido.save();
 
@@ -704,3 +726,4 @@ module.exports = {
     obtenerPedidosEntregadosPorRepartidor,
     obtenerDetalleEntrega
 };
+

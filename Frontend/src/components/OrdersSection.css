@@ -240,6 +240,26 @@
   border-color: var(--status-warning-border);
 }
 
+.status-rechazado {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.status-rechazado .status-dot {
+  background-color: #f87171;
+}
+
+[data-theme='dark'] .status-rechazado {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+[data-theme='dark'] .status-rechazado .status-dot {
+  background-color: #fca5a5;
+}
+
 .status-registrado .status-dot {
   background: var(--status-warning-text);
 }

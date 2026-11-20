@@ -26,6 +26,8 @@ export type DeliveryOrder = {
   metodoPago?: string;
   precio?: number;
   comprobanteUrl?: string;
+  incidenciaMotivo?: string;
+  incidenciaObservacion?: string;
 };
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
@@ -70,6 +72,8 @@ export async function fetchOrders(): Promise<DeliveryOrder[]> {
     metodoPago: pedido.comprobante?.metodoPago ?? undefined,
     precio: pedido.comprobante?.precio ?? undefined,
     comprobanteUrl: pedido.comprobante?.imagen ? `${API_URL}${pedido.comprobante.imagen}` : undefined,
+    incidenciaMotivo: pedido.incidencia?.motivo ?? undefined,
+    incidenciaObservacion: pedido.incidencia?.observacion ?? undefined,
   }));
 }
 
@@ -136,6 +140,37 @@ export async function deliverOrder(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? 'No se pudo registrar la entrega.');
+  }
+
+  return await getOrders();
+}
+
+
+export type FailedDeliveryPayload = {
+  motivo: string;
+  observacion: string;
+  estado?: OrderStatus;
+};
+
+export async function reportFailedOrder(
+  orderId: string,
+  payload: FailedDeliveryPayload,
+): Promise<DeliveryOrder[]> {
+  // Si tenés una ruta específica en el backend (ej. /api/pedidos/incidencia/:id o /api/pedidos/:id/rechazar),
+  // ajustá el path aquí; de lo contrario enviamos estado: 'RECHAZADO' + motivo/observacion
+  const response = await fetch(`${API_URL}/api/pedidos/asignar/${orderId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      estado: payload.estado ?? 'RECHAZADO',
+      motivoIncidencia: payload.motivo,
+      observacionIncidencia: payload.observacion,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? 'No se pudo registrar la entrega fallida.');
   }
 
   return await getOrders();

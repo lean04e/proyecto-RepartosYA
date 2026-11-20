@@ -116,6 +116,12 @@ useEffect(() => {
           // Los pedidos viejos no tienen createdAt: la fecha de creacion esta en los primeros 4 bytes del _id
           const fechaCreacion = (p) => p.createdAt
             || (p._id ? new Date(parseInt(p._id.substring(0, 8), 16) * 1000).toISOString() : new Date().toISOString());
+          const obtenerUltimoRechazo = (p) =>
+  Array.isArray(p.historialEstados)
+    ? [...p.historialEstados]
+        .reverse()
+        .find((h) => String(h.estadoNuevo || '').toLowerCase() === 'rechazado')
+    : null;  
           const pedidosMapeados = pedidosData.map(p => ({
             id: p.ID,
             origin: p.nombreOrigen || p.comercioOrigen || p.origen,
@@ -123,7 +129,8 @@ useEffect(() => {
             driver: p.repartidorNombre || p.repartidor || null,
             status: p.estado ? p.estado.toLowerCase().replace('_', '-') : 'registrado',
             createdAt: fechaCreacion(p),
-            
+            incidenciaMotivo: p.incidencia?.motivo || obtenerUltimoRechazo(p)?.motivo || '',
+            incidenciaObservacion: p.incidencia?.observacion || obtenerUltimoRechazo(p)?.observacion || '',   
         
             statusHistory: p.historialEstados && p.historialEstados.length > 0 
               ? p.historialEstados.map(h => ({
@@ -736,7 +743,7 @@ function OrderDetailModal({
   onEdit,
   onCancelOrder,
   onRemove,
-}) {
+  }) {
   const [copiedTrackingLink, setCopiedTrackingLink] = useState(false)
   const [trackingCopyError, setTrackingCopyError] = useState('')
 
@@ -777,6 +784,22 @@ function OrderDetailModal({
 
         <div className="detail-modal-body">
           <div className="detail-summary-grid">
+            {order.status === 'rechazado' && (
+            <div className="detail-orders-section">
+              <h3 className="detail-orders-title">Motivo del rechazo</h3>
+              <div className="detail-card detail-card-highlight">
+                <span className="detail-card-value">
+                  {order.incidenciaMotivo || 'No especificado'}
+                </span>
+                {order.incidenciaObservacion && (
+                  <span className="detail-party-line">
+                    <span className="detail-party-label">Observación</span>
+                    {order.incidenciaObservacion}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
             <div className="detail-card">
               <span className="detail-card-label">
                 <PackageIcon />

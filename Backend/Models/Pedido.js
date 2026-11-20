@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
 const pedidoSchema = new mongoose.Schema({
+
     ID: {
         type: String,
         default: uuidv4,
@@ -41,6 +42,12 @@ const pedidoSchema = new mongoose.Schema({
         metodoPago: { type: String, default: null },
         precio: { type: Number, default: null }
     },
+      incidencia: {
+        motivo: { type: String, default: null },
+        observacion: { type: String, default: null },
+        fecha: { type: Date, default: null }
+    },
+    
     borrado: {
         type: Boolean,
         default: false
