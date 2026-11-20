@@ -1,0 +1,31 @@
+const express = require('express');
+const router = express.Router();
+const { 
+    crearPedido, 
+    obtenerPedidos, 
+    obtenerSeguimientoPedido,
+    modificarPedido, 
+    cancelarPedido, 
+    eliminarPedido, 
+    obtenerPedidosEntregadosPorRepartidor,
+    asignarRepartidor,
+    entregarPedido,
+    obtenerComprobante,
+    desasignarRepartidor,
+    obtenerDetalleEntrega
+} = require('../pedidoController');
+
+router.post('/cargar', crearPedido);
+router.get('/', obtenerPedidos);
+router.get('/:id/detalle-entrega', obtenerDetalleEntrega);
+router.get('/:id/seguimiento', obtenerSeguimientoPedido);
+router.get('/:id/comprobante', obtenerComprobante);
+router.put('/modificar/:id', modificarPedido); 
+router.put('/cancelar/:id', cancelarPedido);
+router.put('/asignar/:id', asignarRepartidor);
+router.put('/entregar/:id', entregarPedido);
+router.delete('/:id', eliminarPedido);
+router.get('/repartidor/:nombreRepartidor/entregados', obtenerPedidosEntregadosPorRepartidor);
+router.put('/desasignar/:id', desasignarRepartidor);
+
+module.exports = router;

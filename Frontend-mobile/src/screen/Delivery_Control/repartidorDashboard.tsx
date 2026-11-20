@@ -1,0 +1,1276 @@
+import * as ImagePicker from 'expo-image-picker';
+import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  AppState, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+  cancelOrder,
+  deliverOrder,
+  fetchOrders,
+  getOrders,
+  reportFailedOrder,
+  updateOrderStatus,
+  type DeliveryOrder,
+} from '../../data/orders';
+import { useAppTheme } from '../../hooks/app-theme';
+import { getStoredUser } from '../../services/auth';
+import { APP_THEMES, DELIVERY_DASHBOARD_STYLES as styles } from '../../theme/theme';
+
+type ActiveModal =
+  | 'orderDetails'
+  | 'receipt'
+  | 'completion'
+  | 'deliveredDetail'
+  | 'cancelConfirm'
+  | 'failedDelivery'
+  | null;
+
+const DEMO_ETA_SECONDS = 15;
+const STAGE_TWO_START_SECONDS = 7;
+const MAX_VISIBLE_ORDERS = 4;
+const OTHER_PAYMENT = 'Otro';
+const PAYMENT_OPTIONS = ['Transferencia', 'Tarjeta de débito', 'Tarjeta de crédito', 'Efectivo', OTHER_PAYMENT];
+const OTHER_FAILURE_REASON = 'Otro';
+const FAILURE_REASONS = [
+  'Cliente ausente',
+  'Dirección incorrecta',
+  'Rechazado por el destinatario',
+  'Local cerrado',
+  OTHER_FAILURE_REASON,
+];
+const POLL_INTERVAL_MS = 10000;
+
+function formatEta(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+type Palette = (typeof APP_THEMES)['light'];
+type Leg = 'origen' | 'destino';
+
+const LEG_STEPS: { key: Leg; label: string }[] = [
+  { key: 'origen', label: '1 · Retirar en origen' },
+  { key: 'destino', label: '2 · Entregar en destino' },
+];
+
+// Dos pasos: retirar en el depósito de origen y entregar en el destino
+function LegTracker({ leg, palette }: { leg: Leg; palette: Palette }) {
+  return (
+    <View style={styles.legTracker} accessibilityLabel={leg === 'origen' ? 'Paso 1 de 2: retirar en origen' : 'Paso 2 de 2: entregar en destino'}>
+      {LEG_STEPS.map((step) => {
+        const isCurrent = step.key === leg;
+        const isDone = step.key === 'origen' && leg === 'destino';
+        return (
+          <View key={step.key} style={styles.legStep}>
+            <View
+              style={[
+                styles.legBar,
+                { backgroundColor: isCurrent || isDone ? palette.primary : palette.border },
+                isDone && { opacity: 0.45 },
+              ]}
+            />
+            <Text style={[
+              styles.legLabel,
+              { color: isCurrent ? palette.text : palette.secondary, fontWeight: isCurrent ? '800' : '600' },
+            ]}>
+              {step.label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function LegGroup({ active, palette, children }: { active: boolean; palette: Palette; children: ReactNode }) {
+  return (
+    <View
+      style={[
+        styles.legGroup,
+        active
+          ? { backgroundColor: palette.focusSurface, borderColor: palette.primary }
+          : { borderColor: palette.border },
+      ]}>
+      {active && (
+        <Text style={[styles.legTag, { backgroundColor: palette.primary, color: palette.onPrimary }]}>
+          Rumbo actual
+        </Text>
+      )}
+      {children}
+    </View>
+  );
+}
+
+export default function RepartidorDashboard() {
+  const { id, nombre, apellido } = useLocalSearchParams<{
+    id?: string;
+    nombre?: string;
+    apellido?: string;
+  }>();
+  const { isDarkMode, toggleTheme } = useAppTheme();
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [isCancelingOrder, setIsCancelingOrder] = useState(false);
+  const [orders, setOrders] = useState<DeliveryOrder[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [clock, setClock] = useState(Date.now);
+  const [localTimerStartedAt, setLocalTimerStartedAt] = useState<number | null>(null);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
+  const [completedOrder, setCompletedOrder] = useState<DeliveryOrder | null>(null);
+  const [isStartingOrder, setIsStartingOrder] = useState(false);
+  const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deliveredOrder, setDeliveredOrder] = useState<DeliveryOrder | null>(null);
+  const [receiptImageFailed, setReceiptImageFailed] = useState(false);
+  const isBusyRef = useRef(false);
+  const [receiptUri, setReceiptUri] = useState<string | null>(null);
+  const [receiptData, setReceiptData] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [paymentChoice, setPaymentChoice] = useState('');
+  const [customPayment, setCustomPayment] = useState('');
+  // Con "Otro" el repartidor escribe el metodo; con el resto se usa la opcion elegida
+  const paymentMethod = paymentChoice === OTHER_PAYMENT ? customPayment.trim() : paymentChoice;
+  const [price, setPrice] = useState('');
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [failureChoice, setFailureChoice] = useState('');
+  const [customFailureReason, setCustomFailureReason] = useState('');
+  const [failureObservation, setFailureObservation] = useState('');
+  const [failureError, setFailureError] = useState<string | null>(null);
+  const [isReportingFailure, setIsReportingFailure] = useState(false);
+
+  const selectedFailureReason =
+    failureChoice === OTHER_FAILURE_REASON ? customFailureReason.trim() : failureChoice;
+  const activeTimerOrderId = useRef<string | null>(null);
+  const palette = APP_THEMES[isDarkMode ? 'dark' : 'light'];
+  const applyOrders = useCallback((nextOrders: DeliveryOrder[]) => {
+    const nextActiveOrderId = nextOrders.find(
+      (order) => order.repartidorId === id && order.estado === 'EN_CAMINO',
+    )?.id ?? null;
+
+    if (nextActiveOrderId !== activeTimerOrderId.current) {
+      activeTimerOrderId.current = nextActiveOrderId;
+      const startedAt = nextActiveOrderId ? Date.now() : null;
+      setLocalTimerStartedAt(startedAt);
+      if (startedAt !== null) {
+        setClock(startedAt);
+      }
+    }
+
+    setOrders(nextOrders);
+  }, [id]);
+  const courierOrders = orders.filter((order) => order.repartidorId === id);
+  const activeOrder = courierOrders.find((order) => order.estado === 'EN_CAMINO');
+
+  // La cola incluye todos los pedidos asignados/en espera EXCEPTO el activo de arriba
+  const queuedOrders = courierOrders
+    .filter((order) => 
+      order.id !== activeOrder?.id && (
+        order.estado === 'PENDIENTE'
+        || order.estado === 'ASIGNADO'
+        || order.estado === 'MODIFICADO'
+        || order.estado === 'EN_CAMINO' 
+      )
+    )
+    .sort((first, second) => {
+      const t1 = first.createdAt ? Date.parse(first.createdAt) : (first.fechaEstado ? Date.parse(first.fechaEstado) : 0);
+      const t2 = second.createdAt ? Date.parse(second.createdAt) : (second.fechaEstado ? Date.parse(second.fechaEstado) : 0);
+      if (t1 && t2 && t1 !== t2) {
+        return t1 - t2;
+      }
+      return first.codigo.localeCompare(second.codigo);
+    });
+  const today = new Date().toDateString();
+  const historicalOrders = courierOrders
+    .filter((order) => (
+      order.estado === 'ENTREGADO'
+      && order.fechaEstado
+      && new Date(order.fechaEstado).toDateString() === today
+    ))
+    .sort((first, second) => (
+      Date.parse(second.fechaEstado ?? '') - Date.parse(first.fechaEstado ?? '')
+    ));
+  const elapsedSeconds = activeOrder && localTimerStartedAt !== null
+    ? Math.max(0, Math.floor((clock - localTimerStartedAt) / 1000))
+    : 0;
+  const etaTotalSeconds = DEMO_ETA_SECONDS;
+  const etaSeconds = activeOrder ? Math.max(0, etaTotalSeconds - elapsedSeconds) : 0;
+  const activeOrderId = activeOrder?.id;
+  const currentLeg: Leg = etaSeconds > STAGE_TWO_START_SECONDS ? 'origen' : 'destino';
+  const canStartSelected = Boolean(
+    selectedOrder
+    && !activeOrder
+    && queuedOrders[0]?.id === selectedOrder.id
+    && !isStartingOrder,
+  );
+  const isSelectedActiveOrder = Boolean(activeOrder && selectedOrder?.id === activeOrder.id);
+  const canCompleteSelected = isSelectedActiveOrder && etaSeconds === 0 && !isCompletingOrder;
+  const parsedPrice = Number(price.replace(',', '.'));
+  const canConfirmReceipt = Boolean(
+    receiptData && paymentMethod.trim() && parsedPrice > 0 && !isCompletingOrder,
+  );
+  const visibleHistory = showAllHistory
+    ? historicalOrders
+    : historicalOrders.slice(0, MAX_VISIBLE_ORDERS);
+
+  useEffect(() => {
+    if (!activeOrderId) {
+      return undefined;
+    }
+
+    const intervalId = setInterval(() => setClock(Date.now()), 1000);
+
+    return () => clearInterval(intervalId);
+  }, [activeOrderId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getOrders()
+      .then((loadedOrders) => {
+        if (isMounted) {
+          applyOrders(loadedOrders);
+          setOrdersError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (isMounted) {
+          setOrdersError(error instanceof Error ? error.message : 'No se pudieron cargar los pedidos.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingOrders(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [applyOrders]);
+
+  useEffect(() => {
+  isBusyRef.current = isStartingOrder || isCompletingOrder || isReportingFailure;
+}, [isStartingOrder, isCompletingOrder, isReportingFailure]);
+
+  // Refresco automatico: cada 10 s mientras la app esta en primer plano y al volver a ella.
+  // Se omite mientras se inicia/completa un pedido para no pisar ese cambio con datos viejos.
+  useEffect(() => {
+    let isMounted = true;
+
+    const refresh = async () => {
+      if (isBusyRef.current) {
+        return;
+      }
+      try {
+        const freshOrders = await fetchOrders();
+        if (isMounted && !isBusyRef.current) {
+          applyOrders(freshOrders);
+        }
+      } catch {
+        // Falla silenciosa: se conserva la lista actual y se reintenta en el proximo ciclo
+      }
+    };
+
+    const intervalId = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        refresh();
+      }
+    }, POLL_INTERVAL_MS);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        refresh();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      subscription.remove();
+    };
+  }, [applyOrders]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      applyOrders(await fetchOrders());
+      setOrdersError(null);
+    } catch (error) {
+      setOrdersError(error instanceof Error ? error.message : 'No se pudieron actualizar los pedidos.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleStartOrder = async () => {
+    if (
+      !selectedOrder
+      || activeOrder
+      || queuedOrders[0]?.id !== selectedOrder.id
+      || isStartingOrder
+    ) {
+      return;
+    }
+
+    try {
+      setIsStartingOrder(true);
+      const updatedOrders = await updateOrderStatus(selectedOrder.id, 'EN_CAMINO');
+      applyOrders(updatedOrders);
+      setOrdersError(null);
+      setActiveModal(null);
+      setSelectedOrder(null);
+    } catch (error) {
+      setOrdersError(error instanceof Error ? error.message : 'No se pudo iniciar la entrega.');
+    } finally {
+      setIsStartingOrder(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!selectedOrder || isCancelingOrder) {
+      return;
+    }
+
+    try {
+      setIsCancelingOrder(true);
+      const updatedOrders = await cancelOrder(selectedOrder.id);
+      applyOrders(updatedOrders);
+      setOrdersError(null);
+      setActiveModal(null);
+      setSelectedOrder(null);
+    } catch (error) {
+      setOrdersError(error instanceof Error ? error.message : 'No se pudo cancelar el pedido.');
+    } finally {
+      setIsCancelingOrder(false);
+    }
+  };
+
+const handleCompleteOrder = async () => {
+  if (!activeOrder || etaSeconds > 0 || isCompletingOrder) {
+    return;
+  }
+
+  // Escenario 2: Intento de confirmación sin adjuntar foto o sin campos obligatorios
+  if (!receiptData || !paymentMethod.trim() || !(parsedPrice > 0)) {
+    setReceiptError(
+      'Debe adjuntar la foto del comprobante y completar los campos requeridos para finalizar',
+    );
+    return;
+  }
+
+  try {
+    setReceiptError(null);
+    setIsCompletingOrder(true);
+    setCompletedOrder(activeOrder);
+    const updatedOrders = await deliverOrder(activeOrder.id, {
+      imagenBase64: receiptData.base64,
+      mimeType: receiptData.mimeType,
+      metodoPago: paymentMethod.trim(),
+      precio: parsedPrice,
+    });
+    applyOrders(updatedOrders);
+    setOrdersError(null);
+    setReceiptUri(null);
+    setReceiptData(null);
+    setPaymentChoice('');
+    setCustomPayment('');
+    setPrice('');
+    setActiveModal('completion');
+  } catch (error) {
+    setCompletedOrder(null);
+    setOrdersError(error instanceof Error ? error.message : 'No se pudo completar el pedido.');
+  } finally {
+    setIsCompletingOrder(false);
+  }
+};
+
+const openFailedDeliveryModal = () => {
+  setFailureChoice('');
+  setCustomFailureReason('');
+  setFailureObservation('');
+  setFailureError(null);
+  setOrdersError(null);
+  setActiveModal('failedDelivery');
+};
+
+const handleReportFailedDelivery = async () => {
+  if (!activeOrder || isReportingFailure) {
+    return;
+  }
+
+  if (!selectedFailureReason || !failureObservation.trim()) {
+    setFailureError('Debes seleccionar un motivo e ingresar una observación para reportar la incidencia.');
+    return;
+  }
+
+  try {
+    setFailureError(null);
+    setIsReportingFailure(true);
+    const updatedOrders = await reportFailedOrder(activeOrder.id, {
+      motivo: selectedFailureReason,
+      observacion: failureObservation.trim(),
+    });
+    applyOrders(updatedOrders);
+    setOrdersError(null);
+    setSelectedOrder(null);
+    setActiveModal(null);
+  } catch (error) {
+    setFailureError(
+      error instanceof Error ? error.message : 'No se pudo registrar la entrega fallida.',
+    );
+  } finally {
+    setIsReportingFailure(false);
+  }
+};
+
+  const pickReceipt = async (source: 'library' | 'camera') => {
+    try {
+      setReceiptError(null);
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setReceiptError('Necesitas dar permiso para cargar el comprobante.');
+        return;
+      }
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7, base64: true };
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        if (!asset.base64) {
+          setReceiptError('No se pudo leer la imagen.');
+          return;
+        }
+        setReceiptUri(asset.uri);
+        setReceiptData({ base64: asset.base64, mimeType: asset.mimeType ?? 'image/jpeg' });
+      }
+    } catch {
+      setReceiptError('No se pudo cargar la imagen.');
+    }
+  };
+
+  const openReceipt = () => {
+    setReceiptError(null);
+    setOrdersError(null);
+    setActiveModal('receipt');
+  };
+
+  const openDeliveredDetail = (order: DeliveryOrder) => {
+    setDeliveredOrder(order);
+    setReceiptImageFailed(false);
+    setActiveModal('deliveredDetail');
+  };
+
+  const openOrderDetails = (order: DeliveryOrder) => {
+    setSelectedOrder(order);
+    setOrdersError(null);
+    setActiveModal('orderDetails');
+  };
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      <View style={[styles.container, { backgroundColor: palette.background }]}>
+        <View style={[styles.header, { backgroundColor: palette.header }]}>
+          <Image
+            source={
+              isDarkMode
+                ? require('../../../assets/images/repartosYA-version-Osc.png')
+                : require('../../../assets/images/repartosYA-logo.png')
+            }
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="RepartosYa"
+          />
+        </View>
+
+        <View style={styles.content}>
+          <ScrollView
+            contentContainerStyle={styles.dashboardContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={palette.primary}
+                colors={[palette.primary]}
+              />
+            }>
+            <View style={[styles.sectionCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              {isLoadingOrders ? (
+                <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>Cargando pedidos...</Text>
+              ) : activeOrder ? (
+                <Pressable
+                  style={({ pressed }) => pressed && styles.buttonPressed}
+                  onPress={() => openOrderDetails(activeOrder)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver detalles del pedido ${activeOrder.codigo}`}>
+                <View style={[styles.activeOrderCard, { backgroundColor: palette.backgroundElement, borderColor: palette.border }]}>
+                  <View style={styles.orderRowHeader}>
+                    <Text style={[styles.queueOrderCode, { color: palette.text }]}>#{activeOrder.codigo}</Text>
+                    <Text style={styles.etaValue}>Tiempo Restante: {formatEta(etaSeconds)}</Text>
+                  </View>
+                  <LegTracker leg={currentLeg} palette={palette} />
+                  <Text style={[styles.legHeadline, { color: palette.text }]}>
+                    {etaSeconds === 0 ? 'Llegaste a ' : 'Dirigite a '}
+                    {currentLeg === 'origen' ? activeOrder.comercioOrigen : activeOrder.destinatario}
+                  </Text>
+                  <Text style={[styles.legAddress, { color: palette.secondary }]} numberOfLines={2}>
+                    {currentLeg === 'origen' ? activeOrder.origen : activeOrder.destino}
+                  </Text>
+                  {currentLeg === 'origen' && (
+                    <Text style={[styles.legNext, { color: palette.secondary }]} numberOfLines={2}>
+                      Después: {activeOrder.destinatario} · {activeOrder.destino}
+                    </Text>
+                  )}
+                  <View style={[styles.orderCardFooter, { justifyContent: 'flex-end' }]}>
+                    <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
+                  </View>
+                </View>
+                </Pressable>
+              ) : (
+                <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
+                  No hay pedidos en curso.
+                </Text>
+              )}
+            </View>
+
+            <View style={[styles.sectionCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeadingGroup}>
+                  <Text style={[styles.sectionTitle, { color: palette.heading }]}>COLA DE PEDIDOS</Text>
+                  <Text
+                    style={[
+                      styles.sectionCount,
+                      { backgroundColor: palette.countBadge, color: palette.countBadgeText },
+                    ]}>
+                    {queuedOrders.length}
+                  </Text>
+                </View>
+              </View>
+              {isLoadingOrders ? (
+                <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>Cargando pedidos...</Text>
+              ) : queuedOrders.length > 0 ? (
+                queuedOrders.map((order, index) => {
+                  const orderCard = (
+                    <View style={[
+                      styles.queueCard,
+                      {
+                        backgroundColor: index === 0 ? palette.background : palette.backgroundElement,
+                        borderColor: palette.border,
+                      },
+                    ]}>
+                      <View style={styles.queueCardText}>
+                        <Text style={[styles.queueOrderCode, { color: palette.primary }]}>#{order.codigo}</Text>
+                        <Text style={[styles.queueRecipient, { color: palette.text }]} numberOfLines={1}>
+                          {order.destinatario}
+                        </Text>
+                        <Text style={[styles.queueAddress, { color: palette.secondary }]} numberOfLines={1}>
+                          {order.destino}
+                        </Text>
+                      </View>
+                      <View style={styles.queueCardTrailing}>
+                      <Text style={[styles.queueChevron, { color: index === 0 ? palette.primary : palette.secondary }]}>
+                        ›
+                      </Text>
+                      </View>
+                    </View>
+                  );
+
+                  return (
+                    <Pressable
+                      key={order.id}
+                      onPress={() => openOrderDetails(order)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ver pedido ${order.codigo}, ${order.destinatario}`}>
+                      {orderCard}
+                    </Pressable>
+                  );
+                })
+              ) : (
+                <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>No hay pedidos en la cola.</Text>
+              )}
+            </View>
+
+            <View style={[styles.sectionCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeadingGroup}>
+                  <Text style={[styles.sectionTitle, { color: palette.heading }]}>
+                    ENTREGADOS
+                  </Text>
+                  <Text
+                    style={[
+                      styles.sectionCount,
+                      { backgroundColor: palette.countBadge, color: palette.countBadgeText },
+                    ]}>
+                    {historicalOrders.length}
+                  </Text>
+                </View>
+                <Text style={[styles.historyDate, { color: palette.primary }]}>
+                  {new Date().toLocaleDateString('es-AR')}
+                </Text>
+              </View>
+              {isLoadingOrders ? (
+                <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>Cargando pedidos...</Text>
+              ) : visibleHistory.length > 0 ? (
+                visibleHistory.map((order) => (
+                  <Pressable
+                    key={order.id}
+                    style={({ pressed }) => [
+                      styles.historyRow,
+                      { borderBottomColor: palette.border },
+                      pressed && styles.buttonPressed,
+                    ]}
+                    onPress={() => openDeliveredDetail(order)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver detalle del pedido ${order.codigo}`}>
+                    <View style={styles.queueCardText}>
+                      <Text style={[styles.queueOrderCode, { color: palette.text }]}>#{order.codigo}</Text>
+                      <Text style={[styles.queueRecipient, { color: palette.text }]} numberOfLines={1}>
+                        {order.destinatario}
+                      </Text>
+                      <Text style={[styles.queueAddress, { color: palette.secondary }]} numberOfLines={1}>
+                        {order.destino}
+                      </Text>
+                    </View>
+                    <View style={styles.historyTrailing}>
+                      <Text style={[
+                        styles.historyStatus,
+                        { backgroundColor: palette.successSurface, color: palette.successText },
+                      ]}>
+                        Entregado
+                      </Text>
+                      <Text style={[styles.sectionAction, { color: palette.primary }]}>Ver detalle ›</Text>
+                    </View>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
+                  No hay pedidos entregados hoy.
+                </Text>
+              )}
+              {historicalOrders.length > MAX_VISIBLE_ORDERS && (
+                <Pressable
+                  style={styles.showMoreButton}
+                  onPress={() => setShowAllHistory((visible) => !visible)}
+                  accessibilityRole="button">
+                  <Text style={styles.showMoreText}>
+                    {showAllHistory ? 'Ver menos' : 'Ver todos'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            {ordersError && <Text style={styles.orderError} accessibilityRole="alert">{ordersError}</Text>}
+          </ScrollView>
+        </View>
+
+        <View style={[styles.bottomMenu, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <Pressable
+            style={({ pressed }) => [styles.menuButton, pressed && styles.buttonPressed]}
+            onPress={toggleTheme}
+            accessibilityRole="button"
+            accessibilityState={{ checked: isDarkMode }}
+            accessibilityLabel={isDarkMode ? 'Activar modo claro' : 'Activar modo oscuro'}>
+            <Text style={[styles.menuIcon, { color: palette.text }]}>{isDarkMode ? '☀' : '☾'}</Text>
+            <Text style={[styles.menuLabel, { color: palette.secondary }]}>
+              {isDarkMode ? 'Modo claro' : 'Modo oscuro'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.menuButton, pressed && styles.buttonPressed]}
+            onPress={async () => {
+              const stored = await getStoredUser();
+              router.push({
+                pathname: '/options',
+                params: {
+                  id: (stored?.id && stored.id === id ? stored.id : id) ?? '',
+                  nombre: (stored?.id && stored.id === id ? stored.nombre : nombre) ?? '',
+                  apellido: (stored?.id && stored.id === id ? stored.apellido : apellido) ?? '',
+                },
+              });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Opciones">
+            <Text style={[styles.menuIcon, { color: palette.text }]}>☰</Text>
+            <Text style={[styles.menuLabel, { color: palette.secondary }]}>Opciones</Text>
+          </Pressable>
+        </View>
+
+        <Modal
+          visible={activeModal === 'orderDetails'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal(null)}>
+          <View style={[styles.modalBackdrop, { padding: 12 }]}>
+            <View style={[
+              styles.startDialog,
+              { maxWidth: 520, backgroundColor: palette.surface, borderColor: palette.border },
+            ]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.modalTitle, { color: palette.text, flex: 0, lineHeight: 28 }]}>
+                    Detalle del pedido
+                  </Text>
+                  {!isSelectedActiveOrder && (
+                    <Text style={[styles.startSubtitle, { color: palette.secondary }]}>Cola de reparto</Text>
+                  )}
+                </View>
+                <Pressable
+                  onPress={() => setActiveModal(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
+              <ScrollView
+                style={styles.orderDetailScroll}
+                showsVerticalScrollIndicator={false}>
+                {selectedOrder && (
+                  <>
+                    <View style={[
+                      styles.startOrderSummary,
+                      { backgroundColor: palette.background, borderColor: palette.border },
+                    ]}>
+                      <View style={[styles.orderRowHeader, { flexWrap: 'wrap', alignItems: 'flex-start' }]}>
+                        <Text style={[styles.queueOrderCode, { color: palette.text, flexShrink: 1 }]}>
+                          Pedido #{selectedOrder.codigo}
+                        </Text>
+                        {isSelectedActiveOrder && (
+                          <Text style={styles.etaValue}>Tiempo Restante: {formatEta(etaSeconds)}</Text>
+                        )}
+                      </View>
+                      {isSelectedActiveOrder && <LegTracker leg={currentLeg} palette={palette} />}
+                      <LegGroup active={isSelectedActiveOrder && currentLeg === 'origen'} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>DEPÓSITO DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                          {selectedOrder.comercioOrigen ?? 'Depósito de origen'}
+                        </Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.origen}</Text>
+                      </LegGroup>
+                      <LegGroup active={isSelectedActiveOrder && currentLeg === 'destino'} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.destinatario}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ENTREGA</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.destino}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>CONTACTO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{selectedOrder.contacto}</Text>
+                      </LegGroup>
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+              {!isSelectedActiveOrder && !activeOrder && selectedOrder && queuedOrders[0]?.id !== selectedOrder.id && (
+                <View style={styles.startWarning}>
+                  <Text style={styles.startWarningText}>
+                    {queuedOrders[0]
+                      ? `Primero debes completar el pedido #${queuedOrders[0].codigo}.`
+                      : 'Este pedido ya no está en la cola.'}
+                  </Text>
+                </View>
+              )}
+              {ordersError && <Text style={styles.orderError} accessibilityRole="alert">{ordersError}</Text>}
+{isSelectedActiveOrder ? (
+                <>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.startButton,
+                      { backgroundColor: canCompleteSelected ? '#00ffd1' : palette.border },
+                      !canCompleteSelected && { opacity: 0.7 },
+                      pressed && canCompleteSelected && styles.buttonPressed,
+                    ]}
+                    onPress={openReceipt}
+                    disabled={!canCompleteSelected}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canCompleteSelected }}>
+                    <Text style={[styles.startButtonText, { color: canCompleteSelected ? palette.text : palette.secondary }]}>
+                      {etaSeconds > 0 ? 'Entrega en curso' : '✓  Registrar Entrega Exitosa'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.cancelOrderButton, pressed && styles.buttonPressed]}
+                    onPress={openFailedDeliveryModal}
+                    accessibilityRole="button">
+                    <Text style={styles.cancelOrderButtonText}>
+                      Reportar incidencia / Entrega Fallida
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.startButton,
+                      { backgroundColor: canStartSelected ? '#00ffd1' : palette.border },
+                      !canStartSelected && { opacity: 0.7 },
+                      pressed && canStartSelected && styles.buttonPressed,
+                    ]}
+                    onPress={handleStartOrder}
+                    disabled={!canStartSelected}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canStartSelected }}>
+                    <Text style={[styles.startButtonText, { color: canStartSelected ? palette.text : palette.secondary }]}>
+                      {isStartingOrder ? 'Iniciando...' : '✓  Comenzar entrega'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.cancelOrderButton, pressed && styles.buttonPressed]}
+                    onPress={() => {
+                      setOrdersError(null);
+                      setActiveModal('cancelConfirm');
+                    }}
+                    accessibilityRole="button">
+                    <Text style={styles.cancelOrderButtonText}>Cancelar</Text>
+                  </Pressable>
+                </>
+              )}
+              <Pressable
+                style={({ pressed }) => [styles.cancelOrderButton, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  setOrdersError(null);
+                  setActiveModal('cancelConfirm');
+                }}
+                accessibilityRole="button">
+                <Text style={styles.cancelOrderButtonText}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={activeModal === 'cancelConfirm'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal('orderDetails')}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: palette.text }]}>¿Cancelar el pedido?</Text>
+              </View>
+              <Text style={[styles.startSubtitle, { color: palette.secondary, marginBottom: 16 }]}>
+                {selectedOrder ? `Se cancelará el pedido #${selectedOrder.codigo}. ` : ''}Esta acción no se puede deshacer.
+              </Text>
+              {ordersError && <Text style={styles.orderError} accessibilityRole="alert">{ordersError}</Text>}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.cancelOrderButton,
+                  isCancelingOrder && { opacity: 0.7 },
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={handleCancelOrder}
+                disabled={isCancelingOrder}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isCancelingOrder }}>
+                <Text style={styles.cancelOrderButtonText}>
+                  {isCancelingOrder ? 'Cancelando...' : 'Sí, cancelar pedido'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.cancelStartButton}
+                onPress={() => setActiveModal('orderDetails')}
+                disabled={isCancelingOrder}
+                accessibilityRole="button">
+                <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Volver</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={activeModal === 'receipt'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal('orderDetails')}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: palette.text }]}>Entregar pedido</Text>
+                  <Text style={[styles.startSubtitle, { color: palette.secondary }]}>
+                    Carga el comprobante de la compra
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setActiveModal('orderDetails')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
+              <ScrollView
+                style={styles.orderDetailScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                {activeOrder && (
+                  <View style={[
+                    styles.startOrderSummary,
+                    { backgroundColor: palette.background, borderColor: palette.border },
+                  ]}>
+                    <Text style={[styles.queueOrderCode, { color: palette.text }]}>Pedido #{activeOrder.codigo}</Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DEPÓSITO DE ORIGEN</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                      {activeOrder.comercioOrigen ?? 'Depósito de origen'}
+                    </Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>{activeOrder.destinatario}</Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ENTREGA</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>{activeOrder.destino}</Text>
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>CONTACTO</Text>
+                    <Text style={[styles.orderFieldValue, { color: palette.text }]}>{activeOrder.contacto}</Text>
+                  </View>
+                )}
+
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMPROBANTE / FACTURA</Text>
+                <View style={[styles.receiptBox, { backgroundColor: palette.background, borderColor: palette.border }]}>
+                  {receiptUri ? (
+                    <Image
+                      source={{ uri: receiptUri }}
+                      style={styles.receiptImage}
+                      resizeMode="contain"
+                      accessibilityLabel="Comprobante cargado"
+                    />
+                  ) : (
+                    <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
+                      Aún no se cargó ninguna imagen
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.receiptActions}>
+                  <Pressable
+                    style={[styles.receiptActionButton, { borderColor: palette.border }]}
+                    onPress={() => pickReceipt('library')}
+                    accessibilityRole="button">
+                    <Text style={[styles.sectionAction, { color: palette.primary }]}>
+                      {receiptUri ? 'Cambiar imagen' : 'Elegir imagen'}
+                    </Text>
+                  </Pressable>
+                  {Platform.OS !== 'web' && (
+                    <Pressable
+                      style={[styles.receiptActionButton, { borderColor: palette.border }]}
+                      onPress={() => pickReceipt('camera')}
+                      accessibilityRole="button">
+                      <Text style={[styles.sectionAction, { color: palette.primary }]}>Tomar foto</Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>MÉTODO DE PAGO</Text>
+                <View style={styles.paymentOptions} accessibilityRole="radiogroup">
+                  {PAYMENT_OPTIONS.map((option) => {
+                    const selected = paymentChoice === option;
+                    return (
+                      <Pressable
+                        key={option}
+                        style={[
+                          styles.paymentOption,
+                          { borderColor: selected ? palette.primary : palette.border, backgroundColor: selected ? palette.primary : palette.background },
+                        ]}
+                        onPress={() => setPaymentChoice(option)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}>
+                        <Text style={[styles.paymentOptionText, { color: selected ? '#FFFFFF' : palette.text }]}>{option}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {paymentChoice === OTHER_PAYMENT && (
+                  <TextInput
+                    style={[styles.receiptInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.background }]}
+                    value={customPayment}
+                    onChangeText={setCustomPayment}
+                    placeholder="Escribe el método de pago"
+                    placeholderTextColor={palette.secondary}
+                    autoFocus
+                  />
+                )}
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>PRECIO</Text>
+                <TextInput
+                  style={[styles.receiptInput, { color: palette.text, borderColor: palette.border, backgroundColor: palette.background }]}
+                  value={price}
+                  onChangeText={setPrice}
+                  placeholder="Total según la factura"
+                  placeholderTextColor={palette.secondary}
+                  keyboardType="decimal-pad"
+                />
+              </ScrollView>
+              {(receiptError || ordersError) && (
+                <Text style={styles.orderError} accessibilityRole="alert">{receiptError ?? ordersError}</Text>
+              )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.startButton,
+                  { backgroundColor: canConfirmReceipt ? '#00ffd1' : palette.border },
+                  isCompletingOrder && { opacity: 0.7 },
+                  pressed && !isCompletingOrder && styles.buttonPressed,
+                ]}
+                onPress={handleCompleteOrder}
+                disabled={isCompletingOrder}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isCompletingOrder }}>
+                <Text style={[styles.startButtonText, { color: canConfirmReceipt ? palette.text : palette.secondary }]}>
+                  {isCompletingOrder ? 'Guardando...' : '✓  Confirmar entrega'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.cancelStartButton}
+                onPress={() => setActiveModal('orderDetails')}
+                accessibilityRole="button">
+                <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Volver</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={activeModal === 'failedDelivery'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal('orderDetails')}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.modalTitle, { color: palette.text }]}>
+                    Reportar incidencia / Entrega Fallida
+                  </Text>
+                  <Text style={[styles.startSubtitle, { color: palette.secondary }]}>
+                    {activeOrder ? `Pedido #${activeOrder.codigo} · Pasará a estado Rechazado` : 'Indica el motivo de la incidencia'}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setActiveModal('orderDetails')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
+
+              <ScrollView
+                style={styles.orderDetailScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>MOTIVO DE LA INCIDENCIA</Text>
+                <View style={styles.paymentOptions} accessibilityRole="radiogroup">
+                  {FAILURE_REASONS.map((reason) => {
+                    const selected = failureChoice === reason;
+                    return (
+                      <Pressable
+                        key={reason}
+                        style={[
+                          styles.paymentOption,
+                          {
+                            borderColor: selected ? palette.primary : palette.border,
+                            backgroundColor: selected ? palette.primary : palette.background,
+                          },
+                        ]}
+                        onPress={() => {
+                          setFailureChoice(reason);
+                          setFailureError(null);
+                        }}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}>
+                        <Text style={[styles.paymentOptionText, { color: selected ? '#FFFFFF' : palette.text }]}>
+                          {reason}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {failureChoice === OTHER_FAILURE_REASON && (
+                  <TextInput
+                    style={[
+                      styles.receiptInput,
+                      { color: palette.text, borderColor: palette.border, backgroundColor: palette.background },
+                    ]}
+                    value={customFailureReason}
+                    onChangeText={(text) => {
+                      setCustomFailureReason(text);
+                      setFailureError(null);
+                    }}
+                    placeholder="Especifica el motivo"
+                    placeholderTextColor={palette.secondary}
+                    autoFocus
+                  />
+                )}
+
+                <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>OBSERVACIÓN</Text>
+                <TextInput
+                  style={[
+                    styles.receiptInput,
+                    {
+                      color: palette.text,
+                      borderColor: palette.border,
+                      backgroundColor: palette.background,
+                      minHeight: 84,
+                      textAlignVertical: 'top',
+                    },
+                  ]}
+                  value={failureObservation}
+                  onChangeText={(text) => {
+                    setFailureObservation(text);
+                    setFailureError(null);
+                  }}
+                  placeholder="Describe lo ocurrido en el domicilio..."
+                  placeholderTextColor={palette.secondary}
+                  multiline
+                />
+              </ScrollView>
+
+              {failureError && (
+                <Text style={styles.orderError} accessibilityRole="alert">
+                  {failureError}
+                </Text>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.cancelOrderButton,
+                  isReportingFailure && { opacity: 0.7 },
+                  pressed && !isReportingFailure && styles.buttonPressed,
+                ]}
+                onPress={handleReportFailedDelivery}
+                disabled={isReportingFailure}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isReportingFailure }}>
+                <Text style={styles.cancelOrderButtonText}>
+                  {isReportingFailure ? 'Registrando...' : 'Confirmar entrega fallida'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.cancelStartButton}
+                onPress={() => setActiveModal('orderDetails')}
+                disabled={isReportingFailure}
+                accessibilityRole="button">
+                <Text style={[styles.cancelStartText, { color: palette.secondary }]}>Volver</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>        
+        <Modal
+          visible={activeModal === 'deliveredDetail'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal(null)}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.startDialog, styles.deliveredDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={[styles.modalHeader, styles.deliveredHeader]}>
+                <View style={[styles.deliveredBanner, { backgroundColor: palette.successSurface }]}>
+                  <Text style={[styles.deliveredStatus, { color: palette.successText }]}>✓  Entregado</Text>
+                  {deliveredOrder?.fechaEstado && (
+                    <Text style={[styles.deliveredDate, { color: palette.successText }]}>
+                      {new Date(deliveredOrder.fechaEstado).toLocaleDateString('es-AR')}
+                      {' · '}
+                      {new Date(deliveredOrder.fechaEstado).toLocaleTimeString('es-AR', {
+                        hour: '2-digit', minute: '2-digit',
+                      })} hs
+                    </Text>
+                  )}
+                </View>
+                <Pressable
+                  onPress={() => setActiveModal(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
+              <ScrollView style={styles.deliveredScroll} showsVerticalScrollIndicator={false}>
+                {deliveredOrder && (
+                  <>
+                    <View style={[
+                      styles.startOrderSummary,
+                      { backgroundColor: palette.background, borderColor: palette.border },
+                    ]}>
+                      <Text style={[styles.queueOrderCode, { color: palette.text }]}>
+                        Pedido #{deliveredOrder.codigo}
+                      </Text>
+                      <LegGroup active={false} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>DEPÓSITO DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                          {deliveredOrder.comercioOrigen ?? 'Depósito de origen'}
+                        </Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ORIGEN</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.origen}</Text>
+                      </LegGroup>
+                      <LegGroup active={false} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>COMERCIO DESTINO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.destinatario}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>DIRECCIÓN DE ENTREGA</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.destino}</Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>CONTACTO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>{deliveredOrder.contacto}</Text>
+                      </LegGroup>
+                      <LegGroup active={false} palette={palette}>
+                        <Text style={[styles.orderFieldLabel, styles.firstFieldLabel, { color: palette.secondary }]}>MÉTODO DE PAGO</Text>
+                        <Text style={[styles.orderFieldValue, { color: palette.text }]}>
+                          {deliveredOrder.metodoPago ?? 'Sin registrar'}
+                        </Text>
+                        <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>PRECIO</Text>
+                        <Text style={[
+                          styles.orderFieldValue,
+                          styles.deliveredPrice,
+                          { color: typeof deliveredOrder.precio === 'number' ? palette.successText : palette.text },
+                        ]}>
+                          {typeof deliveredOrder.precio === 'number'
+                            ? `$ ${deliveredOrder.precio.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : 'Sin registrar'}
+                        </Text>
+                      </LegGroup>
+                    </View>
+
+                    <Text style={[styles.orderFieldLabel, { color: palette.secondary }]}>COMPROBANTE / FACTURA</Text>
+                    <View style={[styles.receiptBox, { backgroundColor: palette.background, borderColor: palette.border }]}>
+                      {deliveredOrder.comprobanteUrl && !receiptImageFailed ? (
+                        <Image
+                          source={{ uri: deliveredOrder.comprobanteUrl }}
+                          style={styles.receiptImage}
+                          resizeMode="contain"
+                          onError={() => setReceiptImageFailed(true)}
+                          accessibilityLabel="Comprobante de la entrega"
+                        />
+                      ) : (
+                        <Text style={[styles.inlineEmpty, { color: palette.secondary }]}>
+                          {deliveredOrder.comprobanteUrl
+                            ? 'No se pudo cargar la imagen del comprobante.'
+                            : 'Este pedido no tiene comprobante cargado.'}
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={activeModal === 'completion'}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveModal(null)}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.modalDialog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: palette.text }]}>Pedido completado</Text>
+                <Pressable onPress={() => setActiveModal(null)} accessibilityRole="button" accessibilityLabel="Cerrar">
+                  <Text style={[styles.modalClose, { color: palette.secondary }]}>×</Text>
+                </Pressable>
+              </View>
+              <Text style={[styles.modalEmpty, { color: palette.secondary }]}>
+                {completedOrder
+                  ? `El pedido #${completedOrder.codigo} fue marcado como entregado.`
+                  : 'El pedido fue marcado como entregado.'}
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
+  );
+}
